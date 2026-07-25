@@ -5,6 +5,13 @@
 - 触发规则：创建新数据库表、将现有表加入 SYNC_TABLES、修改同步表的主键/UNIQUE/时间戳约束、涉及 hash_id 或 HASH_ID_PREFIXES 的改动时阅读
 - 内容摘要：同步友好建表规则，要求新同步表优先使用 TEXT PRIMARY KEY；AUTOINCREMENT 同步表必须注册 HASH_ID_PREFIXES、增加 hash_id TEXT NOT NULL UNIQUE，并将所有业务 UNIQUE（包括单列）显式声明在 table_constraints，确保 get_unique_fields 的 LWW 查找键与 INSERT OR REPLACE 的业务冲突键一致；包含 SYNC_TABLES 接入检查清单和 mood_impacts 数据覆盖案例
 
+## tombstone-prevention-rules.md
+
+- updated_at: 2026-07-24
+- path: `docs/coding-rules/tombstone-prevention-rules.md`
+- 触发规则：创建新同步表、为已有 SYNC_TABLES 新增删除方法、修改删除逻辑实现、编写 Service/Aggregator 层级联或隐蔽删除时阅读
+- 内容摘要：墓碑同步预防性规则，要求新同步表必须提供走墓碑通道（_generic_delete/_generic_batch_delete）的删除方法，旧表修改删除逻辑必须验证墓碑写入，禁止绕过墓碑通道的删除模式（原生 DELETE FROM、db.delete、软删除伪装），包含级联删除、软删除、同步触发删除的规则和测试覆盖要求
+
 ## backend-core-rules.md
 
 - updated_at: 2026-04-15
