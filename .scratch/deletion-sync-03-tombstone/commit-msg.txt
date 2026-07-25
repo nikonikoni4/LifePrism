@@ -1,0 +1,29 @@
+feat: deletion sync stage3 tombstone sync flow + 3 dedicated endpoints
+
+实现数据库删除的跨端传播机制（墓碑同步流程），完成 PRD 1/2/3 任务链的最后一环。
+
+核心变更：
+- DeletionLogProvider: 墓碑表 CRUD + cursor 变体方法（保证事务原子性）
+- 3 个专用云端端点（替代 SYNC_TABLES 通道）：
+  - /pull-deletion-log: 拉取云端墓碑
+  - /push-deletion-log: 推送本地墓碑
+  - /cleanup-deletion-log: 清理过期墓碑
+- sync_once 集成墓碑 Pull/Push/清理（HTTP 外事务内）
+- CustomRecordRepository 内部实例化 DeletionLogProvider（不引用全局单例）
+- LWW 简化为 INSERT OR IGNORE 跳过本地已有墓碑
+- sync_once 流程：墓碑 Pull → 数据 Pull → 墓碑 Push → 数据 Push → 文件 → 清理 → 更新 last_sync_time
+- deletion_log 从 SYNC_TABLES 移除（避免双重同步）
+
+测试：
+- 16 个端到端墓碑同步测试（test_sync_deletion.py）
+- DeletionLogProvider 单元测试
+- 墓碑同步成员资格 + LWW + 清理测试
+
+文档：
+- 新增 ADR 2026-07-22-deletion-sync-tombstone.md
+- 更新 data-sync-core-spec（墓碑同步章节、29 张静态表、API 端点）
+- 新增 3 个已知限制（delete-update/recreate/file-deletion）
+- 历史 bug 2026-07-16-database-delete-not-synced 标记为已修复
+- 更新 flows、history-bugs、known-limitations、specs 索引
+
+Co-Authored-By: Claude <noreply@anthropic.com>
