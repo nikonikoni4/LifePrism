@@ -132,6 +132,39 @@ class SyncClient:
         with self._sync_lock:
             self._is_syncing = False
 
+    def send_ping(self) -> None:
+        """向云端发送 ping 心跳（同步 HTTP 调用）
+
+        用于 sync_once 因 LOCAL_TASK 冲突放弃时，报告本地在线但不执行同步。
+        参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 4。
+
+        Note:
+            此方法是同步阻塞调用（用 httpx.post）。在 asyncio 事件循环中调用时，
+            必须用 ``await asyncio.to_thread(sync_client.send_ping)`` 包裹，
+            否则会阻塞主事件循环。
+        """
+        from lifeprism.config.settings_manager import get_setting
+        from lifeprism.sync.sync_config import get_sync_api_key
+
+        remote_url = get_setting("sync.remote_url")
+        api_key = get_sync_api_key()
+        if not remote_url or not api_key:
+            logger.debug("未配置同步，跳过 ping 心跳发送")
+            return
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/heartbeat",
+                json={"event": "ping"},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=5.0,
+            )
+            response.raise_for_status()
+            logger.info("已发送 ping 心跳（sync 因 LOCAL_TASK 放弃）")
+        except (httpx.HTTPError, OSError) as e:
+            # 精确捕获 HTTP/网络异常，不使用 except Exception 避免吞掉编程错误
+            # 参考 sync_client.py:58-59 项目自身约定
+            logger.warning("ping 心跳发送失败: %s", e)
+
     def start_scheduled_sync(self, interval_seconds: int = 600):
         """启动后台定时同步。
 
@@ -155,12 +188,17 @@ class SyncClient:
           （不取消整个定时任务，方便用户后续在前端配置 url 后自动开始同步）
         - 并发控制：通过 try_start_sync() 原子地检查并设置同步标志，
           若已在同步中则跳过本次并记录 WARNING
+        - 全局任务状态互斥：try_acquire(CLOUD_SYNC, timeout=0)
+          若 LOCAL_TASK 在执行，放弃本次 sync，调 ping 端点报告在线
+          参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 4
         - 失败重试：sync_once 抛异常时记录 ERROR，下次定时触发时自动重试
-        - 使用 try...finally 确保 finish_sync() 在异常时也能被调用
+        - 使用 try...finally 确保 finish_sync() 和 release() 在异常时也能被调用
 
         Args:
             interval_seconds: 同步间隔（秒）
         """
+        from lifeprism.server.services.global_task_state import TaskState, global_task_state
+
         while True:
             await asyncio.sleep(interval_seconds)
             # 配置检查：未配置 remote_url 时跳过本次（不取消定时任务）
@@ -174,12 +212,21 @@ class SyncClient:
                 logger.warning("跳过定时同步（上次同步未完成）")
                 continue
             try:
-                logger.info("定时同步开始")
-                start_time = datetime.now(timezone.utc)
-                # 使用 asyncio.to_thread 在独立线程中运行同步方法，避免阻塞事件循环
-                await asyncio.to_thread(self.sync_once)
-                duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-                logger.info("定时同步完成，耗时 %ss", duration)
+                # 全局任务状态互斥：尝试获取 CLOUD_SYNC（不等待）
+                if not global_task_state.try_acquire(TaskState.CLOUD_SYNC, 0):
+                    logger.info("跳过定时同步：LOCAL_TASK 正在执行，发送 ping 心跳")
+                    await asyncio.to_thread(self.send_ping)
+                    continue
+
+                try:
+                    logger.info("定时同步开始")
+                    start_time = datetime.now(timezone.utc)
+                    # 使用 asyncio.to_thread 在独立线程中运行同步方法，避免阻塞事件循环
+                    await asyncio.to_thread(self.sync_once)
+                    duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+                    logger.info("定时同步完成，耗时 %ss", duration)
+                finally:
+                    global_task_state.release()
             except Exception:
                 # 失败重试：记录 ERROR，不终止循环，下次定时触发自动重试
                 logger.error("定时同步失败", exc_info=True)
@@ -222,6 +269,16 @@ class SyncClient:
         remote_url = get_setting("sync.remote_url")
         api_key = get_sync_api_key()
         last_sync_time = get_setting("sync.last_sync_time", "")
+
+        # 同步截止时间（sync 开始时间）：
+        # - 用作 sync_once 末尾更新的 last_sync_time 值
+        # - 关键设计：last_sync_time 必须记录"开始时间"而非"结束时间"，
+        #   否则 sync 期间其他任务（如 dreaming / AgentLoop）写入的数据
+        #   updated_at 落在 (T_start, T_end) 区间，会被永久排除在下次同步之外
+        # - 代价：下次 sync 会重复 Push 已 Push 过的数据（updated_at > T_start），
+        #   但云端 LWW 幂等处理（updated_at 相同跳过覆盖），无副作用
+        # 参考 ADR docs/adr/2026-07-25-global-task-state.md
+        sync_cutoff_time = datetime.now(timezone.utc).isoformat()
 
         # 防御性检查：未配置 remote_url 或 api_key 时直接抛出业务校验异常，
         # 避免发起 HTTP 请求时因 url 格式错误导致 httpx.UnsupportedProtocol
@@ -277,10 +334,12 @@ class SyncClient:
         # 墓碑清理（在更新 last_sync_time 之前，用旧 last_sync_time 清理过期墓碑）
         self._cleanup_deletion_log(remote_url, api_key, last_sync_time)
 
-        # 只有全部成功才更新 last_sync_time（使用 ISO 8601 格式，与服务端保持一致）
-        current_time = datetime.now(timezone.utc).isoformat()
-        set_setting("sync.last_sync_time", current_time)
-        logger.info("sync_once: 同步完成，last_sync_time 已更新为 %s", current_time)
+        # 只有全部成功才更新 last_sync_time（使用 sync_cutoff_time，即 sync 开始时间）
+        # 关键：用开始时间而非结束时间，避免 sync 期间写入的数据被永久排除（见上方 sync_cutoff_time 注释）
+        set_setting("sync.last_sync_time", sync_cutoff_time)
+        logger.info(
+            "sync_once: 同步完成，last_sync_time 已更新为 %s（sync 开始时间）", sync_cutoff_time
+        )
 
     # ==================== 墓碑同步（PRD 3 Slice 02） ====================
 

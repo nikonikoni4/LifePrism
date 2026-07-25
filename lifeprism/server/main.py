@@ -316,10 +316,12 @@ async def _start_sync_on_startup(app: FastAPI):
        - 启动同步失败不阻塞应用启动（日志记录 ERROR，应用继续运行）
     3. 启动定时同步循环 start_scheduled_sync(interval=600)（10 分钟间隔）
 
-    并发控制：
-    - 通过 try_start_sync() 原子锁判断是否可启动
-    - sync_once() 完成后调用 finish_sync() 释放锁
-    - 若启动同步未完成时定时同步触发，try_start_sync() 返回 False，定时同步跳过
+    并发控制:
+    - 通过 try_start_sync() 原子锁判断是否可启动（防止 sync_once 自身并发）
+    - 全局任务状态互斥: try_acquire(CLOUD_SYNC, timeout=0)
+      若 LOCAL_TASK 正在执行，放弃本次启动同步，调 send_ping 报告本地在线
+      参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 4
+    - sync_once() 完成后调用 finish_sync() + global_task_state.release() 释放双重锁
 
     Args:
         app: FastAPI 应用实例
@@ -340,12 +342,27 @@ async def _start_sync_on_startup(app: FastAPI):
     # 1. 启动时立即同步一次（通过 try_start_sync() 原子锁判断是否可启动）
     if sync_client.try_start_sync():
         try:
-            logger.info("[STARTUP] 启动同步开始")
-            await asyncio.to_thread(sync_client.sync_once)
-            logger.info("[STARTUP] 启动同步完成")
-        except Exception as e:
-            # 启动同步失败不阻塞应用启动，日志记录 ERROR
-            logger.error("[STARTUP] 启动同步失败: error=%s", e, exc_info=True)
+            # 全局任务状态互斥：尝试获取 CLOUD_SYNC（不等待）
+            # 若 LOCAL_TASK 在执行，放弃本次启动同步，调 ping 心跳报告在线
+            # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 4
+            from lifeprism.server.services.global_task_state import (
+                TaskState,
+                global_task_state,
+            )
+
+            if not global_task_state.try_acquire(TaskState.CLOUD_SYNC, 0):
+                logger.info("[STARTUP] 跳过启动同步：LOCAL_TASK 正在执行，发送 ping 心跳")
+                await asyncio.to_thread(sync_client.send_ping)
+            else:
+                try:
+                    logger.info("[STARTUP] 启动同步开始")
+                    await asyncio.to_thread(sync_client.sync_once)
+                    logger.info("[STARTUP] 启动同步完成")
+                except Exception as e:
+                    # 启动同步失败不阻塞应用启动，日志记录 ERROR
+                    logger.error("[STARTUP] 启动同步失败: error=%s", e, exc_info=True)
+                finally:
+                    global_task_state.release()
         finally:
             sync_client.finish_sync()
     else:

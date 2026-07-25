@@ -20,6 +20,7 @@ from lifeprism.config.settings_manager import settings
 from lifeprism.llm.function.agent_schedule_job import dreaming, process_session_message
 from lifeprism.server.services.backup_service import backup_service
 from lifeprism.server.services.diary_service import generate_diary_ai_summary
+from lifeprism.server.services.global_task_state import TaskState, global_task_state
 from lifeprism.server.services.sync_service import SyncService
 from lifeprism.utils import get_logger
 from lifeprism.utils.time_utils import get_local_today
@@ -39,33 +40,75 @@ async def _dreaming():
     yesterday = (get_local_today() - timedelta(days=1)).isoformat()
     logger.info("[dreaming] 开始执行, 目标日期: %s", yesterday)
 
-    # 先执行增量同步，确保数据已分类和总结
-    try:
-        sync_service = SyncService()
-        logger.info("[dreaming] 开始增量同步数据")
-        sync_result = await sync_service.incremental_sync(auto_classify=True)
-        logger.info("[dreaming] 增量同步完成: %s", sync_result.get("message", ""))
-    except Exception as e:
-        logger.error("[dreaming] 增量同步失败: error=%s", e)
-        # 同步失败不应阻止后续流程，继续执行
+    # 全局任务状态互斥：获取 LOCAL_TASK 状态（5 分钟超时）
+    # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 5
+    # 通过 asyncio.to_thread 包裹避免阻塞主事件循环
+    acquired = await asyncio.to_thread(global_task_state.try_acquire, TaskState.LOCAL_TASK, 300.0)
+    if not acquired:
+        # 超时降级：跳过 incremental_sync（依赖云端数据，CLOUD_SYNC 期间 Pull 可能不一致）
+        # 但 dreaming 和 backup_documents 仍执行：
+        # - 文件同步：下次 sync_once 时 Pre-sync 阶段会重新计算 hash，
+        #   矩阵判定为 PUSH，推送完整 content，云端自动纠正半写入状态
+        # - 数据库同步：last_sync_time 记录为 sync 开始时间（sync_cutoff_time），
+        #   dreaming 写入的数据 updated_at > sync_cutoff_time，下次 sync 会被 Push
+        # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 5 前提
+        logger.warning(
+            "[dreaming] 等待 CLOUD_SYNC 释放超时（5min），跳过 incremental_sync，仍执行 dreaming + backup"
+        )
 
-    if settings.auto_diary_summary:
+    try:
+        # 1. 先执行增量同步，确保数据已分类和总结
+        # 仅在成功获取 LOCAL_TASK 时执行（依赖云端数据，CLOUD_SYNC 期间 Pull 可能不一致）
+        if acquired:
+            try:
+                sync_service = SyncService()
+                logger.info("[dreaming] 开始增量同步数据")
+                sync_result = await sync_service.incremental_sync(auto_classify=True)
+                logger.info("[dreaming] 增量同步完成: %s", sync_result.get("message", ""))
+            except Exception as e:
+                logger.error("[dreaming] 增量同步失败: error=%s", e)
+                # 同步失败不应阻止后续流程，继续执行
+
+        # 2. dreaming（写 behavior.md / recent_state.md / user.md）
+        # 超时降级时仍执行：文件同步可自我纠正（见上方注释）
+        if settings.auto_diary_summary:
+            try:
+                await generate_diary_ai_summary(yesterday)
+            except Exception as e:
+                logger.error("生成日记总结失败: error=%s", e)
+        if settings.auto_update_memory:
+            try:
+                await dreaming(yesterday)
+            except Exception as e:
+                logger.error("更新记忆失败: error=%s", e)
+
+        # 3. backup_documents（在 dreaming 之后，捕获最新写入的文件）
+        # 超时降级时仍执行：备份本地数据，不依赖云端
+        # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 2
         try:
-            await generate_diary_ai_summary(yesterday)
+            await backup_service.backup_documents()
         except Exception as e:
-            logger.error("生成日记总结失败: error=%s", e)
-    if settings.auto_update_memory:
-        try:
-            await dreaming(yesterday)
-        except Exception as e:
-            logger.error("更新记忆失败: error=%s", e)
+            logger.error("[dreaming] 文档备份失败: error=%s", e)
+    finally:
+        if acquired:
+            global_task_state.release()
 
 
 async def _process_session_message():
+    # 全局任务状态互斥：获取 LOCAL_TASK 状态（5 分钟超时）
+    # 4h 任务写 behavior.md（参与同步），需与 sync_once 互斥
+    # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 3
+    acquired = await asyncio.to_thread(global_task_state.try_acquire, TaskState.LOCAL_TASK, 300.0)
+    if not acquired:
+        logger.warning("[process_session_message] 等待 CLOUD_SYNC 释放超时（5min），跳过本次")
+        return
+
     try:
         await process_session_message()
     except Exception as e:
         logger.error("提取历史对话消息信息失败: error=%s", e)
+    finally:
+        global_task_state.release()
 
 
 class ScheduleService:
@@ -121,29 +164,28 @@ class ScheduleService:
             )
 
         # 注册备份任务（仅 full 模式注册，云端 agent_only/web_demo 不备份）
-        # 文档备份：每天本地 03:00，保留 3 份
         # 数据库备份：每 8 小时（本地 00/08/16 点），保留 3 份
         # 设计依据：ADR docs/adr/2026-07-17-data-backup-strategy.md
         # 备份范围与同步范围解耦：ADR docs/adr/2026-07-17-backup-sync-decoupled-scope.md
         # 云端 agent_only 不备份：ADR docs/adr/2026-07-17-data-backup-strategy.md（决策 9）
         #
+        # 文档备份 backup_documents 已移除独立 cron 注册，改为 _dreaming() 的子步骤执行
+        # （位于 dreaming 之后捕获最新数据），与 dreaming 共享 skip_compensation=False 补执行机制
+        # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 2
+        #
+        # 数据库备份不参与全局任务状态互斥（SQLite Online Backup API 不阻塞读写）
+        # 参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 6
+        #
         # 注册时的 run_mode 守卫与 BackupService._check_run_mode() 形成双重保障：
         # - 注册时守卫：避免在非 full 模式下注册无用任务（节省调度器资源）
         # - 运行时守卫：防止 run_mode 在运行期切换后旧任务仍执行
         #
-        # skip_compensation=True：备份是周期性任务（文档每天、数据库每 8 小时），
+        # skip_compensation=True：数据库备份是周期性任务（每 8 小时），
         # 不是"每天一次"的任务，无需启动补偿。系统重启后下一个 cron 周期会自然触发，
         # 避免重启时立即执行备份造成 I/O 压力（也避免测试环境中后台备份干扰时序测试）。
         if settings.run_mode == "full":
             self._system_jobs.extend(
                 [
-                    {
-                        "func": backup_service.backup_documents,
-                        "trigger": "cron",
-                        "kwargs": {"cron_expr": "0 3 * * *"},  # 每天本地 03:00
-                        "job_id": "backup_documents",
-                        "skip_compensation": True,
-                    },
                     {
                         "func": backup_service.backup_database,
                         "trigger": "cron",

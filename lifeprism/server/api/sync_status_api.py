@@ -161,15 +161,33 @@ def reset_sync_progress(request: Request):
 def _run_sync_background(sync_client) -> None:
     """在后台线程中执行同步
 
-    使用 try...finally 确保 finish_sync() 在异常时也能被调用。
+    使用 try...finally 确保 finish_sync() 和 release() 在异常时也能被调用。
     该函数在独立线程中运行，不在 HTTP 请求生命周期内，
     因此需要自行捕获异常（不影响 API 层异常冒泡规范）。
+
+    全局任务状态互斥：尝试获取 CLOUD_SYNC（不等待）
+    若 LOCAL_TASK 在执行，放弃本次同步，调 ping 心跳报告在线
+    参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 4
 
     Args:
         sync_client: SyncClient 实例
     """
+    from lifeprism.server.services.global_task_state import (
+        TaskState,
+        global_task_state,
+    )
+
     try:
-        sync_client.sync_once()
+        # 全局任务状态互斥：尝试获取 CLOUD_SYNC（不等待）
+        if not global_task_state.try_acquire(TaskState.CLOUD_SYNC, 0):
+            logger.info("手动同步跳过：LOCAL_TASK 正在执行，发送 ping 心跳")
+            sync_client.send_ping()
+            return
+
+        try:
+            sync_client.sync_once()
+        finally:
+            global_task_state.release()
     except Exception as e:
         logger.error("手动触发同步失败: %s", e)
     finally:

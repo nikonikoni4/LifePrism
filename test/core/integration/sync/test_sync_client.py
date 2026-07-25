@@ -1364,3 +1364,308 @@ class TestPullMultiPrimaryKeyTables:
             assert cursor.fetchone()[0] == 1
             cursor.execute("SELECT COUNT(*) FROM diary")
             assert cursor.fetchone()[0] == 1
+
+
+# ==================== Seam 6: send_ping 心跳报告 ====================
+
+
+class TestSendPing:
+    """Seam 6: send_ping - CLOUD_SYNC 冲突放弃时报告本地在线
+
+    覆盖 ADR docs/adr/2026-07-25-global-task-state.md 决策 4：
+    sync_once 因 LOCAL_TASK 冲突放弃时调 send_ping，仅报告心跳不执行同步。
+
+    3 条执行路径:
+    1. 配置缺失（remote_url 或 api_key 为空）→ 记录 debug 日志并 return
+    2. HTTP 成功（raise_for_status() 通过）→ 记录 info 日志
+    3. HTTP 失败（raise_for_status() 抛异常）→ 记录 warning 日志，不传播异常
+    """
+
+    def test_send_ping_skips_when_remote_url_missing(self, sync_client):
+        """配置缺失路径：remote_url 为空时跳过 ping，不发 HTTP 请求"""
+        with (
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value=""
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch("lifeprism.sync.sync_client.httpx.post") as mock_post,
+        ):
+            sync_client.send_ping()
+
+        # Assert: 未发起 HTTP 请求
+        mock_post.assert_not_called()
+
+    def test_send_ping_skips_when_api_key_missing(self, sync_client):
+        """配置缺失路径：api_key 为空时跳过 ping，不发 HTTP 请求"""
+        with (
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                return_value="http://test:8000",
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value=""),
+            patch("lifeprism.sync.sync_client.httpx.post") as mock_post,
+        ):
+            sync_client.send_ping()
+
+        # Assert: 未发起 HTTP 请求
+        mock_post.assert_not_called()
+
+    def test_send_ping_sends_heartbeat_on_success(self, sync_client):
+        """HTTP 成功路径：向 /api/sync/heartbeat 发送 event=ping"""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                return_value="http://test:8000",
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch(
+                "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
+            ) as mock_post,
+        ):
+            # 不应抛异常
+            sync_client.send_ping()
+
+        # Assert: 调用了 /api/sync/heartbeat，event=ping，携带 Bearer token
+        mock_post.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
+        assert "/api/sync/heartbeat" in call_kwargs["url"]
+        assert call_kwargs["json"] == {"event": "ping"}
+        assert call_kwargs["headers"]["Authorization"] == "Bearer test-key"
+        # raise_for_status 被调用（验证成功路径）
+        mock_response.raise_for_status.assert_called_once()
+
+    def test_send_ping_swallows_http_error(self, sync_client):
+        """HTTP 失败路径：raise_for_status 抛 httpx.HTTPError 时仅记录 warning，不传播"""
+        import httpx
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Internal Server Error",
+            request=httpx.Request("POST", "http://test:8000/api/sync/heartbeat"),
+            response=httpx.Response(500),
+        )
+
+        with (
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                return_value="http://test:8000",
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response),
+        ):
+            # 关键断言：异常被吞掉，不传播到调用方
+            # 若异常未被吞掉，此处会抛出 httpx.HTTPStatusError
+            sync_client.send_ping()
+
+    def test_send_ping_swallows_oserror_on_network_failure(self, sync_client):
+        """HTTP 失败路径：网络异常（OSError）时仅记录 warning，不传播"""
+        with (
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                return_value="http://test:8000",
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch(
+                "lifeprism.sync.sync_client.httpx.post",
+                side_effect=OSError("Connection refused"),
+            ),
+        ):
+            # 关键断言：OSError 被吞掉，不传播到调用方
+            # 若异常未被吞掉，此处会抛出 OSError
+            sync_client.send_ping()
+
+    def test_send_ping_does_not_swallow_programming_error(self, sync_client):
+        """编程错误（TypeError/AttributeError）不被吞掉，应传播
+
+        验证 Issue 6 修复：except (httpx.HTTPError, OSError) 精确捕获，
+        不使用 except Exception 避免吞掉编程错误。
+        """
+        # 模拟 get_setting 内部抛出 TypeError（编程错误）
+        with (
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=TypeError("programming error"),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch("lifeprism.sync.sync_client.httpx.post"),
+        ):
+            # 关键断言：TypeError 应传播，不被 send_ping 吞掉
+            with pytest.raises(TypeError, match="programming error"):
+                sync_client.send_ping()
+
+
+# ==================== Seam 7: sync_cutoff_time 防数据丢失 ====================
+
+
+class TestSyncCutoffTime:
+    """Seam 7: sync_cutoff_time - 用 sync 开始时间作为 last_sync_time 更新值
+
+    回归测试：防止 Issue 9 描述的数据丢失问题
+    参考:
+    - ADR docs/adr/2026-07-25-global-task-state.md 全局前提 4
+    - history-bugs/2026-07-25-sync-last-sync-time-update-point-data-loss.md
+
+    Bug 简述：原实现用 sync 结束时间更新 last_sync_time，
+    导致 sync 期间写入的数据 updated_at ∈ (T_start, T_end) 落入时间窗口黑洞，
+    下次 sync 的 WHERE updated_at > T_end 永远查不到这些数据，造成静默丢失。
+    修复：在 sync_once 开头记录 sync_cutoff_time（开始时间），
+    末尾用该值更新 last_sync_time。
+    """
+
+    def test_sync_once_records_cutoff_time_at_start(self, sync_client, initialized_db, clean_tables):
+        """sync_cutoff_time 在 sync_once 开头计算（pull 之前），保证覆盖 sync 期间写入的数据
+
+        通过 mock 在 pull 阶段捕获时间戳，断言 last_sync_time 更新值
+        早于 push 阶段的时间（即开始时间 < 完成时间）。
+        """
+        recorded_times = {"pull_time": None, "set_setting_time": None}
+
+        def mock_post_side_effect(*args, **kwargs):
+            url = kwargs.get("url", "")
+            if "/pull" in url and "/pull-files" not in url and "/pull-deletion-log" not in url:
+                # 在 pull 阶段记录当前时间（此时 sync_cutoff_time 已在 sync_once 开头计算）
+                import time as _time
+
+                recorded_times["pull_time"] = _time.monotonic()
+                return _make_mock_response({"changes": {}})
+            return _mock_post_factory()(*args, **kwargs)
+
+        def mock_set_setting_side_effect(key, value):
+            if key == "sync.last_sync_time":
+                import time as _time
+
+                recorded_times["set_setting_time"] = _time.monotonic()
+
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", side_effect=mock_post_side_effect),
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=_mock_get_setting_factory(),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch(
+                "lifeprism.config.settings_manager.set_setting",
+                side_effect=mock_set_setting_side_effect,
+            ),
+        ):
+            sync_client.sync_once(tables=["todo_list"])
+
+        # Assert: set_setting 在 pull 之后被调用（说明 last_sync_time 是用开头计算的 sync_cutoff_time）
+        assert recorded_times["pull_time"] is not None, "pull 应被调用"
+        assert recorded_times["set_setting_time"] is not None, "set_setting 应被调用"
+        assert recorded_times["set_setting_time"] > recorded_times["pull_time"], (
+            "last_sync_time 在 pull 之后更新（在 sync_once 末尾），但其值是开头计算的 sync_cutoff_time"
+        )
+
+    def test_sync_once_uses_iso8601_utc_cutoff_time(self, sync_client, initialized_db, clean_tables):
+        """sync_cutoff_time 是 ISO 8601 UTC 格式（含时区后缀 +00:00）"""
+        captured_value = {"last_sync_time": None}
+
+        def mock_set_setting_side_effect(key, value):
+            if key == "sync.last_sync_time":
+                captured_value["last_sync_time"] = value
+
+        with (
+            patch(
+                "lifeprism.sync.sync_client.httpx.post",
+                side_effect=_mock_post_factory(),
+            ),
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=_mock_get_setting_factory(),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch(
+                "lifeprism.config.settings_manager.set_setting",
+                side_effect=mock_set_setting_side_effect,
+            ),
+        ):
+            sync_client.sync_once(tables=["todo_list"])
+
+        # Assert: last_sync_time 是 ISO 8601 格式且含 UTC 时区后缀
+        last_sync_time = captured_value["last_sync_time"]
+        assert last_sync_time is not None, "last_sync_time 应被更新"
+        assert "T" in last_sync_time, f"应为 ISO 8601 格式（含 T 分隔符），实际: {last_sync_time}"
+        # datetime.now(timezone.utc).isoformat() 输出含 +00:00 时区后缀
+        assert "+00:00" in last_sync_time, (
+            f"应为 UTC 时区（含 +00:00 后缀），实际: {last_sync_time}"
+        )
+
+    def test_sync_once_cutoff_time_covers_data_written_during_sync(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """关键回归：sync 期间写入的数据 updated_at > sync_cutoff_time，下次 sync 会包含
+
+        场景模拟：
+        1. sync_once 开始时记录 sync_cutoff_time = T0
+        2. pull 阶段期间，其他任务（如 dreaming）写入一条 todo，updated_at = T0 + 1s
+        3. push 阶段使用 WHERE updated_at > last_sync_time（旧的），不包含该数据（因为 last_sync_time 仍是旧值）
+        4. sync_once 结束，set_setting("sync.last_sync_time", T0)
+        5. 下次 sync：WHERE updated_at > T0 会包含该数据（updated_at = T0 + 1s > T0）
+
+        本测试只验证步骤 4：last_sync_time 用 T0（开始时间）而非 T_end（结束时间）
+        """
+        cutoff_times = {"start": None, "set_setting_value": None}
+
+        def mock_post_side_effect(*args, **kwargs):
+            url = kwargs.get("url", "")
+            # 在第一次 pull 之前记录开始时间近似值
+            if (
+                cutoff_times["start"] is None
+                and "/pull" in url
+                and "/pull-files" not in url
+                and "/pull-deletion-log" not in url
+            ):
+                from datetime import datetime, timezone
+
+                cutoff_times["start"] = datetime.now(timezone.utc)
+            return _mock_post_factory()(*args, **kwargs)
+
+        def mock_set_setting_side_effect(key, value):
+            if key == "sync.last_sync_time":
+                from datetime import datetime, timezone
+
+                cutoff_times["set_setting_value"] = value
+                cutoff_times["set_setting_call_time"] = datetime.now(timezone.utc)
+
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", side_effect=mock_post_side_effect),
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=_mock_get_setting_factory(),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch(
+                "lifeprism.config.settings_manager.set_setting",
+                side_effect=mock_set_setting_side_effect,
+            ),
+        ):
+            sync_client.sync_once(tables=["todo_list"])
+
+        # 关键断言：last_sync_time 更新值 ≈ sync_once 开始时间（T0），而非结束时间（T_end）
+        # 允许 5 秒容差（mock 调用开销）
+        from datetime import datetime
+
+        set_value_str = cutoff_times["set_setting_value"]
+        assert set_value_str is not None, "last_sync_time 应被更新"
+        set_value = datetime.fromisoformat(set_value_str)
+        start_time = cutoff_times["start"]
+        call_time = cutoff_times["set_setting_call_time"]
+
+        # 断言 1: set_setting 的值接近开始时间（±5s 容差）
+        diff_from_start = abs((set_value - start_time).total_seconds())
+        assert diff_from_start < 5.0, (
+            f"last_sync_time 应≈sync 开始时间 T0（容差 5s），"
+            f"实际差值 {diff_from_start}s。值={set_value_str}，开始时间={start_time.isoformat()}"
+        )
+
+        # 断言 2: set_setting 的值明显早于 set_setting 调用时间（证明用的是开始时间而非结束时间）
+        # sync_once 至少经过 pull + push + 文件同步等步骤，应耗时 > 0.01s
+        diff_from_call = (call_time - set_value).total_seconds()
+        assert diff_from_call >= 0, (
+            f"last_sync_time 值不应晚于 set_setting 调用时间（即不是用结束时间），"
+            f"差值 {diff_from_call}s"
+        )

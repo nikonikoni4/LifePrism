@@ -134,5 +134,5 @@
 ## data-backup-spec
 - updated_at: 2026-07-25
 - path: `docs/specs/2026-07-17-data-backup-spec.md`
-- 触发规则：开发、修改或查询数据备份模块相关功能时阅读（定时全量备份、数据库在线备份、备份保留策略、完整性校验、同秒触发冲突保护、run_mode 守卫）
-- 内容摘要：数据备份模块规格（v2.0），触发于 2026-07-16 CONFLICT_RESOLVE LLM 合并破坏 behavior.md 的生产级 bug。定义三道防线中的第三道（定时全量备份），采用平铺存储（非 zip）+ 复用 ScheduleService + 不做恢复 API（恢复通过文档指导手工操作）。覆盖文档目录（session/diary/agent/user/plan）与 SQLite 数据库（lifewatch_ai.db）的定时全量备份（文档每天 03:00、数据库每 8 小时 00/08/16 点），SQLite 使用 Online Backup API 保证一致性（无需 WAL checkpoint），备份后立即完整性校验（文档：数量+SHA-256；数据库：PRAGMA integrity_check），文档与数据库各自保留最新 3 份，同秒触发冲突保护（清理已存在的目录/文件后再备份），run_mode 双重守卫（注册时+运行时）
+- 触发规则：开发、修改或查询数据备份模块相关功能时阅读（定时全量备份、数据库在线备份、备份保留策略、完整性校验、同秒触发冲突保护、run_mode 守卫、全局任务状态互斥）
+- 内容摘要：数据备份模块规格（v3.0），触发于 2026-07-16 CONFLICT_RESOLVE LLM 合并破坏 behavior.md 的生产级 bug。定义三道防线中的第三道（定时全量备份），采用平铺存储（非 zip）+ 复用 ScheduleService + 不做恢复 API（恢复通过文档指导手工操作）。v3.0 变更：文档备份 backup_documents 从独立 03:00 cron 移除，并入 10点任务（job_id=update_memory）子步骤，位于 dreaming 之后（捕获 dreaming 写入的最新数据），与 dreaming 共享 skip_compensation=False 补执行机制；数据库备份保持独立 cron（每 8 小时 00/08/16 点），SQLite 使用 Online Backup API 保证一致性（无需 WAL checkpoint），不参与全局任务状态互斥；10点任务（含 backup_documents）持 LOCAL_TASK 状态与云端 sync_once 互斥（见 ADR 2026-07-25-global-task-state.md）；备份后立即完整性校验（文档：数量+SHA-256；数据库：PRAGMA integrity_check），文档与数据库各自保留最新 3 份，同秒触发冲突保护（清理已存在的目录/文件后再备份），run_mode 双重守卫（注册时+运行时）

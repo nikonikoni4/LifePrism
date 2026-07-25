@@ -1,9 +1,9 @@
 ---
-version: 2.0
+version: 3.0
 created_at: 2026-07-17
 updated_at: 2026-07-25
-last_updated: 重写 spec 与实际实现对对齐。v1.0 描述的 zip 打包 + 恢复 API + manifest 方案已被 ADR 否决（决策为平铺存储 + 无 API），v2.0 同步代码现状并补充同秒触发冲突保护机制
-abstract: 数据备份模块规格，定义本地数据（lifeprism_data_path 下的 session/diary/agent/user/plan 目录与 dataset/lifewatch_ai.db）的定时全量备份、备份保留策略、备份完整性校验的技术契约。备份采用平铺存储（非 zip），不做恢复 API（恢复通过文档指导手工操作）
+last_updated: v3.0 backup_documents 从独立 03:00 cron 改为 10点任务子步骤，解决"凌晨3点未开机不补备份"问题；引入 GlobalTaskState 全局任务状态互斥机制（见 ADR 2026-07-25-global-task-state.md）
+abstract: 数据备份模块规格，定义本地数据（lifeprism_data_path 下的 session/diary/agent/user/plan 目录与 dataset/lifewatch_ai.db）的定时全量备份、备份保留策略、备份完整性校验的技术契约。备份采用平铺存储（非 zip），不做恢复 API（恢复通过文档指导手工操作）。v3.0：文档备份并入 10点任务序列，参与 GlobalTaskState 互斥；数据库备份保持独立 cron 不参与互斥
 status: current
 module: backup
 ---
@@ -16,6 +16,7 @@ module: backup
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿（zip + 恢复 API + manifest 方案，未实现） |
 | 2.0 | 重写为与实际实现对齐：平铺存储 + 无 API + 保留 3 份 + 同秒触发冲突保护；删除 WAL checkpoint 要求（Online Backup API 自动处理 WAL） |
+| 3.0 | backup_documents 从独立 03:00 cron 改为 10点任务子步骤；引入 GlobalTaskState 全局任务状态互斥机制（见 ADR 2026-07-25-global-task-state.md） |
 
 ## Overview
 
@@ -60,6 +61,7 @@ module: backup
 - **配置文件迁移前备份**：[config_migrator.py](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/config/migrations/config_migrator.py) 已独立实现
 - **冲突解决前备份**：[sync_client.py](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/sync/sync_client.py) 已独立实现
 - **sync_conflict/ 清理**：由 `backup_conflict_versions` 函数内联触发，不依赖调度器
+- **全局任务状态互斥机制的设计细节**：见 ADR [2026-07-25-global-task-state.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-25-global-task-state.md)，本 spec 仅说明 backup 参与互斥的契约
 
 ## Functional Checklist
 
@@ -67,13 +69,15 @@ module: backup
 
 ### 备份调度
 
-- [x] 文档备份默认每天本地 03:00 触发一次全量备份（cron `0 3 * * *`）
-- [x] 数据库备份默认每 8 小时触发一次（本地 00/08/16 点，cron `0 0,8,16 * * *`）
-- [x] 备份调度在 `ScheduleService.__init__` 中注册（仅 `run_mode == "full"` 时注册）
-- [x] 备份调度独立于同步流程，同步进行中时备份照常执行
+- [x] 文档备份：**作为 10点任务（job_id=`update_memory`）的子步骤执行**，位于 `dreaming` 之后（捕获 dreaming 写入的最新数据）。不再独立注册 cron
+- [x] 数据库备份默认每 8 小时触发一次（本地 00/08/16 点，cron `0 0,8,16 * * *`），独立 cron 不变
+- [x] 数据库备份在 `ScheduleService.__init__` 中注册（仅 `run_mode == "full"` 时注册）；文档备份随 10点任务注册
+- [x] 10点任务 `skip_compensation=False`（默认）：启动时若已过本地 10:00 则补执行一次（含 incremental_sync + dreaming + backup_documents）
+- [x] 数据库备份 `skip_compensation=True`：跳过启动补偿，避免重启时立即备份造成 I/O 压力
 - [x] 备份失败不阻塞应用主流程，仅记录 ERROR 日志
-- [x] `skip_compensation=True`：跳过启动补偿，避免重启时立即备份造成 I/O 压力
-- [x] run_mode 双重守卫：注册时守卫 + 运行时 `_check_run_mode()` 守卫
+- [x] run_mode 双重守卫：注册时守卫 + 运行时 `_check_run_mode()` 守卫（仅数据库备份需要，文档备份随 10点任务）
+- [x] **全局任务状态互斥**：10点任务（含 backup_documents）持 `LOCAL_TASK` 状态，与云端 `sync_once` 互斥（见 ADR [2026-07-25-global-task-state.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-25-global-task-state.md)）
+- [x] 数据库备份不参与互斥（SQLite Online Backup API 不阻塞读写）
 
 ### 备份范围
 
@@ -163,15 +167,30 @@ BACKUP_DB_FILES = ["dataset/lifewatch_ai.db"]
 
 <key_function>
 - lifeprism/server/services/schedule_service.py
-  - ScheduleService.__init__: 在 __init__ 中注册备份任务
+  - ScheduleService.__init__: 在 __init__ 中注册备份任务（仅数据库备份）和 10点任务
+  - _dreaming: 10点任务协程，末尾调用 backup_service.backup_documents()
+- lifeprism/server/services/global_task_state.py
+  - GlobalTaskState: 全局任务状态单例（IDLE/LOCAL_TASK/CLOUD_SYNC）
 </key_function>
 
 **调度配置**：
 
-| 任务 | cron 表达式 | job_id | skip_compensation |
-|------|------------|--------|-------------------|
-| 文档备份 | `0 3 * * *`（每天本地 03:00） | `backup_documents` | True |
-| 数据库备份 | `0 0,8,16 * * *`（每 8 小时） | `backup_database` | True |
+| 任务 | cron 表达式 | job_id | skip_compensation | 参与互斥 |
+|------|------------|--------|-------------------|---------|
+| 10点任务（含 incremental_sync + dreaming + backup_documents） | `0 10 * * *`（每天本地 10:00） | `update_memory` | False（默认，补执行） | ✅ LOCAL_TASK |
+| 数据库备份 | `0 0,8,16 * * *`（每 8 小时） | `backup_database` | True | ❌ 不参与（SQLite Online Backup 安全） |
+
+**10点任务执行序列**：
+
+```
+try_acquire(LOCAL_TASK, timeout=300s)
+  ├─ 超时降级: incremental_sync 跳过; dreaming + backup_documents 仍执行
+  └─ 成功:
+      1. incremental_sync      (ActivityWatch → 本地数据库)
+      2. dreaming              (LLM 写 behavior.md/recent_state.md/user.md)
+      3. backup_documents      (平铺备份文档，捕获 dreaming 写入的最新数据)
+release()
+```
 
 **时区**：本地时区（`pytz.timezone(get_user_timezone())`），与 cron 触发时间一致。
 
@@ -383,12 +402,16 @@ if dst_db.exists():
 - 不备份 Electron 配置（localData/）
 - 备份大小无硬上限，超大备份可能影响磁盘空间
 - 时间戳精度为秒，同秒触发需通过冲突保护机制处理
+- 文档备份并入 10点任务后，仅在 10点触发一次（不再有 03:00 独立备份）
+- LOCAL_TASK 持锁期间云端 sync 放弃（10分钟周期容忍）
+- 5 分钟超时是经验值，sync_once 实际耗时受数据库大小、网络状况影响
 
 **相关 ADR / Bug**：
 
 - [history-bug 2026-07-16 CONFLICT_RESOLVE LLM 破坏 behavior.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/history-bugs/2026-07-16-conflict-resolve-llm-destroys-behavior-md.md)
 - [ADR 2026-07-17-data-backup-strategy.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-17-data-backup-strategy.md)（平铺存储 + 复用调度器 + 不做恢复 API）
 - [ADR 2026-07-17-backup-sync-decoupled-scope.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-17-backup-sync-decoupled-scope.md)（备份范围与同步范围解耦）
+- [ADR 2026-07-25-global-task-state.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-25-global-task-state.md)（全局任务状态互斥机制：backup_documents 并入 10点任务的决策来源）
 - [恢复指导文档](file:///d:/desktop/软件开发/LifeWatch-AI/templates/docs/lifewatch/06-数据备份与恢复.md)
 
 ## Interaction / UX Notes

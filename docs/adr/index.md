@@ -1,10 +1,16 @@
 ---
-version: 2.1
+version: 2.2
 created_at: 2026-04-10
-updated_at: 2026-07-23
-last_updated: 新增 deletion-sync-tombstone ADR（专用端点替代 SYNC_TABLES）；标记 deletion-log-table 部分被 supersede；修正 add-hash-id-to-autoincrement-tables 表数表述
+updated_at: 2026-07-25
+last_updated: 新增 global-task-state ADR（全局任务状态互斥机制：引入 GlobalTaskState 单例协调本地任务与云端同步互斥，backup_documents 并入 10点任务）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## global-task-state
+- updated_at: 2026-07-25
+- path: `docs/adr/2026-07-25-global-task-state.md`
+- 触发规则：当需要理解本地任务（10点序列 + 4h 任务）与云端 sync_once 的互斥机制、跨线程通信方案选型（threading.Condition）、backup_documents 为何并入 10点任务、4h 任务为何纳入 LOCAL_TASK 互斥、或修改 GlobalTaskState 单例时读取
+- 内容摘要：引入 GlobalTaskState 单例（IDLE/LOCAL_TASK/CLOUD_SYNC 三态），用 threading.Condition 跨线程协调本地定时任务与云端 sync_once 互斥。8 个决策——（决策 1）三态枚举 + threading.Condition + LazySingleton；（决策 2）backup_documents 从独立 03:00 cron 移除并入 10点任务子步骤（解决凌晨3点未开机不补备份问题），执行序列 incremental_sync → dreaming → backup_documents；（决策 3）4h process_session_message 纳入 LOCAL_TASK 互斥（写 behavior.md 与 sync 冲突）；（决策 4）云端 sync 遇 LOCAL_TASK 放弃本次 + 调 ping 端点（不等待，10分钟周期容忍）；（决策 5）10点任务遇 CLOUD_SYNC 用有限等待 + 超时降级（5分钟，dreaming/backup 仍执行）；（决策 6）数据库备份不参与互斥（SQLite Online Backup 不阻塞读写）；（决策 7）跨线程通信用 threading.Condition 而非 asyncio.Lock/线程 Lock（需 wait/notify 能力）；（决策 8）与现有 SyncClient._is_syncing 共存不整合（拆分关注点）。supersede `2026-07-17-data-backup-strategy.md` 中"文档每天 03:00 备份一次"决策。
 
 ## deletion-sync-tombstone
 - updated_at: 2026-07-23

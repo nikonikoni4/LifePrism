@@ -813,15 +813,19 @@ class TestRunModeGuard:
 
 
 class TestScheduleServiceBackupRegistration:
-    """ScheduleService 在 __init__ 中注册备份 cron 任务"""
+    """ScheduleService 在 __init__ 中注册备份 cron 任务
 
-    def test_schedule_service_registers_backup_documents_job(self):
-        """ScheduleService.__init__ 注册 backup_documents cron 任务"""
+    注：v3.0 后 backup_documents 已从独立 cron 移除，作为 _dreaming 的子步骤执行
+    （参考 ADR docs/adr/2026-07-25-global-task-state.md 决策 2）
+    """
+
+    def test_schedule_service_does_not_register_backup_documents_job(self):
+        """ScheduleService.__init__ 不再注册 backup_documents 独立 cron（已并入 10点任务）"""
         from lifeprism.server.services.schedule_service import ScheduleService
 
         service = ScheduleService()
         job_ids = [j["job_id"] for j in service._system_jobs]
-        assert "backup_documents" in job_ids
+        assert "backup_documents" not in job_ids
 
     def test_schedule_service_registers_backup_database_job(self):
         """ScheduleService.__init__ 注册 backup_database cron 任务"""
@@ -830,18 +834,6 @@ class TestScheduleServiceBackupRegistration:
         service = ScheduleService()
         job_ids = [j["job_id"] for j in service._system_jobs]
         assert "backup_database" in job_ids
-
-    def test_backup_documents_cron_is_daily_at_03(self):
-        """backup_documents cron 表达式为 0 3 * * *（每天本地 03:00）"""
-        from lifeprism.server.services.schedule_service import ScheduleService
-
-        service = ScheduleService()
-        for job in service._system_jobs:
-            if job["job_id"] == "backup_documents":
-                assert job["trigger"] == "cron"
-                assert job["kwargs"]["cron_expr"] == "0 3 * * *"
-                return
-        pytest.fail("未找到 backup_documents 任务")
 
     def test_backup_database_cron_is_every_8_hours(self):
         """backup_database cron 表达式为 0 0,8,16 * * *（每 8 小时）"""
@@ -854,18 +846,6 @@ class TestScheduleServiceBackupRegistration:
                 assert job["kwargs"]["cron_expr"] == "0 0,8,16 * * *"
                 return
         pytest.fail("未找到 backup_database 任务")
-
-    def test_backup_documents_job_uses_backup_service_method(self):
-        """backup_documents 任务的 func 是 backup_service.backup_documents"""
-        from lifeprism.server.services.backup_service import backup_service
-        from lifeprism.server.services.schedule_service import ScheduleService
-
-        service = ScheduleService()
-        for job in service._system_jobs:
-            if job["job_id"] == "backup_documents":
-                assert job["func"] == backup_service.backup_documents
-                return
-        pytest.fail("未找到 backup_documents 任务")
 
     def test_backup_database_job_uses_backup_service_method(self):
         """backup_database 任务的 func 是 backup_service.backup_database"""

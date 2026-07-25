@@ -125,3 +125,10 @@
 - path: `docs/generated/022/2026-07-24-code-review-deletion-sync-tombstone.md`
 - 触发规则：审查"同步删除阶段3：墓碑同步流程（DeletionLogProvider + 3 专用端点 + sync_once 集成）"commit `99872455` 时查看
 - 内容摘要：同步删除阶段3（45 个文件 +3952/-214 行）的 8 维度并行代码审查报告。发现 9 个问题（置信度 ≥ 80）：3 个 P0 数据完整性（AUTOINCREMENT 表 daily_focus/weekly_focus/category_map_cache 缺少 hash_id 导致墓碑跨端删除目标错误，90；动态表名校验过宽可构造 SQL 注入，90；非 SQLite 异常导致 _pull_deletion_log 事务未回滚，85）、2 个 P1 架构偏差（专用通道未强制隔离——deletion_log 仍可通过通用同步通道传播，85；模块文档字符串声称"LWW 用 updated_at 比较"与 ADR 决策 3 的 INSERT OR IGNORE 不符，85）、1 个 P1 代码质量（API 端点 except Exception 违反项目规则，85）、1 个 P2 最佳实践（新增墓碑端点缺少 Pydantic 请求/响应模型，80）、1 个 P2 代码质量（DeletionLogProvider 三个写入方法大量重复代码，80）、1 个 P2 测试（缺少云侧端点集成测试 + Push 失败路径测试 + cursor 变体方法单元测试，80）。正向：ADR 文档结构优秀、Spec 准确反映实现、22 个已知限制文档详尽、16 个 PRD 场景全部覆盖、SQL 参数化查询完整。
+
+## 2026-07-25-code-review-global-task-state
+
+- updated_at: 2026-07-25
+- path: `docs/generated/023/2026-07-25-code-review-global-task-state.md`
+- 触发规则：审查"GlobalTaskState 全局任务状态互斥机制（新增 2 文件 + 修改 5 文件，参考 ADR 2026-07-25-global-task-state.md v1.1）"时查看
+- 内容摘要：GlobalTaskState 全局任务状态互斥机制的 8 维度并行代码审查报告（8 个子 agent 并行审查 Security/Performance/Architecture/Code Quality/Best Practices/Testing/Documentation/代码注释合规）。审查 2 个新增文件（global_task_state.py + 15 个单元测试）和 5 个修改文件（sync_client.py / schedule_service.py / main.py / sync_status_api.py / test_backup_service.py）。ADR 8 个决策在代码层面全部正确落地（含 v1.1 修订的决策 5 超时降级策略）。发现 10 个问题（置信度 ≥ 80）：4 个 Documentation（global_task_state.py:14 模块 docstring 仍停留在 v1.0"跳过整个 10点任务"描述与 ADR v1.1 决策 5 矛盾 100、GlobalTaskState 类 docstring 使用示例与 10点任务实际用法不一致 90、main.py _start_sync_on_startup docstring 未反映 CLOUD_SYNC 互斥 90、ADR 决策 2 执行序列图在超时分支错误标注 release() 80）、4 个 Testing（test_global_task_state.py 缺少 @pytest.mark.core 标记 95、5 处集成互斥逻辑完全无测试覆盖 92、_send_ping 新方法无任何单元测试 88、last_sync_time 改用 sync_cutoff_time 防数据丢失变更无回归测试 85）、2 个 Code Quality/Best Practices（_send_ping 使用过宽 except Exception 违反项目自身规范 90、外部访问 _send_ping 私有方法违反封装约定 85）。正向：Security 维度无问题、Performance 维度无 ≥80 分问题、GlobalTaskState 类本身有 15 个高质量单元测试。

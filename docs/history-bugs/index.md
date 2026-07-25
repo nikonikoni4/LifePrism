@@ -1,3 +1,10 @@
+## 2026-07-25-sync-last-sync-time-update-point-data-loss
+
+- updated_at: 2026-07-25
+- path: `docs/history-bugs/2026-07-25-sync-last-sync-time-update-point-data-loss.md`
+- 触发规则：修改 `sync_client.py` 中 `sync_once` 的 `last_sync_time` 更新逻辑、修改 `sync_repository.py` 中 `query_incremental` 的 `WHERE updated_at > ?` 查询条件、排查"本地写入的数据同步后云端没有"、排查"sync 期间写入的数据下次 sync 仍不会被 Push"、讨论 sync_once 与 AgentLoop/dreaming/其他定时任务的并发写入问题、设计或修改 GlobalTaskState 互斥机制、评估"last_sync_time 取开始时间还是结束时间"时阅读
+- 内容摘要：**数据丢失 bug（P1，已修复 2026-07-25）** — `sync_once` 在末尾用"同步结束时间 T_end"更新 `last_sync_time`，导致 sync 期间其他任务（AgentLoop / dreaming / 4h 任务）写入数据库的数据 `updated_at ∈ (T0, T_end)` 落入时间窗口黑洞，下次 sync 的 `WHERE updated_at > T_end` 永远查不到这些数据，造成静默丢失。根因：`last_sync_time` 作为增量游标应记录"已读点"（sync 开始时间 T0）而非"完成点"（T_end），原设计隐含错误的"原子事务"假设。修复为在函数开头记录 `sync_cutoff_time`（开始时间），末尾用该值更新 `last_sync_time`，代价是下次 sync 会重复 Push 已 Push 过的数据（LWW 幂等处理，无副作用）。沉淀规则：增量游标的更新值必须是"读取数据的时刻"，不能是"处理完成的时刻"；互斥机制（GlobalTaskState）不能替代游标正确性。
+
 ## 2026-07-23-mood-impacts-lww-bypass-by-column-level-unique
 
 - updated_at: 2026-07-23
