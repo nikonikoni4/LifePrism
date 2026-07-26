@@ -10,6 +10,7 @@
 
 Mock 策略：
 - patch('asyncssh.connect') 返回 AsyncMock 模拟 SSHClientConnection
+- patch('asyncssh.import_private_key') 返回 MagicMock 模拟 SSHKey 对象
 - mock connection.forward_local_port 返回 AsyncMock 模拟 SSHListener
 - patch('httpx.get') 模拟远程端点响应
 - patch('asyncio.sleep') 加速重连退避时序测试
@@ -28,6 +29,17 @@ pytestmark = pytest.mark.core
 
 
 # ==================== Fixtures ====================
+
+
+@pytest.fixture(autouse=True)
+def mock_import_private_key():
+    """自动 mock asyncssh.import_private_key（connect() 会将 PEM 字符串转为 SSHKey 对象）
+
+    测试使用假私钥字符串，真实的 import_private_key 会失败。
+    """
+    mock_key = MagicMock()
+    with patch("asyncssh.import_private_key", return_value=mock_key):
+        yield
 
 
 @pytest.fixture
@@ -151,9 +163,7 @@ class TestStateMachine:
         await tunnel.close()
         assert tunnel.connection_state == ConnectionState.DISCONNECTED
 
-    async def test_forwarder_failure_sets_state_to_failed(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_forwarder_failure_sets_state_to_failed(self, tunnel_kwargs, mock_connection):
         """SSH 连接成功但端口转发失败时状态变为 failed"""
         from lifeprism.sync.ssh_tunnel import ConnectionState, SSHTunnel
 
@@ -258,9 +268,7 @@ class TestConnectErrorTransparency:
             assert call_kwargs.get("port") == tunnel_kwargs["port"]
             assert call_kwargs.get("username") == tunnel_kwargs["username"]
 
-    async def test_connect_starts_local_port_forwarding(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_connect_starts_local_port_forwarding(self, tunnel_kwargs, mock_connection):
         """connect() 成功后启动本地端口转发，参数与构造参数一致"""
         from lifeprism.sync.ssh_tunnel import SSHTunnel
 
@@ -298,9 +306,7 @@ class TestConnectErrorTransparency:
 class TestClose:
     """测试 close() 优雅关闭连接和转发"""
 
-    async def test_close_closes_forwarder_and_connection(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_close_closes_forwarder_and_connection(self, tunnel_kwargs, mock_connection):
         """close() 关闭 forwarder 和 SSH 连接（按顺序）"""
         from lifeprism.sync.ssh_tunnel import SSHTunnel
 
@@ -393,9 +399,7 @@ class TestKeepAliveLoop:
             assert tunnel.connection_state == ConnectionState.CONNECTED
             assert tunnel.is_connected is True
 
-    async def test_exponential_backoff_sequence_5_10_20_30_cap(
-        self, tunnel_kwargs
-    ):
+    async def test_exponential_backoff_sequence_5_10_20_30_cap(self, tunnel_kwargs):
         """重连退避时序：5s → 10s → 20s → 30s（上限）"""
         from lifeprism.sync.ssh_tunnel import ConnectionState, SSHTunnel
 
@@ -436,9 +440,7 @@ class TestKeepAliveLoop:
         for s in sleep_calls[4:]:
             assert s == 30, f"上限后应保持 30s, 实际: {s}"
 
-    async def test_reconnect_state_during_reconnect_failure(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_reconnect_state_during_reconnect_failure(self, tunnel_kwargs, mock_connection):
         """连接断开后重连持续失败时保持 reconnecting 状态"""
         from lifeprism.sync.ssh_tunnel import ConnectionState, SSHTunnel
 
@@ -474,9 +476,7 @@ class TestKeepAliveLoop:
                     except asyncio.CancelledError:
                         pass
 
-    async def test_close_during_reconnecting_sets_disconnected(
-        self, tunnel_kwargs
-    ):
+    async def test_close_during_reconnecting_sets_disconnected(self, tunnel_kwargs):
         """重连中调用 close() 状态变为 disconnected，重连循环退出"""
         from lifeprism.sync.ssh_tunnel import ConnectionState, SSHTunnel
 
@@ -537,9 +537,7 @@ class TestKeepAliveLoop:
 class TestTestConnection:
     """测试 test_connection() 一次性测试连接"""
 
-    async def test_success_returns_ok_with_remote_response(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_success_returns_ok_with_remote_response(self, tunnel_kwargs, mock_connection):
         """成功场景：SSH 隧道建立 + 远程 8102 健康端点可达"""
         from lifeprism.sync.ssh_tunnel import ConnectionState, SSHTunnel
 
@@ -571,9 +569,7 @@ class TestTestConnection:
         assert "密钥被拒绝" in result["error"]
         assert result["code"] == "SSH_KEY_REJECTED"
 
-    async def test_remote_unreachable_returns_error_dict(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_remote_unreachable_returns_error_dict(self, tunnel_kwargs, mock_connection):
         """远程不可达场景：SSH 隧道建立成功但远程 8102 不可达"""
         from lifeprism.sync.ssh_tunnel import ConnectionState, SSHTunnel
 
@@ -624,9 +620,7 @@ class TestTestConnection:
         conn.close.assert_called_once()
         assert tunnel.connection_state == ConnectionState.DISCONNECTED
 
-    async def test_remote_http_error_returns_error_dict(
-        self, tunnel_kwargs, mock_connection
-    ):
+    async def test_remote_http_error_returns_error_dict(self, tunnel_kwargs, mock_connection):
         """远程端点返回非 2xx 状态码"""
         from lifeprism.sync.ssh_tunnel import SSHTunnel
 

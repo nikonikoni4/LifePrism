@@ -162,12 +162,25 @@ class SSHTunnel:
         )
 
         # ===== 阶段 1：建立 SSH 连接 =====
+        # 将 PEM 字符串转为 SSHKey 对象（asyncssh 的 client_keys 不接受原始 PEM 字符串）
+        try:
+            key_obj = asyncssh.import_private_key(self.private_key)
+        except Exception as e:
+            self._state = ConnectionState.FAILED
+            logger.error("SSH 私钥解析失败: %s", e)
+            raise ExternalServiceError(
+                message=f"SSH 私钥解析失败: {e}",
+                code="SSH_KEY_INVALID",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
+
         try:
             self._connection = await asyncssh.connect(
                 host=self.host,
                 port=self.port,
                 username=self.username,
-                client_keys=[self.private_key],
+                client_keys=[key_obj],
                 known_hosts=None,  # 信任主机密钥（生产应使用 known_hosts 文件）
             )
         except asyncssh.PermissionDenied as e:
