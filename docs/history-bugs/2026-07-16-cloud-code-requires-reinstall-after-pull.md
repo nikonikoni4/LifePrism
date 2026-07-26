@@ -27,7 +27,7 @@ abstract: 云端服务器 git pull 后 Python 运行时不热更新，需重新 
 
 ## Bug 简述
 
-云端服务器（`123.56.49.198`）部署方式为 `pip install -e .`（编辑模式），正常情况应随着 git pull 自动热更新代码。
+云端服务器部署方式为 `pip install -e .`（编辑模式），正常情况应随着 git pull 自动热更新代码。
 但实际出现过 git pull 后代码文件已是最新（如 commit `bcba5b74` 包含同步黑名单 `EXCLUDED_FILENAMES`），
 但 uvicorn 运行时仍加载旧版本模块的行为，导致同步黑名单完全不生效。
 

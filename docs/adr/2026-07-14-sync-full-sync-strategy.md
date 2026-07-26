@@ -169,7 +169,7 @@ LWW 相等跳过的决策逻辑：
 - 前端设置界面云端同步区域：
   - 现有"手动同步"按钮重命名为"手动同步（增量）"
   - 新增"重置同步进度"按钮，点击后清空 `sync.last_sync_time` 并二次确认
-- 还原 `localData/config/config.yaml` 中 `sync.remote_url` 从 `http://127.0.0.1:8102` 到 `http://123.56.49.198:8102`（本地测试用，需还原）
+- 还原 `localData/config/config.yaml` 中 `sync.remote_url` 从 `http://127.0.0.1:8102` 到 `http://your-server-ip:8102`（本地测试用，需还原）
 
 ### 需要后续验证或复盘的事项
 
