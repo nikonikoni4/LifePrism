@@ -429,7 +429,7 @@ describe('SyncConfigSection', () => {
       });
 
       // 输入 SSH 配置
-      await user.type(screen.getByLabelText(/SSH 主机/i), '123.56.49.198');
+      await user.type(screen.getByLabelText(/SSH 主机/i), '1.2.3.4');
       await user.type(screen.getByLabelText(/SSH 用户名/i), 'lifeprism');
 
       // 切换回 HTTP 模式
@@ -439,7 +439,7 @@ describe('SyncConfigSection', () => {
       await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/SSH 主机/i)).toHaveValue('123.56.49.198');
+        expect(screen.getByLabelText(/SSH 主机/i)).toHaveValue('1.2.3.4');
         expect(screen.getByLabelText(/SSH 用户名/i)).toHaveValue('lifeprism');
       });
     });
@@ -585,7 +585,7 @@ describe('SyncConfigSection', () => {
       });
 
       // 输入 SSH 参数
-      await user.type(screen.getByLabelText(/SSH 主机/i), '123.56.49.198');
+      await user.type(screen.getByLabelText(/SSH 主机/i), '1.2.3.4');
       await user.clear(screen.getByLabelText(/SSH 端口/i));
       await user.type(screen.getByLabelText(/SSH 端口/i), '22');
       await user.type(screen.getByLabelText(/SSH 用户名/i), 'lifeprism');
@@ -595,7 +595,7 @@ describe('SyncConfigSection', () => {
 
       await waitFor(() => {
         expect(SyncConfigAPI.testConnection).toHaveBeenCalledWith({
-          host: '123.56.49.198',
+          host: '1.2.3.4',
           port: 22,
           username: 'lifeprism',
           local_port: 8102,

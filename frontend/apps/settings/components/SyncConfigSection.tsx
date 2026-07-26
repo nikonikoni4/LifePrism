@@ -485,7 +485,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     aria-label="SSH 主机"
                                     value={sshConfig.host}
                                     onChange={(e) => updateSshField('host', e.target.value)}
-                                    placeholder="123.56.49.198"
+                                    placeholder="your-server-ip"
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
                                 />
                             </div>

@@ -154,7 +154,7 @@ disconnected ──connect()──→ connecting ──成功──→ connected
 - SyncClient 内部所有方法（约 20 个）通过参数传递 `remote_url`，源头都集中在 `_read_remote_url()` 一个方法
 - 改一个方法即可让所有同步请求透明走 localhost
 - settings_manager 保持纯净，不感知 SSH 隧道
-- 前端展示的"云端地址"仍是用户填写的真实地址（如 `http://123.56.49.198:8102`），日志可读性不受影响
+- 前端展示的"云端地址"仍是用户填写的真实地址（如 `http://your-server-ip:8102`），日志可读性不受影响
 
 **拦截逻辑**：
 

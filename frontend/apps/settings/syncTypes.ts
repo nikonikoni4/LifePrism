@@ -48,7 +48,7 @@ export type ConnectionMode = 'http' | 'ssh';
 
 /** SSH 隧道配置参数（用户输入） */
 export interface SSHTunnelConfig {
-    /** SSH 服务器地址（如 123.56.49.198） */
+    /** SSH 服务器地址（如 1.2.3.4） */
     host: string;
     /** SSH 端口，默认 22 */
     port: number;

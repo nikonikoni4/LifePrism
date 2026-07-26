@@ -526,8 +526,8 @@ class TestSshTunnelConfigReadWrite:
             patch.object(settings, "_config_path", tmp_path / "config.yaml"),
             patch.object(settings, "_config", {}),
         ):
-            settings.set("sync.ssh_tunnel.host", "123.56.49.198", save=False)
-            assert settings.get("sync.ssh_tunnel.host") == "123.56.49.198"
+            settings.set("sync.ssh_tunnel.host", "1.2.3.4", save=False)
+            assert settings.get("sync.ssh_tunnel.host") == "1.2.3.4"
 
     def test_set_and_get_sync_ssh_tunnel_port(self, tmp_path):
         """set('sync.ssh_tunnel.port', ...) 后 get 返回写入的值"""

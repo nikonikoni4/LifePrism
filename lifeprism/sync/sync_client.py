@@ -305,6 +305,11 @@ class SyncClient:
         from lifeprism.config.settings_manager import settings
         from lifeprism.sync.ssh_tunnel import SSHTunnel
 
+        # 守卫：非 SSH 模式或无私钥时直接返回，不启动隧道
+        if not self._should_use_ssh_tunnel():
+            logger.debug("未启用 SSH 隧道模式，跳过启动")
+            return
+
         try:
             host = settings.get("sync.ssh_tunnel.host")
             port = settings.get("sync.ssh_tunnel.port")

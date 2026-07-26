@@ -26,7 +26,7 @@ abstract: 面向修改 SyncClient 和新增同步方法的开发者与 AI，规�
 PRD `.scratch/ssh-tunnel-integration/prd.md` 引入 SSH 隧道模式作为 HTTP/HTTPS 之外的第三种连接方式。SSH 隧道启用时：
 
 - SyncClient 实际请求目标变为 `http://localhost:{local_port}`（通过 SSH 隧道转发到云端 `127.0.0.1:8102`）
-- 用户在 `sync.remote_url` 中填写的真实地址（如 `http://123.56.49.198:8102`）**仅作标识用**，不用于实际请求
+- 用户在 `sync.remote_url` 中填写的真实地址（如 `http://your-server-ip:8102`）**仅作标识用**，不用于实际请求
 
 拦截点选在 `SyncClient._read_remote_url()`（选项 C），原因：
 

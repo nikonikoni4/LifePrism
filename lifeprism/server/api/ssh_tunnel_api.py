@@ -41,7 +41,7 @@ class SSHTunnelTestRequest(BaseModel):
     私钥不通过请求体传递，从 keyring 读取（与 enable 端点保持一致）。
     """
 
-    host: str = Field(..., description="SSH 服务器地址（如 123.56.49.198）")
+    host: str = Field(..., description="SSH 服务器地址（如 1.2.3.4）")
     port: int = Field(default=22, ge=1, le=65535, description="SSH 端口，默认 22")
     username: str = Field(..., description="SSH 用户名（如 lifeprism）")
     local_port: int = Field(default=8102, ge=1, le=65535, description="本地监听端口，默认 8102")
