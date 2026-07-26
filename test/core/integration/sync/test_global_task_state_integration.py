@@ -601,6 +601,7 @@ class TestStartSyncOnStartupMutex:
         mock_sync_client.sync_once = MagicMock()
         mock_sync_client.send_ping = MagicMock()
         mock_sync_client.start_scheduled_sync = MagicMock(return_value=MagicMock())
+        mock_sync_client._start_ssh_tunnel = AsyncMock(return_value=None)
 
         mock_app = MagicMock()
         mock_app.state.sync_client = mock_sync_client
@@ -633,6 +634,7 @@ class TestStartSyncOnStartupMutex:
         mock_sync_client.sync_once = MagicMock()
         mock_sync_client.send_ping = MagicMock()
         mock_sync_client.start_scheduled_sync = MagicMock(return_value=MagicMock())
+        mock_sync_client._start_ssh_tunnel = AsyncMock(return_value=None)
 
         mock_app = MagicMock()
         mock_app.state.sync_client = mock_sync_client

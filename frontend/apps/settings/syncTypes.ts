@@ -40,3 +40,62 @@ export interface ResetSyncProgressResponse {
     /** 提示消息 */
     message: string;
 }
+
+// ==================== SSH 隧道相关类型 ====================
+
+/** 同步连接方式 */
+export type ConnectionMode = 'http' | 'ssh';
+
+/** SSH 隧道配置参数（用户输入） */
+export interface SSHTunnelConfig {
+    /** SSH 服务器地址（如 123.56.49.198） */
+    host: string;
+    /** SSH 端口，默认 22 */
+    port: number;
+    /** SSH 用户名（如 lifeprism） */
+    username: string;
+    /** 本地监听端口，默认 8102 */
+    local_port: number;
+    /** 远程目标端口，默认 8102 */
+    remote_port: number;
+}
+
+/** POST /api/v2/settings/ssh-tunnel/enable 响应 */
+export interface EnableSshTunnelResponse {
+    /** 公钥字符串（OpenSSH 格式，以 `ssh-ed25519 ` 开头） */
+    public_key: string;
+    /** 本次是否新生成了密钥对（True=新生成，False=保留已有私钥） */
+    is_new: boolean;
+}
+
+/** GET /api/v2/settings/ssh-tunnel/public-key 响应 */
+export interface GetPublicKeyResponse {
+    /** 公钥字符串（OpenSSH 格式），无私钥时为空字符串 */
+    public_key: string;
+}
+
+/** POST /api/v2/settings/ssh-tunnel/test 请求参数 */
+export interface SSHTunnelTestParams {
+    /** SSH 服务器地址 */
+    host: string;
+    /** SSH 端口 */
+    port: number;
+    /** SSH 用户名 */
+    username: string;
+    /** 本地监听端口 */
+    local_port: number;
+    /** 远程目标端口 */
+    remote_port: number;
+}
+
+/** POST /api/v2/settings/ssh-tunnel/test 响应 */
+export interface SSHTunnelTestResponse {
+    /** 测试结果：ok=成功，error=失败 */
+    status: 'ok' | 'error';
+    /** 成功时远程服务响应（健康检查数据） */
+    remote_response?: Record<string, unknown>;
+    /** 失败时的错误消息 */
+    error?: string;
+    /** 失败时的错误码（如 SSH_KEY_REJECTED / SSH_NETWORK_UNREACHABLE 等） */
+    code?: string;
+}

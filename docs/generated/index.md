@@ -132,3 +132,10 @@
 - path: `docs/generated/023/2026-07-25-code-review-global-task-state.md`
 - 触发规则：审查"GlobalTaskState 全局任务状态互斥机制（新增 2 文件 + 修改 5 文件，参考 ADR 2026-07-25-global-task-state.md v1.1）"时查看
 - 内容摘要：GlobalTaskState 全局任务状态互斥机制的 8 维度并行代码审查报告（8 个子 agent 并行审查 Security/Performance/Architecture/Code Quality/Best Practices/Testing/Documentation/代码注释合规）。审查 2 个新增文件（global_task_state.py + 15 个单元测试）和 5 个修改文件（sync_client.py / schedule_service.py / main.py / sync_status_api.py / test_backup_service.py）。ADR 8 个决策在代码层面全部正确落地（含 v1.1 修订的决策 5 超时降级策略）。发现 10 个问题（置信度 ≥ 80）：4 个 Documentation（global_task_state.py:14 模块 docstring 仍停留在 v1.0"跳过整个 10点任务"描述与 ADR v1.1 决策 5 矛盾 100、GlobalTaskState 类 docstring 使用示例与 10点任务实际用法不一致 90、main.py _start_sync_on_startup docstring 未反映 CLOUD_SYNC 互斥 90、ADR 决策 2 执行序列图在超时分支错误标注 release() 80）、4 个 Testing（test_global_task_state.py 缺少 @pytest.mark.core 标记 95、5 处集成互斥逻辑完全无测试覆盖 92、_send_ping 新方法无任何单元测试 88、last_sync_time 改用 sync_cutoff_time 防数据丢失变更无回归测试 85）、2 个 Code Quality/Best Practices（_send_ping 使用过宽 except Exception 违反项目自身规范 90、外部访问 _send_ping 私有方法违反封装约定 85）。正向：Security 维度无问题、Performance 维度无 ≥80 分问题、GlobalTaskState 类本身有 15 个高质量单元测试。
+
+## 2026-07-26-code-review-ssh-tunnel-integration
+
+- updated_at: 2026-07-26
+- path: `docs/generated/024/2026-07-26-code-review-ssh-tunnel-integration.md`
+- 触发规则：审查"SSH 隧道集成（7 个切片，19 个修改文件 + 7 个新增文件，+2513/-152 行）"工作区改动时查看
+- 内容摘要：SSH 隧道集成的 8 维度并行代码审查报告（4 个子 agent 并行审查 Security+Performance / Architecture+Code Quality / Best Practices+Testing / Documentation+注释合规）。审查 12 个代码文件 + 6 个测试文件 + 8 个文档文件。发现 8 个问题（置信度 ≥ 80）：1 个 P0 致命（_start_ssh_tunnel/_stop_ssh_tunnel 生命周期方法未在生产代码接入，SSH 隧道功能形同虚设，90）、1 个 P1 正确性（_reconnect_with_backoff 成功日志永远显示"经过 0 次尝试"，95）、1 个 P1 文档（sync-remote-url-access-rules.md 审计表行号与方法名已过期，90）、1 个 P1 安全（known_hosts=None 禁用主机密钥验证存在 MITM 风险，80）、1 个 P2 架构（_ensure_tunnel_ready() 为死代码偏离 PRD 设计，85）、1 个 P2 代码质量（SSH 隧道实例属性缺少类型注解，85）、1 个 P2 测试（_stop_ssh_tunnel() 完全无行为测试，85）、1 个 P2 代码质量（同一条件在不同位置使用不同日志级别，80）。正向：非侵入式原则成立（HTTP 模式行为不变）、三层守卫设计完整、_read_remote_url() docstring 警告符合规则 6 全部 4 项要求、前端 UI 测试覆盖充分（22 个新测试）、文档交叉引用全部有效。

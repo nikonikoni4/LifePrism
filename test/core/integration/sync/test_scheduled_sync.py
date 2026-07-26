@@ -479,10 +479,9 @@ class TestSyncOnceValidation:
         """sync_once 在 remote_url 为空时抛出 ValidationError"""
         from lifeprism.utils.exceptions import ValidationError
 
-        with patch(
-            "lifeprism.config.settings_manager.get_setting",
-            return_value="",
-        ):
+        # 通过 patch _read_remote_url 模拟未配置 remote_url
+        # （sync_once 通过 _read_remote_url() 获取 remote_url，禁止直接调用 get_setting）
+        with patch.object(sync_client, "_read_remote_url", return_value=""):
             with patch(
                 "lifeprism.sync.sync_config.get_sync_api_key",
                 return_value="some_key",

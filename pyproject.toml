@@ -45,6 +45,7 @@ dependencies = [
     "cryptography>=41.0.0",
     "qrcode>=7.4.0",
     "typing-extensions>=4.8.0",
+    "asyncssh>=2.14.0",
 ]
 
 # 可选依赖

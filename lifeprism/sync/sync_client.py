@@ -16,7 +16,7 @@ import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -37,6 +37,9 @@ from lifeprism.sync.constants import (
     EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES,
 )
 from lifeprism.utils import get_logger
+
+if TYPE_CHECKING:
+    from lifeprism.sync.ssh_tunnel import SSHTunnel
 
 logger = get_logger(__name__)
 
@@ -106,6 +109,12 @@ class SyncClient:
         # template_hashes 集合缓存（Issue 1: PRD 决策 8）
         # 首次使用时懒加载，后续直接复用；None 表示尚未计算
         self._template_hashes: set[str] | None = None
+        # SSH 隧道实例（None 表示未启动；启动后持有 SSHTunnel 实例）
+        # 参考 Issue 05: SyncClient SSH 隧道编排
+        self._ssh_tunnel: SSHTunnel | None = None
+        # keep-alive 后台任务句柄（持引用避免被 GC 提前回收，参考 asyncio.create_task 文档）
+        # 与 self._sync_task 同样的生命周期管理模式
+        self._ssh_tunnel_keep_alive_task: asyncio.Task | None = None
 
     @property
     def is_syncing(self) -> bool:
@@ -143,10 +152,11 @@ class SyncClient:
             必须用 ``await asyncio.to_thread(sync_client.send_ping)`` 包裹，
             否则会阻塞主事件循环。
         """
-        from lifeprism.config.settings_manager import get_setting
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        remote_url = get_setting("sync.remote_url")
+        # 通过 _read_remote_url() 获取（SSH 模式下走 localhost）
+        # 禁止直接读取 sync.remote_url 配置，参考 sync-remote-url-access-rules.md
+        remote_url = self._read_remote_url()
         api_key = get_sync_api_key()
         if not remote_url or not api_key:
             logger.debug("未配置同步，跳过 ping 心跳发送")
@@ -184,7 +194,8 @@ class SyncClient:
         """定时同步循环的内部实现。
 
         循环执行：等待 interval_seconds -> 检查配置 -> 调用 sync_once()。
-        - 配置检查：每次执行前重新读取 sync.remote_url，为空则跳过本次
+        - SSH 隧道就绪检查：启用 SSH 模式时，隧道未就绪则跳过本次
+        - 配置检查：通过 _read_remote_url() 获取（SSH 模式下走 localhost），为空则跳过本次
           （不取消整个定时任务，方便用户后续在前端配置 url 后自动开始同步）
         - 并发控制：通过 try_start_sync() 原子地检查并设置同步标志，
           若已在同步中则跳过本次并记录 WARNING
@@ -201,6 +212,11 @@ class SyncClient:
 
         while True:
             await asyncio.sleep(interval_seconds)
+            # SSH 隧道就绪检查：如启用 SSH 模式但隧道未就绪，跳过本次
+            # 参考 PRD Issue 05: _ensure_tunnel_ready 统一入口判断
+            if not await self._ensure_tunnel_ready():
+                logger.warning("跳过定时同步：SSH 隧道未就绪")
+                continue
             # 配置检查：未配置 remote_url 时跳过本次（不取消定时任务）
             # 这样用户后续在前端配置 url 后，下次定时自动开始同步，无需重启
             remote_url = self._read_remote_url()
@@ -233,18 +249,155 @@ class SyncClient:
             finally:
                 self.finish_sync()
 
-    def _read_remote_url(self) -> str:
-        """读取 sync.remote_url 配置（每次调用都从 SettingsManager 内存读取，支持热重载）
+    # ==================== SSH 隧道编排（Issue 05） ====================
 
-        前端通过 PATCH /api/v2/settings 修改 sync_remote_url 后，
-        SettingsManager.update 会立即更新内存中的 _config，
-        因此此处调用 get_setting 能立即读到新值，无需重启或 reload。
+    def _should_use_ssh_tunnel(self) -> bool:
+        """三层守卫判断是否启用 SSH 隧道
+
+        三层守卫（参考 PRD run_mode 守卫模式）：
+        1. run_mode 守卫：云端 agent_only 模式根本不启动隧道
+        2. connection_mode 守卫：未启用 SSH 模式不启动
+        3. 私钥存在性守卫：无私钥不启动
 
         Returns:
-            remote_url 字符串，未配置时返回空字符串
+            True 表示启用 SSH 隧道模式，False 表示走 HTTP/HTTPS 模式
         """
-        from lifeprism.config.settings_manager import get_setting
+        from lifeprism.config.settings_manager import settings
 
+        if settings.run_mode != "full":
+            return False  # 云端模式不启用 SSH 隧道
+        if settings.get("sync.connection_mode") != "ssh":
+            return False  # 未启用 SSH 模式
+        return bool(settings.get_storage_key("ssh_tunnel_private_key"))  # 有无私钥
+
+    def _is_tunnel_ready(self) -> bool:
+        """检查 SSH 隧道是否就绪
+
+        Returns:
+            True 表示隧道实例存在且已连接，False 表示未启动或未连接
+        """
+        return self._ssh_tunnel is not None and self._ssh_tunnel.is_connected
+
+    async def _ensure_tunnel_ready(self) -> bool:
+        """检查 SSH 隧道是否就绪（非阻塞）
+
+        非阻塞检查：仅判断当前隧道状态，不主动等待重连。
+        隧道未就绪时返回 False，由调用方决定跳过或重试。
+
+        Returns:
+            True 表示可以使用隧道（或非 SSH 模式），False 表示隧道未就绪
+        """
+        if not self._should_use_ssh_tunnel():
+            return True
+        return self._is_tunnel_ready()
+
+    async def _start_ssh_tunnel(self) -> None:
+        """启动 SSH 隧道（含 keep-alive 后台任务）
+
+        读取 sync.ssh_tunnel.* 配置，创建 SSHTunnel 实例并建立连接，
+        连接成功后启动 keep-alive 后台任务（心跳保活 + 断线重连）。
+
+        失败处理：捕获所有异常，记录 ERROR 日志，不抛出（避免阻塞 SyncClient 启动）。
+        隧道失败时其他功能（如 LLM 对话）仍可使用，仅同步功能受影响。
+
+        参考 PRD User Story 18: SSH 隧道失败时不阻塞 SyncClient 启动。
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.sync.ssh_tunnel import SSHTunnel
+
+        try:
+            host = settings.get("sync.ssh_tunnel.host")
+            port = settings.get("sync.ssh_tunnel.port")
+            username = settings.get("sync.ssh_tunnel.username")
+            local_port = settings.get("sync.ssh_tunnel.local_port")
+            remote_host = settings.get("sync.ssh_tunnel.remote_host")
+            remote_port = settings.get("sync.ssh_tunnel.remote_port")
+            private_key = settings.get_storage_key("ssh_tunnel_private_key")
+
+            tunnel = SSHTunnel(
+                host=host,
+                port=port,
+                username=username,
+                private_key=private_key,
+                local_port=local_port,
+                remote_host=remote_host,
+                remote_port=remote_port,
+            )
+            await tunnel.connect()
+            self._ssh_tunnel = tunnel
+            # 启动 keep-alive 后台任务（心跳保活 + 断线重连）
+            # 持引用避免被 GC 提前回收（参考 asyncio.create_task 文档）
+            self._ssh_tunnel_keep_alive_task = asyncio.create_task(tunnel.start_keep_alive_loop())
+            logger.info(
+                "SSH 隧道已启动: 127.0.0.1:%s -> %s:%s",
+                local_port,
+                remote_host,
+                remote_port,
+            )
+        except Exception as e:
+            # 捕获所有异常（含 ExternalServiceError、asyncssh 异常），
+            # 不阻塞 SyncClient 启动，仅记录 ERROR
+            logger.error("SSH 隧道启动失败: %s", e, exc_info=True)
+            self._ssh_tunnel = None
+            self._ssh_tunnel_keep_alive_task = None
+
+    async def _stop_ssh_tunnel(self) -> None:
+        """优雅关闭 SSH 隧道
+
+        幂等：多次调用不抛异常。close() 内部会通知 keep-alive 循环退出。
+        关闭顺序：先调 tunnel.close()（通知 keep-alive 退出）→ 等待 keep-alive 任务结束 → 清理引用。
+        """
+        if self._ssh_tunnel is not None:
+            try:
+                await self._ssh_tunnel.close()
+                logger.info("SSH 隧道已关闭")
+            except Exception as e:
+                # 辅助操作兜底：关闭失败不应阻塞 SyncClient 关闭流程
+                logger.warning("关闭 SSH 隧道时出错（忽略）: %s", e)
+            finally:
+                self._ssh_tunnel = None
+
+        # 等待 keep-alive 后台任务退出（close() 已通过 _closed 标志通知它退出）
+        # 设短超时避免 close 异常时卡住；任务可能为 None（启动失败或未启动）
+        if self._ssh_tunnel_keep_alive_task is not None:
+            try:
+                await asyncio.wait_for(self._ssh_tunnel_keep_alive_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                # 超时则强制取消（保底，正常不应发生）
+                self._ssh_tunnel_keep_alive_task.cancel()
+                logger.warning("keep-alive 任务未在 5s 内退出，已强制取消")
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                # 辅助操作兜底：等待任务退出失败不应阻塞关闭流程
+                logger.warning("等待 keep-alive 任务退出时出错（忽略）: %s", e)
+            finally:
+                self._ssh_tunnel_keep_alive_task = None
+
+    def _read_remote_url(self) -> str:
+        """读取实际请求用的 remote_url（SSH 模式下走 localhost）
+
+        ⚠ 警告：所有需要 remote_url 的代码路径必须通过此方法获取，
+        禁止直接调用 get_setting("sync.remote_url")。
+        SSH 隧道启用时，直接读取 settings 会绕过隧道拦截，导致：
+        1. 连接失败：真实地址 8102 端口绑定 127.0.0.1，公网不可达
+        2. 安全风险：泄露真实服务器 IP
+        3. 行为不一致：部分同步流程走隧道，部分不走
+        详见 docs/coding-rules/sync-remote-url-access-rules.md
+
+        返回值语义：
+        - HTTP/HTTPS 模式：返回 sync.remote_url 配置值
+        - SSH 隧道模式 + 隧道就绪：返回 http://localhost:{local_port}
+        - SSH 隧道模式 + 隧道未就绪：返回空字符串（触发上层跳过逻辑）
+        """
+        from lifeprism.config.settings_manager import get_setting, settings
+
+        if self._should_use_ssh_tunnel():
+            if not self._is_tunnel_ready():
+                logger.warning("SSH 隧道未就绪，跳过本次同步")
+                return ""  # 触发上层"未配置 remote_url"跳过逻辑（已有）
+            local_port = settings.get("sync.ssh_tunnel.local_port") or 8102
+            return f"http://localhost:{local_port}"
         return get_setting("sync.remote_url") or ""
 
     def sync_once(self, tables=None, directories=None):
@@ -266,7 +419,9 @@ class SyncClient:
         from lifeprism.sync.sync_config import get_sync_api_key
         from lifeprism.utils.exceptions import ValidationError
 
-        remote_url = get_setting("sync.remote_url")
+        # 通过 _read_remote_url() 获取（SSH 模式下走 localhost）
+        # 禁止直接读取 sync.remote_url 配置，参考 sync-remote-url-access-rules.md
+        remote_url = self._read_remote_url()
         api_key = get_sync_api_key()
         last_sync_time = get_setting("sync.last_sync_time", "")
 
@@ -279,6 +434,13 @@ class SyncClient:
         #   但云端 LWW 幂等处理（updated_at 相同跳过覆盖），无副作用
         # 参考 ADR docs/adr/2026-07-25-global-task-state.md
         sync_cutoff_time = datetime.now(timezone.utc).isoformat()
+
+        # SSH 隧道模式 + 隧道未就绪 → 跳过本次同步（不抛异常）
+        # _read_remote_url() 已记录 WARNING，此处不重复记录
+        # 触发场景：隧道启动失败、隧道断开重连中、隧道未启动
+        # 不抛异常原因：隧道状态可能在中途恢复，下次定时同步会自动重试
+        if self._should_use_ssh_tunnel() and not self._is_tunnel_ready():
+            return
 
         # 防御性检查：未配置 remote_url 或 api_key 时直接抛出业务校验异常，
         # 避免发起 HTTP 请求时因 url 格式错误导致 httpx.UnsupportedProtocol

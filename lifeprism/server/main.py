@@ -126,11 +126,16 @@ _log_startup_time("[OK] SQLite environment check passed", _step_start)
 
 # ==================== API 路由导入 ====================
 print("[STARTUP] 正在导入 API 路由模块...")
-_import_start = time.perf_counter()
 
+_import_start = time.perf_counter()
 from lifeprism.server.api import sync_router
 
 _log_startup_time("  - sync_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import ssh_tunnel_router
+
+_log_startup_time("  - ssh_tunnel_router", _import_start)
 
 _import_start = time.perf_counter()
 from lifeprism.server.api import category_v2_router
@@ -338,6 +343,10 @@ async def _start_sync_on_startup(app: FastAPI):
             settings.run_mode,
         )
         return
+
+    # 0. 启动 SSH 隧道（如启用 SSH 模式，在同步前建立隧道）
+    # 隧道失败不阻塞启动（_start_ssh_tunnel 内部捕获所有异常）
+    await sync_client._start_ssh_tunnel()
 
     # 1. 启动时立即同步一次（通过 try_start_sync() 原子锁判断是否可启动）
     if sync_client.try_start_sync():
@@ -564,6 +573,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("[SHUTDOWN] 关闭前同步失败: error=%s", e)
 
+    # 关闭时：停止 SSH 隧道（如已启动）
+    # 放在 sync_once 之后、offline 心跳之前：sync_once 可能需要走隧道
+    if hasattr(app.state, "sync_client") and app.state.sync_client:
+        try:
+            await app.state.sync_client._stop_ssh_tunnel()
+        except Exception as e:
+            logger.warning("[SHUTDOWN] 关闭 SSH 隧道时出现警告: error=%s", e)
+
     # 发送 offline 心跳事件（同步完成后通知云端接管）
     # 关机场景也必须发送，让云端立即接管
     # 关机场景（skip_sync=True）使用 2s 超时，避免 10s 网络超时被 Electron 4s 强杀打断
@@ -736,6 +753,7 @@ app.include_router(habit_router, prefix="/api/v2/habit", tags=["habit"])  # Habi
 app.include_router(custom_records_router, prefix="/api/v2")  # Custom Records 自定义记录
 app.include_router(sync_status_router)  # 同步状态查询和手动触发
 app.include_router(cloud_config_router)  # 云端配置生成
+app.include_router(ssh_tunnel_router, prefix="/api/v2")  # SSH 隧道管理（仅 full 模式注册）
 app.include_router(add_on_router)
 
 _log_startup_time("[OK] API routers registered (21 routers)", _router_start)

@@ -193,3 +193,29 @@ class TestBootstrapFunctionsBehavior:
 
             # wechat.stop 应被调用
             mock_wechat.stop.assert_called_once()
+
+
+class TestAgentOnlyApiHostBinding:
+    """测试 Agent Only 模式 8102 端口绑定地址
+
+    Issue: .scratch/ssh-tunnel-integration/issues/01-8102-bind-localhost.md
+
+    默认绑定 127.0.0.1（仅本机，关闭公网暴露），
+    可通过环境变量 LIFEPRISM_API_HOST 覆盖（如 0.0.0.0 用于测试或 Nginx 反代场景）。
+    """
+
+    def test_default_host_is_localhost(self, monkeypatch):
+        """默认配置下 API host 为 127.0.0.1（关闭公网暴露）"""
+        monkeypatch.delenv("LIFEPRISM_API_HOST", raising=False)
+
+        from lifeprism.server.main_agent_only import _get_api_host
+
+        assert _get_api_host() == "127.0.0.1"
+
+    def test_env_var_overrides_host(self, monkeypatch):
+        """环境变量 LIFEPRISM_API_HOST=0.0.0.0 时 host 覆盖为 0.0.0.0"""
+        monkeypatch.setenv("LIFEPRISM_API_HOST", "0.0.0.0")
+
+        from lifeprism.server.main_agent_only import _get_api_host
+
+        assert _get_api_host() == "0.0.0.0"

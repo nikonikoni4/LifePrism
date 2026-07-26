@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-14
-updated_at: 2026-07-14
-last_updated: 初始版本，记录云端部署中的明文存储安全限制
+updated_at: 2026-07-26
+last_updated: 限制 4 增加 SSH 隧道备注（无需域名和证书的替代方案）
 abstract: 记录 LifePrism 云端部署中存在的已知安全限制，包括微信用户 ID（wxid）和 API Key 在云端的明文存储问题。这些限制不影响当前功能正常运行，但应在未来版本中改进。
 ---
 
@@ -13,6 +13,7 @@ abstract: 记录 LifePrism 云端部署中存在的已知安全限制，包括�
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建文档初稿 |
+| 1.1 | 限制 4 增加 SSH 隧道备注：SSH 隧道模式可作为 HTTPS 的替代方案，无需域名和证书 |
 
 ---
 
@@ -120,6 +121,17 @@ PRD（`linux-deployment-prd.md:526`）明确要求"HTTPS 加密传输（必须�
 
 - 服务器端：安装 Nginx + Let's Encrypt 证书，配置 `/api/sync/` → `http://127.0.0.1:8102` 反向代理（nginx-setup.md 已包含完整配置）
 - 本地：`sync.remote_url` 前缀改为 `https://`
+
+### 替代方案：SSH 隧道（无需域名和证书）
+
+> **备注（2026-07-26）**：对于无备案域名 + 动态 IP 的本地客户端，SSH 隧道模式可作为 HTTPS 的替代方案，无需域名和 TLS 证书即可实现传输加密。
+
+- **方案**：LifePrism 内置 SSH 隧道能力，本地 SyncClient 通过 SSH 加密隧道把云端 `127.0.0.1:8102` 映射到本地端口，所有同步流量走 SSH 加密通道
+- **安全收益**：API Key 经 SSH 加密传输，中间人无法抓包；云端 8102 端口默认绑定 `127.0.0.1`，公网完全不可见
+- **配套变更**：8102 默认绑定 `127.0.0.1`（环境变量 `LIFEPRISM_API_HOST` 可覆盖），模式 B（uvicorn 直连）已标注为"不推荐，仅测试用"
+- **适用场景**：本地无备案域名、IP 动态变化、不希望引入 Nginx/证书运维成本
+- **完整部署流程**：详见 [部署文档 cloud-https-setup.md](../deployment/cloud-https-setup.md) "模式 C 配置：SSH 隧道（无域名场景）"章节
+- **已知限制**：SSH 隧道方案本身存在 7 项已知限制（如本地需保持隧道进程、私钥丢失无法恢复等），详见 [SSH 隧道已知限制](ssh-tunnel-limitations.md)
 
 ---
 

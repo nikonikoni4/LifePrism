@@ -1,8 +1,8 @@
 ## cloud-https-setup
-- updated_at: 2026-07-14
-- path: `templates/deployment/cloud-https-setup.md`
-- 触发规则：云端部署同步 API 的 HTTPS 时阅读
-- 内容摘要：两种 HTTPS 模式（Nginx 反向代理 + uvicorn 直连）的完整部署配置。覆盖 SSL 证书申请、Nginx 配置（443 → 8102）、uvicorn SSL 参数、防火墙 / 安全组设置、systemd 进程守护、证书自动续期、前端 remote_url 配置说明。所有代码仅供参考，AI 应依据实际环境适配。
+- updated_at: 2026-07-26
+- path: `docs/deployment/cloud-https-setup.md`
+- 触发规则：云端部署同步 API 时阅读
+- 内容摘要：三种连接模式（Nginx 反向代理 + uvicorn 直连 HTTPS + SSH 隧道）的完整部署配置。覆盖 SSL 证书申请、Nginx 配置（443 → 8102）、uvicorn SSL 参数、SSH 隧道流程、SSH 服务加固（fail2ban、禁用密码认证、禁止 root 登录）、防火墙 / 安全组设置、systemd 进程守护、证书自动续期、前端 remote_url 配置说明。所有代码仅供参考，AI 应依据实际环境适配。
 
 ## linux-deployment-guide
 - updated_at: 2026-07-08

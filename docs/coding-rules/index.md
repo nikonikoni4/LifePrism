@@ -12,6 +12,13 @@
 - 触发规则：创建新同步表、为已有 SYNC_TABLES 新增删除方法、修改删除逻辑实现、编写 Service/Aggregator 层级联或隐蔽删除时阅读
 - 内容摘要：墓碑同步预防性规则，要求新同步表必须提供走墓碑通道（_generic_delete/_generic_batch_delete）的删除方法，旧表修改删除逻辑必须验证墓碑写入，禁止绕过墓碑通道的删除模式（原生 DELETE FROM、db.delete、软删除伪装），包含级联删除、软删除、同步触发删除的规则和测试覆盖要求
 
+## sync-remote-url-access-rules.md
+
+- updated_at: 2026-07-26
+- path: `docs/coding-rules/sync-remote-url-access-rules.md`
+- 触发规则：新增 SyncClient 同步方法、修改已有方法的 remote_url 获取方式、在 SyncClient 之外新增发起 HTTP 请求到云端的代码、修改 _read_remote_url() 方法本身、修改 sync.connection_mode 或 SSH 隧道配置 schema 时阅读
+- 内容摘要：remote_url 访问预防性规则，要求所有发起 HTTP 请求的代码路径必须通过 SyncClient._read_remote_url() 获取 remote_url，禁止直接调用 get_setting("sync.remote_url")，防止 SSH 隧道启用时同步请求绕过隧道导致连接失败或泄露真实服务器 IP；包含例外清单（前端展示、配置完整性检查、日志记录）、新增同步方法的检查清单、违反约束的后果说明
+
 ## backend-core-rules.md
 
 - updated_at: 2026-04-15

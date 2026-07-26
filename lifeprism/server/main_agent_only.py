@@ -22,6 +22,7 @@ CLI 命令：
 
 环境变量：
     LIFEPRISM_DATA_PATH — 数据目录路径（可选，默认 localData/）
+    LIFEPRISM_API_HOST — API 绑定地址（可选，默认 127.0.0.1；设为 0.0.0.0 可公网访问，用于测试或 Nginx 反代）
     LIFEPRISM_SSL_KEYFILE — SSL 私钥路径（可选，设置后启用 HTTPS）
     LIFEPRISM_SSL_CERTFILE — SSL 证书路径（可选，设置后启用 HTTPS）
 
@@ -120,6 +121,19 @@ _LLM_TEST_MESSAGE = "Hello, please reply 'OK' if you receive this."
 
 
 # ==================== 工具函数 ====================
+
+
+def _get_api_host() -> str:
+    """
+    读取 API 绑定地址。
+
+    默认 127.0.0.1（仅本机访问，关闭公网暴露，配合 SSH 隧道方案使用）。
+    可通过环境变量 LIFEPRISM_API_HOST 覆盖（如 0.0.0.0 用于测试场景或 Nginx 反代）。
+
+    Returns:
+        绑定地址字符串，如 "127.0.0.1" 或 "0.0.0.0"
+    """
+    return os.environ.get("LIFEPRISM_API_HOST", "127.0.0.1")
 
 
 def mask_api_key(api_key: str | None) -> str:
@@ -315,9 +329,10 @@ async def _run_agent_and_api() -> None:
         and os.path.exists(ssl_certfile)
     )
 
+    api_host = _get_api_host()
     config = uvicorn.Config(
         app,
-        host="0.0.0.0",
+        host=api_host,
         port=8102,
         ssl_keyfile=ssl_keyfile if use_ssl else None,
         ssl_certfile=ssl_certfile if use_ssl else None,
@@ -326,7 +341,8 @@ async def _run_agent_and_api() -> None:
     server = uvicorn.Server(config)
     api_task = asyncio.create_task(server.serve())
     logger.info(
-        "[AGENT-ONLY] FastAPI 启动: host=0.0.0.0, port=8102, https=%s",
+        "[AGENT-ONLY] FastAPI 启动: host=%s, port=8102, https=%s",
+        api_host,
         use_ssl,
     )
 

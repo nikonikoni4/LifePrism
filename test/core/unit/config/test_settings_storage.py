@@ -436,3 +436,311 @@ class TestGetSetRouting:
             result = settings.get("sync_api_key")
             # full 模式不应读取 storage.yaml 中的值
             assert result != "storage_value"
+
+
+# ==================== Slice 9: SSH 隧道配置字段默认值 ====================
+
+
+class TestSshTunnelConfigDefaults:
+    """测试 SSH 隧道相关配置字段的默认值（参考 Issue #02）"""
+
+    def test_sync_connection_mode_default_is_http(self):
+        """sync.connection_mode 默认值为 'http'"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.connection_mode") == "http"
+
+    def test_sync_ssh_tunnel_host_default_is_empty_string(self):
+        """sync.ssh_tunnel.host 默认值为空字符串"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.ssh_tunnel.host") == ""
+
+    def test_sync_ssh_tunnel_port_default_is_22(self):
+        """sync.ssh_tunnel.port 默认值为 22"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.ssh_tunnel.port") == 22
+
+    def test_sync_ssh_tunnel_username_default_is_empty_string(self):
+        """sync.ssh_tunnel.username 默认值为空字符串"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.ssh_tunnel.username") == ""
+
+    def test_sync_ssh_tunnel_local_port_default_is_8102(self):
+        """sync.ssh_tunnel.local_port 默认值为 8102"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.ssh_tunnel.local_port") == 8102
+
+    def test_sync_ssh_tunnel_remote_host_default_is_127_0_0_1(self):
+        """sync.ssh_tunnel.remote_host 默认值为 '127.0.0.1'"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.ssh_tunnel.remote_host") == "127.0.0.1"
+
+    def test_sync_ssh_tunnel_remote_port_default_is_8102(self):
+        """sync.ssh_tunnel.remote_port 默认值为 8102"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+        ):
+            assert settings.get("sync.ssh_tunnel.remote_port") == 8102
+
+
+# ==================== Slice 10: SSH 隧道配置字段读写 ====================
+
+
+class TestSshTunnelConfigReadWrite:
+    """测试 sync.ssh_tunnel.* 6 个字段 + sync.connection_mode 可正常读写"""
+
+    def test_set_and_get_sync_connection_mode(self, tmp_path):
+        """set('sync.connection_mode', 'ssh') 后 get 返回 'ssh'，并写入 config.yaml"""
+        config_path = tmp_path / "config" / "config.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.connection_mode", "ssh", save=False)
+            assert settings.get("sync.connection_mode") == "ssh"
+
+    def test_set_and_get_sync_ssh_tunnel_host(self, tmp_path):
+        """set('sync.ssh_tunnel.host', ...) 后 get 返回写入的值"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", tmp_path / "config.yaml"),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.ssh_tunnel.host", "123.56.49.198", save=False)
+            assert settings.get("sync.ssh_tunnel.host") == "123.56.49.198"
+
+    def test_set_and_get_sync_ssh_tunnel_port(self, tmp_path):
+        """set('sync.ssh_tunnel.port', ...) 后 get 返回写入的值"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", tmp_path / "config.yaml"),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.ssh_tunnel.port", 2222, save=False)
+            assert settings.get("sync.ssh_tunnel.port") == 2222
+
+    def test_set_and_get_sync_ssh_tunnel_username(self, tmp_path):
+        """set('sync.ssh_tunnel.username', ...) 后 get 返回写入的值"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", tmp_path / "config.yaml"),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.ssh_tunnel.username", "lifeprism", save=False)
+            assert settings.get("sync.ssh_tunnel.username") == "lifeprism"
+
+    def test_set_and_get_sync_ssh_tunnel_local_port(self, tmp_path):
+        """set('sync.ssh_tunnel.local_port', ...) 后 get 返回写入的值"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", tmp_path / "config.yaml"),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.ssh_tunnel.local_port", 9000, save=False)
+            assert settings.get("sync.ssh_tunnel.local_port") == 9000
+
+    def test_set_and_get_sync_ssh_tunnel_remote_host(self, tmp_path):
+        """set('sync.ssh_tunnel.remote_host', ...) 后 get 返回写入的值"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", tmp_path / "config.yaml"),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.ssh_tunnel.remote_host", "10.0.0.1", save=False)
+            assert settings.get("sync.ssh_tunnel.remote_host") == "10.0.0.1"
+
+    def test_set_and_get_sync_ssh_tunnel_remote_port(self, tmp_path):
+        """set('sync.ssh_tunnel.remote_port', ...) 后 get 返回写入的值"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", tmp_path / "config.yaml"),
+            patch.object(settings, "_config", {}),
+        ):
+            settings.set("sync.ssh_tunnel.remote_port", 8103, save=False)
+            assert settings.get("sync.ssh_tunnel.remote_port") == 8103
+
+    def test_sync_ssh_tunnel_fields_persisted_to_config_yaml(self, tmp_path):
+        """sync.ssh_tunnel.* 字段写入 config.yaml 文件（非 storage.yaml）"""
+        config_path = tmp_path / "config" / "config.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {}),
+            patch("lifeprism.config.settings_manager.keyring.set_password"),
+        ):
+            settings.set("sync.connection_mode", "ssh")
+            settings.set("sync.ssh_tunnel.host", "192.168.1.1")
+            settings.set("sync.ssh_tunnel.port", 22)
+            settings.set("sync.ssh_tunnel.username", "deploy")
+            settings.set("sync.ssh_tunnel.local_port", 8102)
+            settings.set("sync.ssh_tunnel.remote_host", "127.0.0.1")
+            settings.set("sync.ssh_tunnel.remote_port", 8102)
+
+            assert config_path.exists()
+            with open(config_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            assert data["sync.connection_mode"] == "ssh"
+            assert data["sync.ssh_tunnel.host"] == "192.168.1.1"
+            assert data["sync.ssh_tunnel.port"] == 22
+            assert data["sync.ssh_tunnel.username"] == "deploy"
+            assert data["sync.ssh_tunnel.local_port"] == 8102
+            assert data["sync.ssh_tunnel.remote_host"] == "127.0.0.1"
+            assert data["sync.ssh_tunnel.remote_port"] == 8102
+
+
+# ==================== Slice 11: ssh_tunnel_private_key 存储路由 ====================
+
+
+class TestSshTunnelPrivateKeyStorageRoute:
+    """测试 ssh_tunnel_private_key 走 keyring/storage.yaml 路由（参考 Issue #02）"""
+
+    def test_set_ssh_tunnel_private_key_to_keyring_in_full_mode(self, tmp_path):
+        """full 模式下 set_storage_key('ssh_tunnel_private_key', pem) 写入 keyring"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+        ):
+            pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
+            settings.set_storage_key("ssh_tunnel_private_key", pem)
+            mock_set.assert_called_once_with(
+                KEYRING_SERVICE_NAME, "ssh_tunnel_private_key", pem
+            )
+
+    def test_get_ssh_tunnel_private_key_from_keyring_in_full_mode(self, tmp_path):
+        """full 模式下 get_storage_key('ssh_tunnel_private_key') 从 keyring 读取"""
+        pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password", return_value=pem
+            ) as mock_kr,
+        ):
+            result = settings.get_storage_key("ssh_tunnel_private_key")
+            assert result == pem
+            mock_kr.assert_called_once_with(KEYRING_SERVICE_NAME, "ssh_tunnel_private_key")
+
+    def test_get_ssh_tunnel_private_key_returns_none_in_agent_only_when_not_exist(
+        self, tmp_path
+    ):
+        """agent_only 模式下 storage.yaml 无此字段时返回 None"""
+        # storage.yaml 不存在，模拟云端未配置 SSH 隧道场景
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
+            result = settings.get_storage_key("ssh_tunnel_private_key")
+            assert result is None
+
+    def test_get_ssh_tunnel_private_key_returns_none_in_agent_only_when_field_missing(
+        self, tmp_path
+    ):
+        """agent_only 模式下 storage.yaml 存在但无私钥字段时返回 None"""
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        with open(storage_path, "w", encoding="utf-8") as f:
+            yaml.dump({"sync_api_key": "other_key"}, f)
+
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
+            result = settings.get_storage_key("ssh_tunnel_private_key")
+            assert result is None
+
+    def test_set_ssh_tunnel_private_key_to_storage_yaml_in_cloud_mode(self, tmp_path):
+        """agent_only 模式下 set_storage_key 写入 storage.yaml"""
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
+            pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
+            settings.set_storage_key("ssh_tunnel_private_key", pem)
+
+            storage_path = tmp_path / "config" / "storage.yaml"
+            assert storage_path.exists()
+            with open(storage_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            assert data["ssh_tunnel_private_key"] == pem
+
+    def test_ssh_tunnel_private_key_not_in_config_yaml(self, tmp_path):
+        """set('ssh_tunnel_private_key', pem) 不写入 config.yaml（走 storage 路由）"""
+        config_path = tmp_path / "config" / "config.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        # 预先写入普通配置，确保 config.yaml 存在
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump({"user_name": "alice", "sync.remote_url": "http://example.com"}, f)
+
+        pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings,
+                "_config",
+                {"user_name": "alice", "sync.remote_url": "http://example.com"},
+            ),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_kr_set,
+        ):
+            settings.set("ssh_tunnel_private_key", pem)
+
+            # keyring 被调用（走 storage 路由）
+            mock_kr_set.assert_called_once_with(
+                KEYRING_SERVICE_NAME, "ssh_tunnel_private_key", pem
+            )
+            # config.yaml 不应包含私钥字段（仍只有普通配置）
+            assert config_path.exists()
+            with open(config_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            assert "ssh_tunnel_private_key" not in data
+            # 普通配置仍正常持久化
+            assert data.get("user_name") == "alice"
+
+    def test_get_ssh_tunnel_private_key_via_get_method_in_full_mode(self, tmp_path):
+        """full 模式下 get('ssh_tunnel_private_key') 走 keyring 路由"""
+        pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password", return_value=pem
+            ),
+        ):
+            result = settings.get("ssh_tunnel_private_key")
+            assert result == pem
+
+    def test_ssh_tunnel_private_key_registered_in_storage_key_fields(self):
+        """ssh_tunnel_private_key 应注册到 STORAGE_KEY_FIELDS"""
+        assert "ssh_tunnel_private_key" in settings.STORAGE_KEY_FIELDS
+
+    def test_ssh_tunnel_private_key_registered_in_keyring_username_map(self):
+        """ssh_tunnel_private_key 应在 STORAGE_KEY_TO_KEYRING_USERNAME 中注册映射"""
+        assert (
+            settings.STORAGE_KEY_TO_KEYRING_USERNAME.get("ssh_tunnel_private_key")
+            == "ssh_tunnel_private_key"
+        )

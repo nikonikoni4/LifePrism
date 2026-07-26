@@ -42,6 +42,7 @@
 - **严重程度**: 高
 - **影响范围**: 云端部署全链路（密钥存储、传输、生成）
 - **问题描述**: (1) wxid 明文存储，攻击者可伪装 AI 机器人；(2) API Key 明文存储，攻击者可滥用 LLM 服务；(3) 同步 API Key 无法重新生成（config.yaml fallback 污染）；(4) 同步数据传输未启用 HTTPS，Bearer Token 明文传输
+- **替代方案**: 限制 4 已增加 SSH 隧道备注——SSH 隧道模式可作为 HTTPS 的替代方案，无需域名和证书（详见条目 12）
 - **计划改进**: frontend 增加 Key 更换确认键、Key 统一到 storage.yaml + run_mode 隔离读写、Let's Encrypt TLS + Nginx 反向代理
 
 ### 5. keyring 包在 Linux headless 环境可能不可用
@@ -112,6 +113,17 @@
 - **问题描述**: 墓碑同步机制（`/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`）只覆盖数据库记录的删除传播，不覆盖文件删除。文件删除依赖 `file_sync_state` 表的 LWW 机制，可能出现"幽灵文件"（已删文件被对端拉回）
 - **触发条件**: 出现真实的"幽灵文件"问题，或文件删除-修改并发频率显著提升
 - **临时方案**: 依赖每日全量备份恢复，或用户手动删除"幽灵文件"
+
+### 12. SSH 隧道已知限制（8 项）
+
+- **文件**: `ssh-tunnel-limitations.md`
+- **状态**: `acknowledged`（已确认，当前 PRD 范围下有意接受的设计选择）
+- **严重程度**: 低~中（不影响核心功能可用性，仅是运维体验和密钥管理限制；其中限制 8 为安全性限制，严重程度中）
+- **影响范围**: 模式 C（SSH 隧道）连接模式
+- **问题描述**: SSH 隧道方案当前 PRD 范围下的 8 项设计限制：(1) 本地需保持 LifePrism 进程（隧道随进程关闭）；(2) 依赖云端 SSH 服务可用；(3) 私钥丢失无法恢复（需重新生成密钥对）；(4) 不支持私钥导入（仅前端生成）；(5) 密钥保留不覆盖（多端切换可能公钥不一致）；(6) 无私钥轮换 UI（无"重新生成密钥对"按钮）；(7) 隧道状态非实时显示（需手动"测试连接"验证）；(8) SSH 主机密钥验证未启用（known_hosts=None，存在 MITM 风险）
+- **触发条件**: 使用 SSH 隧道模式（部署文档模式 C）
+- **临时方案**: 各项限制均有对应的临时排查/恢复步骤，详见 `ssh-tunnel-limitations.md` 各限制的"临时方案或计划改进"章节
+- **相关文档**: 部署文档 `docs/deployment/cloud-https-setup.md` 模式 C、PRD `.scratch/ssh-tunnel-integration/prd.md` Out of Scope、代码实现 `lifeprism/sync/ssh_tunnel.py:172`
 
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 

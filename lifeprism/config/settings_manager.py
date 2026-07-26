@@ -42,13 +42,15 @@ class SettingsManager:
 
     # storage.yaml 承载的 Key 类字段（run_mode 为云端时从 storage.yaml 读写）
     # api_key 不纳入，保持现有 ENV_VAR + keyring 路径
-    STORAGE_KEY_FIELDS = {"sync_api_key", "wechat_token"}
+    STORAGE_KEY_FIELDS = {"sync_api_key", "wechat_token", "ssh_tunnel_private_key"}
 
     # storage key → keyring username 映射
     # storage.yaml 中用 wechat_token 作为字段名，但 keyring 中历史使用 wechat_bot_token 作为 username（PRD 规范）。
     # 此映射保证本地模式读写 keyring 时使用正确的 username。
+    # ssh_tunnel_private_key 显式注册（与 storage key 同名），保持映射表完整性，便于后续审计与扩展。
     STORAGE_KEY_TO_KEYRING_USERNAME = {
         "wechat_token": KEYRING_WECHAT_TOKEN_USERNAME,
+        "ssh_tunnel_private_key": "ssh_tunnel_private_key",
     }
 
     # 默认配置值
@@ -87,6 +89,16 @@ class SettingsManager:
         "auto_update_memory": True,  # 自动更新记忆
         "timezone": "Asia/Shanghai",  # 用户时区（IANA 标识符）
         "sync.remote_url": "",  # 云端服务器地址
+        # SSH 隧道配置（参考 .scratch/ssh-tunnel-integration/prd.md Issue #02）
+        # connection_mode: 连接方式 "http"（默认）| "ssh"（启用 SSH 隧道）
+        # ssh_tunnel.* 为非敏感配置字段，写入 config.yaml；私钥走 keyring/storage.yaml 路由
+        "sync.connection_mode": "http",
+        "sync.ssh_tunnel.host": "",
+        "sync.ssh_tunnel.port": 22,
+        "sync.ssh_tunnel.username": "",
+        "sync.ssh_tunnel.local_port": 8102,
+        "sync.ssh_tunnel.remote_host": "127.0.0.1",
+        "sync.ssh_tunnel.remote_port": 8102,
     }
 
     def __new__(cls) -> "SettingsManager":

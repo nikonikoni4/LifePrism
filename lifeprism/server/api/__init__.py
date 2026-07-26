@@ -15,6 +15,7 @@ from .habit_api import router as habit_router
 from .mood_api import router as mood_router
 from .report_api import router as report_router
 from .setting_api import router as setting_router
+from .ssh_tunnel_api import router as ssh_tunnel_router
 from .sync import router as sync_router
 from .sync_cloud_api import router as sync_cloud_router
 from .sync_status_api import router as sync_status_router
@@ -48,4 +49,5 @@ __all__ = [
     "sync_cloud_router",
     "sync_status_router",
     "cloud_config_router",
+    "ssh_tunnel_router",
 ]
