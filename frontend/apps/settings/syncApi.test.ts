@@ -182,6 +182,151 @@ describe('SyncConfigAPI', () => {
     });
   });
 
+  // ==================== saveSshConfig ====================
+
+  describe('saveSshConfig', () => {
+    it('should call PATCH /api/v2/settings with all 5 SSH fields (snake_case)', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ settings: {}, message: '配置已更新' }),
+      } as Response);
+
+      await SyncConfigAPI.saveSshConfig({
+        host: '1.2.3.4',
+        port: 22,
+        username: 'lifeprism',
+        local_port: 8102,
+        remote_port: 8102,
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v2/settings',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sync_ssh_tunnel_host: '1.2.3.4',
+            sync_ssh_tunnel_port: 22,
+            sync_ssh_tunnel_username: 'lifeprism',
+            sync_ssh_tunnel_local_port: 8102,
+            sync_ssh_tunnel_remote_port: 8102,
+          }),
+        },
+      );
+    });
+
+    it('should save empty host and username when given empty strings', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ settings: {}, message: '配置已更新' }),
+      } as Response);
+
+      await SyncConfigAPI.saveSshConfig({
+        host: '',
+        port: 22,
+        username: '',
+        local_port: 8102,
+        remote_port: 8102,
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v2/settings',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sync_ssh_tunnel_host: '',
+            sync_ssh_tunnel_port: 22,
+            sync_ssh_tunnel_username: '',
+            sync_ssh_tunnel_local_port: 8102,
+            sync_ssh_tunnel_remote_port: 8102,
+          }),
+        },
+      );
+    });
+
+    it('should throw error when response is not ok', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      } as Response);
+
+      await expect(
+        SyncConfigAPI.saveSshConfig({
+          host: '1.2.3.4',
+          port: 22,
+          username: 'lifeprism',
+          local_port: 8102,
+          remote_port: 8102,
+        }),
+      ).rejects.toThrow('保存 SSH 配置失败');
+    });
+  });
+
+  // ==================== getSshConfig ====================
+
+  describe('getSshConfig', () => {
+    it('should extract all 5 SSH fields from settings response', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          settings: {
+            user_name: 'test',
+            sync_ssh_tunnel_host: '1.2.3.4',
+            sync_ssh_tunnel_port: 2222,
+            sync_ssh_tunnel_username: 'lifeprism',
+            sync_ssh_tunnel_local_port: 9000,
+            sync_ssh_tunnel_remote_port: 8102,
+          },
+          message: 'success',
+        }),
+      } as Response);
+
+      const result = await SyncConfigAPI.getSshConfig();
+
+      expect(fetch).toHaveBeenCalledWith('http://localhost:8000/api/v2/settings');
+      expect(result).toEqual({
+        host: '1.2.3.4',
+        port: 2222,
+        username: 'lifeprism',
+        local_port: 9000,
+        remote_port: 8102,
+      });
+    });
+
+    it('should return default values when SSH fields are not set', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          settings: { user_name: 'test' },
+          message: 'success',
+        }),
+      } as Response);
+
+      const result = await SyncConfigAPI.getSshConfig();
+
+      // 默认值：host='', port=22, username='', local_port=8102, remote_port=8102
+      expect(result).toEqual({
+        host: '',
+        port: 22,
+        username: '',
+        local_port: 8102,
+        remote_port: 8102,
+      });
+    });
+
+    it('should throw error when response is not ok', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      } as Response);
+
+      await expect(SyncConfigAPI.getSshConfig()).rejects.toThrow('获取 SSH 配置失败');
+    });
+  });
+
   // ==================== openFolderAndSelect ====================
 
   describe('openFolderAndSelect', () => {

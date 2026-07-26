@@ -34,9 +34,15 @@ def get_settings() -> SettingItems:
     """
     config = settings.get_for_display()
 
-    # sync.remote_url 在 config.yaml 中是点号分隔的 key，映射为 Pydantic 的 sync_remote_url
+    # sync.* 在 config.yaml 中是点号分隔的 key，映射为 Pydantic 的下划线字段
     if "sync.remote_url" in config:
         config["sync_remote_url"] = config.pop("sync.remote_url")
+    if "sync.connection_mode" in config:
+        config["sync_connection_mode"] = config.pop("sync.connection_mode")
+    for key in ["host", "port", "username", "local_port", "remote_port"]:
+        cfg_key = f"sync.ssh_tunnel.{key}"
+        if cfg_key in config:
+            config[f"sync_ssh_tunnel_{key}"] = config.pop(cfg_key)
 
     # 添加 provider_list (来自 provider_manager)
     config["provider_list"] = provider_manager.provider_list
@@ -65,9 +71,15 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
     """
     updates = request.model_dump(exclude_none=True)
 
-    # sync_remote_url 在 config.yaml 中存储为 sync.remote_url
+    # sync_* 在 config.yaml 中存储为 sync.* 点号分隔的 key
     if "sync_remote_url" in updates:
         updates["sync.remote_url"] = updates.pop("sync_remote_url")
+    if "sync_connection_mode" in updates:
+        updates["sync.connection_mode"] = updates.pop("sync_connection_mode")
+    for key in ["host", "port", "username", "local_port", "remote_port"]:
+        field = f"sync_ssh_tunnel_{key}"
+        if field in updates:
+            updates[f"sync.ssh_tunnel.{key}"] = updates.pop(field)
     if updates:
         logger.info("更新配置: %s", list(updates.keys()))
 

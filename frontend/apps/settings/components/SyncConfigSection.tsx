@@ -7,7 +7,7 @@
  * - SSH 隧道选项卡：SSH 参数表单 + 公钥展示 + 配置命令展示 + 测试连接按钮
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Cloud,
@@ -79,6 +79,10 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
     const [publicKey, setPublicKey] = useState('');
     const [isTesting, setIsTesting] = useState(false);
     const [testResult, setTestResult] = useState<SSHTunnelTestResponse | null>(null);
+    // 标记本次会话是否已从后端加载过 SSH 配置。
+    // 首次进入 SSH 模式（mount 时或首次切换）加载一次，之后切换保留内存状态，
+    // 避免覆盖用户已输入但尚未保存的字段。
+    const hasLoadedSshConfig = useRef(false);
 
     // 加载云端地址
     useEffect(() => {
@@ -127,6 +131,19 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                             toast.error(err instanceof Error ? err.message : '获取 SSH 公钥失败');
                         }
                     }
+                    // 同时加载已保存的 SSH 配置（host/port/username/local_port/remote_port）
+                    // 仅在首次加载，避免覆盖用户后续输入
+                    try {
+                        const sshCfg = await SyncConfigAPI.getSshConfig();
+                        if (!cancelled) {
+                            setSshConfig(sshCfg);
+                            hasLoadedSshConfig.current = true;
+                        }
+                    } catch (err) {
+                        if (!cancelled) {
+                            toast.error(err instanceof Error ? err.message : '获取 SSH 配置失败');
+                        }
+                    }
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -152,6 +169,16 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
             setIsSaving(false);
         }
     }, [remoteUrl]);
+
+    // 保存 SSH 配置（5 个输入框失焦时触发）
+    // 与 handleSaveUrl 一致的策略：每次 blur 都保存完整 sshConfig，简化逻辑
+    const handleSaveSshConfig = useCallback(async () => {
+        try {
+            await SyncConfigAPI.saveSshConfig(sshConfig);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : '保存 SSH 配置失败');
+        }
+    }, [sshConfig]);
 
     // 点击生成按钮 -> 弹出选择框
     const handleGenerateClick = useCallback(() => {
@@ -185,7 +212,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
         }
     }, []);
 
-    // 切换到 SSH 模式：enable → getPublicKey → saveConnectionMode
+    // 切换到 SSH 模式：enable → getPublicKey → getSshConfig → saveConnectionMode
     const handleSwitchToSsh = useCallback(async () => {
         if (isEnabling) return;
         setIsEnabling(true);
@@ -204,10 +231,22 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                 toast.error(err instanceof Error ? err.message : '获取 SSH 公钥失败');
             }
 
-            // 3. 调 saveConnectionMode 保存连接方式
+            // 3. 首次切换到 SSH 时加载已保存的 SSH 配置（避免覆盖用户已输入的字段）
+            if (!hasLoadedSshConfig.current) {
+                try {
+                    const sshCfg = await SyncConfigAPI.getSshConfig();
+                    setSshConfig(sshCfg);
+                    hasLoadedSshConfig.current = true;
+                } catch (err) {
+                    toast.error(err instanceof Error ? err.message : '获取 SSH 配置失败');
+                }
+            }
+
+            // 4. 调 saveConnectionMode 保存连接方式，失败则回滚 connectionMode
             try {
                 await SyncConfigAPI.saveConnectionMode('ssh');
             } catch (err) {
+                setConnectionMode('http'); // 回滚到原模式
                 toast.error(err instanceof Error ? err.message : '保存连接方式失败');
             }
         } catch (err) {
@@ -225,6 +264,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
         try {
             await SyncConfigAPI.saveConnectionMode('http');
         } catch (err) {
+            setConnectionMode('ssh'); // 回滚到原模式
             toast.error(err instanceof Error ? err.message : '保存连接方式失败');
         }
     }, []);
@@ -292,6 +332,18 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
         value: SSHTunnelConfig[K],
     ) => {
         setSshConfig(prev => ({ ...prev, [field]: value }));
+    }, []);
+
+    // 更新端口字段：清空（NaN）时保留原值，避免传入 0/NaN 到后端
+    const updatePortField = useCallback(<K extends 'port' | 'local_port' | 'remote_port'>(
+        field: K,
+        raw: string,
+    ) => {
+        const v = parseInt(raw);
+        if (!isNaN(v)) {
+            setSshConfig(prev => ({ ...prev, [field]: v }));
+        }
+        // NaN 时不更新，state 保留原值，受控 input 回滚
     }, []);
 
     const configCommand = buildConfigCommand(publicKey);
@@ -485,6 +537,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     aria-label="SSH 主机"
                                     value={sshConfig.host}
                                     onChange={(e) => updateSshField('host', e.target.value)}
+                                    onBlur={handleSaveSshConfig}
                                     placeholder="your-server-ip"
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
                                 />
@@ -499,7 +552,8 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     type="number"
                                     aria-label="SSH 端口"
                                     value={sshConfig.port}
-                                    onChange={(e) => updateSshField('port', parseInt(e.target.value) || 0)}
+                                    onChange={(e) => updatePortField('port', e.target.value)}
+                                    onBlur={handleSaveSshConfig}
                                     min={1}
                                     max={65535}
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
@@ -516,6 +570,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     aria-label="SSH 用户名"
                                     value={sshConfig.username}
                                     onChange={(e) => updateSshField('username', e.target.value)}
+                                    onBlur={handleSaveSshConfig}
                                     placeholder="lifeprism"
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
                                 />
@@ -530,7 +585,8 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     type="number"
                                     aria-label="本地监听端口"
                                     value={sshConfig.local_port}
-                                    onChange={(e) => updateSshField('local_port', parseInt(e.target.value) || 0)}
+                                    onChange={(e) => updatePortField('local_port', e.target.value)}
+                                    onBlur={handleSaveSshConfig}
                                     min={1}
                                     max={65535}
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
@@ -546,7 +602,8 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     type="number"
                                     aria-label="远程目标端口"
                                     value={sshConfig.remote_port}
-                                    onChange={(e) => updateSshField('remote_port', parseInt(e.target.value) || 0)}
+                                    onChange={(e) => updatePortField('remote_port', e.target.value)}
+                                    onBlur={handleSaveSshConfig}
                                     min={1}
                                     max={65535}
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"

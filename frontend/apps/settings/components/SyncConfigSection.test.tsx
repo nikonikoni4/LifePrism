@@ -27,6 +27,8 @@ vi.mock('../syncApi', () => ({
     testConnection: vi.fn(),
     saveConnectionMode: vi.fn(),
     getConnectionMode: vi.fn(),
+    saveSshConfig: vi.fn(),
+    getSshConfig: vi.fn(),
   },
 }));
 
@@ -81,6 +83,15 @@ describe('SyncConfigSection', () => {
       status: 'ok',
       remote_response: { status: 'healthy' },
     });
+    // SSH 配置默认 mock：未保存时返回默认值
+    vi.mocked(SyncConfigAPI.getSshConfig).mockResolvedValue({
+      host: '',
+      port: 22,
+      username: '',
+      local_port: 8102,
+      remote_port: 8102,
+    });
+    vi.mocked(SyncConfigAPI.saveSshConfig).mockResolvedValue(undefined);
     // 默认 clipboard mock
     Object.defineProperty(navigator, 'clipboard', {
       value: {
@@ -586,8 +597,8 @@ describe('SyncConfigSection', () => {
 
       // 输入 SSH 参数
       await user.type(screen.getByLabelText(/SSH 主机/i), '1.2.3.4');
-      await user.clear(screen.getByLabelText(/SSH 端口/i));
-      await user.type(screen.getByLabelText(/SSH 端口/i), '22');
+      // SSH 端口默认就是 22，无需修改；用 fireEvent.change 显式设置以确保一致
+      fireEvent.change(screen.getByLabelText(/SSH 端口/i), { target: { value: '22' } });
       await user.type(screen.getByLabelText(/SSH 用户名/i), 'lifeprism');
 
       // 点击测试连接
@@ -847,6 +858,434 @@ describe('SyncConfigSection', () => {
       await waitFor(() => {
         const sshBtn = screen.getByRole('button', { name: /SSH 隧道/i });
         expect(sshBtn).toHaveAttribute('aria-pressed', 'true');
+      });
+    });
+  });
+
+  // ==================== Seam 12: SSH 配置初始加载 + 回填 ====================
+
+  describe('Seam 12: SSH 配置初始加载 + 回填', () => {
+    it('should load SSH config from backend on mount when connection_mode is ssh', async () => {
+      vi.mocked(SyncConfigAPI.getConnectionMode).mockResolvedValue('ssh');
+      vi.mocked(SyncConfigAPI.getSshConfig).mockResolvedValue({
+        host: '5.6.7.8',
+        port: 2222,
+        username: 'myuser',
+        local_port: 9000,
+        remote_port: 8101,
+      });
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.getSshConfig).toHaveBeenCalledTimes(1);
+      });
+
+      // SSH 配置应从后端回填，而非使用 DEFAULT_SSH_CONFIG
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 主机/i)).toHaveValue('5.6.7.8');
+        expect(screen.getByLabelText(/SSH 端口/i)).toHaveValue(2222);
+        expect(screen.getByLabelText(/SSH 用户名/i)).toHaveValue('myuser');
+        expect(screen.getByLabelText(/本地监听端口/i)).toHaveValue(9000);
+        expect(screen.getByLabelText(/远程目标端口/i)).toHaveValue(8101);
+      });
+    });
+
+    it('should load SSH config when switching from HTTP to SSH mode', async () => {
+      const user = userEvent.setup();
+      // 初始为 HTTP 模式，getSshConfig 返回已保存配置
+      vi.mocked(SyncConfigAPI.getSshConfig).mockResolvedValue({
+        host: '9.9.9.9',
+        port: 22,
+        username: 'admin',
+        local_port: 8102,
+        remote_port: 8102,
+      });
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      // 初始 HTTP 模式下不应调用 getSshConfig
+      expect(SyncConfigAPI.getSshConfig).not.toHaveBeenCalled();
+
+      // 切换到 SSH 模式应触发 getSshConfig
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.getSshConfig).toHaveBeenCalledTimes(1);
+      });
+
+      // 应回填后端已保存的配置
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 主机/i)).toHaveValue('9.9.9.9');
+        expect(screen.getByLabelText(/SSH 用户名/i)).toHaveValue('admin');
+      });
+    });
+
+    it('should not override user input with default config when backend returns defaults', async () => {
+      // 初始就是 SSH 模式，后端未保存配置（返回默认值）
+      vi.mocked(SyncConfigAPI.getConnectionMode).mockResolvedValue('ssh');
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 主机/i)).toBeInTheDocument();
+      });
+
+      // 默认值应正确显示
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 端口/i)).toHaveValue(22);
+        expect(screen.getByLabelText(/本地监听端口/i)).toHaveValue(8102);
+        expect(screen.getByLabelText(/远程目标端口/i)).toHaveValue(8102);
+      });
+    });
+  });
+
+  // ==================== Seam 13: SSH 输入框 onBlur 自动保存 ====================
+
+  describe('Seam 13: SSH 输入框 onBlur 自动保存', () => {
+    it('should save SSH config via saveSshConfig when host input loses focus', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 主机/i)).toBeInTheDocument();
+      });
+
+      // 输入 host 后失焦
+      await user.type(screen.getByLabelText(/SSH 主机/i), '1.2.3.4');
+      fireEvent.blur(screen.getByLabelText(/SSH 主机/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ host: '1.2.3.4' }),
+        );
+      });
+    });
+
+    it('should save SSH config via saveSshConfig when username input loses focus', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 用户名/i)).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText(/SSH 用户名/i), 'lifeprism');
+      fireEvent.blur(screen.getByLabelText(/SSH 用户名/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ username: 'lifeprism' }),
+        );
+      });
+    });
+
+    it('should save SSH config via saveSshConfig when port input loses focus', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 端口/i)).toBeInTheDocument();
+      });
+
+      // 直接修改端口值为 2222 后失焦
+      fireEvent.change(screen.getByLabelText(/SSH 端口/i), { target: { value: '2222' } });
+      fireEvent.blur(screen.getByLabelText(/SSH 端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ port: 2222 }),
+        );
+      });
+    });
+
+    it('should save SSH config via saveSshConfig when local_port input loses focus', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/本地监听端口/i)).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText(/本地监听端口/i), { target: { value: '9000' } });
+      fireEvent.blur(screen.getByLabelText(/本地监听端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ local_port: 9000 }),
+        );
+      });
+    });
+
+    it('should save SSH config via saveSshConfig when remote_port input loses focus', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/远程目标端口/i)).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText(/远程目标端口/i), { target: { value: '8101' } });
+      fireEvent.blur(screen.getByLabelText(/远程目标端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ remote_port: 8101 }),
+        );
+      });
+    });
+
+    it('should show error toast when saveSshConfig fails on blur', async () => {
+      const user = userEvent.setup();
+      vi.mocked(SyncConfigAPI.saveSshConfig).mockRejectedValue(new Error('网络错误'));
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 主机/i)).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText(/SSH 主机/i), '1.2.3.4');
+      fireEvent.blur(screen.getByLabelText(/SSH 主机/i));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('网络错误');
+      });
+    });
+  });
+
+  // ==================== Seam 14: 端口输入框 NaN 修复 ====================
+
+  describe('Seam 14: 端口输入框 NaN 修复', () => {
+    it('should preserve original SSH port value when input is cleared (not 0 or NaN)', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 端口/i)).toBeInTheDocument();
+      });
+
+      // 默认 port=22。清空输入框后 blur，saveSshConfig 应保留原值 22，而非 0 或 NaN
+      fireEvent.change(screen.getByLabelText(/SSH 端口/i), { target: { value: '' } });
+      fireEvent.blur(screen.getByLabelText(/SSH 端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ port: 22 }),
+        );
+      });
+    });
+
+    it('should preserve original local_port value when input is cleared', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/本地监听端口/i)).toBeInTheDocument();
+      });
+
+      // 默认 local_port=8102。清空后 blur，应保留 8102
+      fireEvent.change(screen.getByLabelText(/本地监听端口/i), { target: { value: '' } });
+      fireEvent.blur(screen.getByLabelText(/本地监听端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ local_port: 8102 }),
+        );
+      });
+    });
+
+    it('should preserve original remote_port value when input is cleared', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/远程目标端口/i)).toBeInTheDocument();
+      });
+
+      // 默认 remote_port=8102。清空后 blur，应保留 8102
+      fireEvent.change(screen.getByLabelText(/远程目标端口/i), { target: { value: '' } });
+      fireEvent.blur(screen.getByLabelText(/远程目标端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ remote_port: 8102 }),
+        );
+      });
+    });
+
+    it('should still update port when a valid number is entered', async () => {
+      const user = userEvent.setup();
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/SSH 端口/i)).toBeInTheDocument();
+      });
+
+      // 输入有效数字 2222 后 blur，应保存 port=2222
+      fireEvent.change(screen.getByLabelText(/SSH 端口/i), { target: { value: '2222' } });
+      fireEvent.blur(screen.getByLabelText(/SSH 端口/i));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveSshConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ port: 2222 }),
+        );
+      });
+    });
+  });
+
+  // ==================== Seam 15: 切换模式失败回滚 state ====================
+
+  describe('Seam 15: 切换模式失败回滚 state', () => {
+    it('should rollback connectionMode to http when switching to SSH fails on saveConnectionMode', async () => {
+      const user = userEvent.setup();
+      // saveConnectionMode('ssh') 失败
+      vi.mocked(SyncConfigAPI.saveConnectionMode).mockRejectedValueOnce(new Error('保存失败'));
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      // 初始 HTTP 模式
+      expect(screen.getByRole('button', { name: /HTTP\/HTTPS/i })).toHaveAttribute('aria-pressed', 'true');
+
+      // 点击切换到 SSH
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      // 等待 saveConnectionMode 被调用并失败
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveConnectionMode).toHaveBeenCalledWith('ssh');
+      });
+
+      // 失败后应回滚到 HTTP 模式（HTTP 按钮重新变为 active）
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /HTTP\/HTTPS/i })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toHaveAttribute('aria-pressed', 'false');
+      });
+
+      // 应 toast 错误提示
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('保存失败');
+      });
+    });
+
+    it('should rollback connectionMode to ssh when switching to HTTP fails on saveConnectionMode', async () => {
+      const user = userEvent.setup();
+      // 初始就是 SSH 模式
+      vi.mocked(SyncConfigAPI.getConnectionMode).mockResolvedValue('ssh');
+      // saveConnectionMode('http') 失败
+      vi.mocked(SyncConfigAPI.saveConnectionMode).mockRejectedValueOnce(new Error('网络错误'));
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toHaveAttribute('aria-pressed', 'true');
+      });
+
+      // 点击切换回 HTTP
+      await user.click(screen.getByRole('button', { name: /HTTP\/HTTPS/i }));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveConnectionMode).toHaveBeenCalledWith('http');
+      });
+
+      // 失败后应回滚到 SSH 模式
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: /HTTP\/HTTPS/i })).toHaveAttribute('aria-pressed', 'false');
+      });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('网络错误');
+      });
+    });
+
+    it('should not display SSH UI when rollback to HTTP after saveConnectionMode fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(SyncConfigAPI.saveConnectionMode).mockRejectedValueOnce(new Error('保存失败'));
+
+      render(<SyncConfigSection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /SSH 隧道/i })).toBeInTheDocument();
+      });
+
+      // 点击切换到 SSH
+      await user.click(screen.getByRole('button', { name: /SSH 隧道/i }));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.saveConnectionMode).toHaveBeenCalledWith('ssh');
+      });
+
+      // 回滚后不应显示 SSH UI（host 输入框不应存在）
+      await waitFor(() => {
+        expect(screen.queryByLabelText(/SSH 主机/i)).not.toBeInTheDocument();
       });
     });
   });

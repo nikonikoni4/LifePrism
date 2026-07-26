@@ -35,6 +35,12 @@ class SettingItems(BaseModel):
     output_tokens_cost: float = Field(description="输出token单价 /1k")
     # 同步配置
     sync_remote_url: str = Field(default="", description="云端服务器地址")
+    sync_connection_mode: str = Field(default="http", description="连接方式: http | ssh")
+    sync_ssh_tunnel_host: str = Field(default="", description="SSH 服务器地址")
+    sync_ssh_tunnel_port: int = Field(default=22, description="SSH 端口")
+    sync_ssh_tunnel_username: str = Field(default="", description="SSH 用户名")
+    sync_ssh_tunnel_local_port: int = Field(default=8102, description="本地监听端口")
+    sync_ssh_tunnel_remote_port: int = Field(default=8102, description="远程目标端口")
     # 分类配置
     classification_mode: str = Field(description="分类模式")
     long_log_threshold: int = Field(description="长时长阈值 (秒)")
@@ -100,6 +106,12 @@ class UpdateSettingsRequest(BaseModel):
     screen_analysis_ignore: list[str] | None = None
     timezone: str | None = None
     sync_remote_url: str | None = None
+    sync_connection_mode: str | None = None
+    sync_ssh_tunnel_host: str | None = None
+    sync_ssh_tunnel_port: int | None = None
+    sync_ssh_tunnel_username: str | None = None
+    sync_ssh_tunnel_local_port: int | None = None
+    sync_ssh_tunnel_remote_port: int | None = None
 
 
 class UpdateApiKeyRequest(BaseModel):

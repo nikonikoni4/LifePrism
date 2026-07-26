@@ -19,6 +19,7 @@ import type {
     GetPublicKeyResponse,
     OpenFolderResult,
     ResetSyncProgressResponse,
+    SSHTunnelConfig,
     SSHTunnelTestParams,
     SSHTunnelTestResponse,
     SyncStatus,
@@ -81,6 +82,55 @@ export const SyncConfigAPI = {
         }
         const data = await response.json();
         return data.settings?.sync_remote_url || '';
+    },
+
+    /**
+     * 保存 SSH 隧道配置到 config.yaml::sync.ssh_tunnel.*
+     *
+     * 复用 PATCH /api/v2/settings 接口，传入 5 个 sync_ssh_tunnel_* 字段。
+     * SSH 模式下输入框失焦时自动调用，无需额外点击保存按钮。
+     *
+     * @param config SSH 隧道配置（host/port/username/local_port/remote_port）
+     */
+    async saveSshConfig(config: SSHTunnelConfig): Promise<void> {
+        const response = await fetch(`${getApiV2Base()}/settings`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sync_ssh_tunnel_host: config.host,
+                sync_ssh_tunnel_port: config.port,
+                sync_ssh_tunnel_username: config.username,
+                sync_ssh_tunnel_local_port: config.local_port,
+                sync_ssh_tunnel_remote_port: config.remote_port,
+            }),
+        });
+        if (!response.ok) {
+            throw new Error(`保存 SSH 配置失败: ${response.statusText}`);
+        }
+    },
+
+    /**
+     * 从设置 API 读取 SSH 隧道配置
+     *
+     * 返回 5 个字段，未设置时使用默认值（host='', port=22, username='',
+     * local_port=8102, remote_port=8102），与后端 schema 默认值一致。
+     *
+     * @returns SSH 隧道配置
+     */
+    async getSshConfig(): Promise<SSHTunnelConfig> {
+        const response = await fetch(`${getApiV2Base()}/settings`);
+        if (!response.ok) {
+            throw new Error(`获取 SSH 配置失败: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const s = data.settings || {};
+        return {
+            host: s.sync_ssh_tunnel_host ?? '',
+            port: s.sync_ssh_tunnel_port ?? 22,
+            username: s.sync_ssh_tunnel_username ?? '',
+            local_port: s.sync_ssh_tunnel_local_port ?? 8102,
+            remote_port: s.sync_ssh_tunnel_remote_port ?? 8102,
+        };
     },
 
     /**
