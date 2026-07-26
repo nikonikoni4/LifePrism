@@ -683,6 +683,75 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                 </div>
                             )}
                         </div>
+
+                        {/* 生成云端配置按钮（与 HTTP 模式一致） */}
+                        <div className="border-t border-slate-100 pt-4 mt-2">
+                            <button
+                                onClick={handleGenerateClick}
+                                disabled={isGenerating}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-bold text-sm"
+                            >
+                                {isGenerating ? (
+                                    <span className="flex items-center gap-2">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        生成中...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-2">
+                                        <FolderOpen className="w-4 h-4" />
+                                        生成云端配置
+                                    </span>
+                                )}
+                            </button>
+                            <p className="text-xs text-slate-500 mt-2">
+                                生成 cloud_init.yaml 配置文件（包含所有 API Key），复制到云端服务器即可使用。SSH 隧道模式下同样需要此配置文件。
+                            </p>
+
+                            {/* 生成结果信息面板（与 HTTP 模式共享 state） */}
+                            {result && (
+                                <div
+                                    className={`mt-4 border rounded-xl p-4 ${
+                                        result.key_is_new
+                                            ? 'border-amber-200 bg-amber-50'
+                                            : 'border-green-200 bg-green-50'
+                                    }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        {result.key_is_new ? (
+                                            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                        ) : (
+                                            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            {result.key_is_new ? (
+                                                <div className="space-y-2">
+                                                    <p className="text-sm font-bold text-amber-800">
+                                                        配置已生成！同步 API Key 已更换。
+                                                    </p>
+                                                    <ol className="list-decimal list-inside space-y-1 text-xs text-amber-700">
+                                                        <li>将配置文件复制到云端 LifePrism/localData/ 目录</li>
+                                                        <li>在云端 LifePrism 目录下执行：python lifeprism/server/main_agent_only.py reinit-config</li>
+                                                        <li>重启云端服务使新 Key 生效</li>
+                                                    </ol>
+                                                    <p className="text-xs text-amber-700 font-medium">
+                                                        配置文件路径：{result.cloud_config_path}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <p className="text-sm font-bold text-green-800">
+                                                        配置已生成！使用已有的同步 API Key。
+                                                    </p>
+                                                    <p className="text-xs text-green-700">
+                                                        配置文件路径：{result.cloud_config_path}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
