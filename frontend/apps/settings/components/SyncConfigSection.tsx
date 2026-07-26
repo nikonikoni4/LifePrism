@@ -563,7 +563,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                             {/* SSH 用户名 */}
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
-                                    SSH 用户名
+                                    SSH 用户名(部署lifeprism所在的用户)
                                 </label>
                                 <input
                                     type="text"
@@ -571,7 +571,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                     value={sshConfig.username}
                                     onChange={(e) => updateSshField('username', e.target.value)}
                                     onBlur={handleSaveSshConfig}
-                                    placeholder="lifeprism"
+                                    placeholder="root"
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
                                 />
                             </div>

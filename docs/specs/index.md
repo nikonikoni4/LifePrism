@@ -6,10 +6,10 @@
 - 内容摘要：数据同步模块总览，定义子模块分层架构（数据库同步 + 动态表 + 心跳 / 文件同步 / 配置桥接）、依赖规则和子 spec 索引。原 `2026-07-11-data-sync-spec.md` 因超过 500 行拆分为 core 和 files 两个子 spec
 
 ## data-sync-core-spec
-- updated_at: 2026-07-23
+- updated_at: 2026-07-26
 - path: `docs/specs/2026-07-16-data-sync-core-spec.md`
-- 触发规则：开发、修改或查询数据库同步、动态表同步、墓碑同步（删除传播）、心跳管理、消息路由、云端配置初始化相关功能时阅读
-- 内容摘要：数据同步模块核心规格，定义 29 张静态表增量同步（updated_at + 分批拉取）、动态表 slug 集合对比双向建表、墓碑专用端点跨端传播 DELETE（3 个专用端点 + HTTP 外事务内 + INSERT OR IGNORE 跳过 LWW）、LWW 冲突解决策略、心跳状态管理（纯内存 15 分钟超时）、消息路由、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全
+- 触发规则：开发、修改或查询数据库同步、动态表同步、墓碑同步（删除传播）、心跳管理、消息路由、云端配置初始化、last_sync_time 更新点设计相关功能时阅读
+- 内容摘要：数据同步模块核心规格 v2.2，定义 29 张静态表增量同步（updated_at + 分批拉取）、动态表 slug 集合对比双向建表、墓碑专用端点跨端传播 DELETE（3 个专用端点 + HTTP 外事务内 + INSERT OR IGNORE 跳过 LWW）、LWW 冲突解决策略、心跳状态管理（纯内存 15 分钟超时）、消息路由、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全；v2.2 新增 last_sync_time 更新为 sync_cutoff_time（开始时间 T0）设计说明
 
 ## data-sync-files-spec
 - updated_at: 2026-07-16
@@ -136,3 +136,9 @@
 - path: `docs/specs/2026-07-17-data-backup-spec.md`
 - 触发规则：开发、修改或查询数据备份模块相关功能时阅读（定时全量备份、数据库在线备份、备份保留策略、完整性校验、同秒触发冲突保护、run_mode 守卫、全局任务状态互斥）
 - 内容摘要：数据备份模块规格（v3.0），触发于 2026-07-16 CONFLICT_RESOLVE LLM 合并破坏 behavior.md 的生产级 bug。定义三道防线中的第三道（定时全量备份），采用平铺存储（非 zip）+ 复用 ScheduleService + 不做恢复 API（恢复通过文档指导手工操作）。v3.0 变更：文档备份 backup_documents 从独立 03:00 cron 移除，并入 10点任务（job_id=update_memory）子步骤，位于 dreaming 之后（捕获 dreaming 写入的最新数据），与 dreaming 共享 skip_compensation=False 补执行机制；数据库备份保持独立 cron（每 8 小时 00/08/16 点），SQLite 使用 Online Backup API 保证一致性（无需 WAL checkpoint），不参与全局任务状态互斥；10点任务（含 backup_documents）持 LOCAL_TASK 状态与云端 sync_once 互斥（见 ADR 2026-07-25-global-task-state.md）；备份后立即完整性校验（文档：数量+SHA-256；数据库：PRAGMA integrity_check），文档与数据库各自保留最新 3 份，同秒触发冲突保护（清理已存在的目录/文件后再备份），run_mode 双重守卫（注册时+运行时）
+
+## data-sync-ssh-tunnel-spec
+- updated_at: 2026-07-26
+- path: `docs/specs/2026-07-26-data-sync-ssh-tunnel-spec.md`
+- 触发规则：开发、修改或查询 SSH 隧道连接方式（无域名场景安全传输）、SSH 密钥管理、隧道状态机、remote_url 拦截逻辑、SSH 隧道管理 API（enable/public-key/test）、SyncClient SSH 集成相关功能时阅读
+- 内容摘要：SSH 隧道同步模块规格，定义作为 HTTP/HTTPS 之外第三种连接方式的安全传输通道。覆盖 SSHTunnel 类对外接口（connect/close/start_keep_alive_loop/test_connection/状态机枚举）、SyncClient SSH 集成方法（_should_use_ssh_tunnel 三层守卫、_read_remote_url 统一拦截入口、_start_ssh_tunnel、_stop_ssh_tunnel）、3 个 SSH 隧道管理 API 端点、配置 Schema（sync.connection_mode 和 sync.ssh_tunnel.*）、7 个错误码契约（SSH_KEY_REJECTED/SSH_NETWORK_UNREACHABLE/SSH_LOCAL_PORT_IN_USE 等）、远端 8102 端口默认绑定 127.0.0.1 策略、非侵入式设计与三层守卫策略、密钥存储路由复用 ADR 2026-07-09

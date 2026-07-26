@@ -1,8 +1,8 @@
 ## 2026-07-11-data-sync-flow
- - updated_at : 2026-07-16
+ - updated_at : 2026-07-26
  - path: docs/flows/2026-07-11-data-sync-flow.md
- - 触发规则：需要理解 Windows ↔ Linux 数据同步完整数据流、动态表定义对比与双向建表链路、数据库 Pull/Push 路径、文件三阶段同步协议（check → fetch/push → verify/commit）、心跳维护与消息路由决策时读取
- - 内容摘要：SyncData 数据流 v2.0，覆盖云端配置初始化（本地生成 cloud_init.yaml → 云端消费写入 config/providers.yaml）、数据库同步（动态表 slug 对比 → 双向建表 → Pull 分批拉取+LWW 过滤 → Push 增量推送）、文件同步三阶段协议（Phase 1 check 交换 hash → Phase 2 fetch/push 传输 → Phase 3 verify/commit 一致性校验）、心跳与消息路由（is_local_online 判断→消息处理分支）共 4 条链路，含动态表建表不写 meta 和双层命名反常设计说明
+ - 触发规则：需要理解 Windows ↔ Linux 数据同步完整数据流、动态表定义对比与双向建表链路、墓碑同步链路（Pull/Push/清理）、数据库 Pull/Push 路径、文件三阶段同步协议（check → fetch/push → verify/commit）、心跳维护与消息路由决策、全局任务状态互斥（LOCAL_TASK vs CLOUD_SYNC）、SSH 模式下 sync_once 路径（_read_remote_url 拦截）时读取
+ - 内容摘要：SyncData 数据流 v3.0，覆盖云端配置初始化（cloud_init.yaml 生成→云端消费）、数据库同步 7 步流程（动态表定义对比 → 墓碑 Pull → 数据 Pull → 墓碑 Push → 数据 Push → 文件三阶段 → 墓碑清理 → 更新 last_sync_time 为开始时间 T0）、文件同步三阶段协议、心跳与消息路由、全局任务状态互斥（try_acquire(CLOUD_SYNC, timeout=0)，遇 LOCAL_TASK 放弃+ping）、SSH 模式下 sync_once 路径（_read_remote_url 拦截+隧道未就绪跳过）共 6 条链路，含 last_sync_time T0、动态表建表不写 meta、SSH 模式 remote_url 语义变化、global_task_state 与 _is_syncing 共存等 6 项反常设计说明
 
 ## 2026-07-06-repository-initialization-flow
  - updated_at : 2026-07-06
@@ -76,3 +76,9 @@
  - path: docs/flows/2026-07-11-custom-card-rendering-flow.md
  - 触发规则：需要理解前端卡片渲染管线、L1/L2/L3三层布局引擎、多正文叠加、空字段过滤、三布局分支渲染、确定性字段着色时读取
  - 内容摘要：CardLayoutResult 数据流（纯前端），覆盖布局分析核心管线（空值过滤→resolveRole三级优先级→标题竞争分配→布局模式决策）、L2 overrides构建（从fields.display_role提取）、L3模板预设解析（getTemplatePreset返回CSS类名）、EntryCard三布局分支渲染（note多正文叠加/compact键值对/tight纯标签云）、字段颜色确定性分配、日期分组共 6 条链路，含数据驱动布局和模板-布局正交设计说明
+
+## 2026-07-26-ssh-tunnel-flow
+ - updated_at : 2026-07-26
+ - path: docs/flows/2026-07-26-ssh-tunnel-flow.md
+ - 触发规则：需要理解 SSH 隧道完整生命周期、密钥生成/派生/部署流程、测试连接一次性流程、SyncClient 启动隧道与 keep-alive 后台任务、sync_once 在 SSH 模式下的 remote_url 拦截、隧道断开自动重连（指数退避）、关闭隧道优雅清理时读取
+ - 内容摘要：SSHTunnel 生命周期数据流，覆盖"前端切换到 SSH 模式 → 后端生成密钥 → 返回公钥"、"测试连接（建立→验证→关闭）"、"SyncClient 启动隧道（connect + keep_alive_loop）"、"sync_once 在 SSH 模式下（_read_remote_url 拦截 + _ensure_tunnel_ready 检查）"、"隧道断开自动重连（5s/10s/20s/30s 退避）"、"关闭隧道（tunnel.close + 等待 keep-alive 任务退出）"共 6 条链路，含 SSHTunnel 状态机（DISCONNECTED/CONNECTING/CONNECTED/RECONNECTING/FAILED）、5 项反常设计说明（test_connection 临时实例、known_hosts=None、无最大重试次数、隧道失败不阻塞 SyncClient、Windows GSSAPI 兼容性）

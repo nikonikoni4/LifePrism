@@ -1,8 +1,8 @@
 ---
-version: 2.1
+version: 2.2
 created_at: 2026-07-16
-updated_at: 2026-07-23
-last_updated: 新增墓碑同步章节（专用端点替代 SYNC_TABLES、HTTP 外事务内、INSERT OR IGNORE 跳过 LWW、Aggregator 实例化 Provider、sync_once 顺序）；新增 DeletionLogProvider key_function；SyncRepository/SyncClient/Sync Cloud API 各补墓碑相关接口；同步表数 30→29（deletion_log 走专用通道）；Functional Checklist 补墓碑同步小节；更新 sync_once 流程顺序
+updated_at: 2026-07-26
+last_updated: 补充 last_sync_time 更新点改为开始时间 T0 的设计说明（sync_once 入口记录 sync_cutoff_time，全部成功后更新为该值）；引用 ADR 2026-07-25-global-task-state 决策依据；同步对齐 data-sync-flow v3.0
 abstract: Windows 本地 ↔ Linux 云端数据同步模块核心规格（数据库同步 + 动态表同步 + 墓碑同步 + 心跳路由 + 云端配置初始化），定义 29 张静态表增量同步、动态表 slug 集合对比双向建表、墓碑专用端点跨端传播删除、LWW 冲突解决和认证安全的技术契约
 status: draft
 module: sync
@@ -14,6 +14,7 @@ module: sync
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 2.2 | 补充 `last_sync_time` 更新点设计：sync_once 入口记录 `sync_cutoff_time`（开始时间 T0），全部步骤成功后更新 `last_sync_time = sync_cutoff_time`（而非结束时间 T_end）；前提条件依赖云端 LWW 幂等性（`updated_at` 相等跳过覆盖）；引用 ADR [2026-07-25-global-task-state](../adr/2026-07-25-global-task-state.md) 全局前提 4 |
 | 2.1 | 新增墓碑同步机制（专用端点 `/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`，HTTP 外事务内，`INSERT OR IGNORE` 跳过 LWW，Aggregator 内部实例化 DeletionLogProvider）；`deletion_log` 从 `SYNC_TABLES` 移除改走专用通道；静态同步表数量 30→29；新增 DeletionLogProvider 章节；sync_once 流程新增墓碑 Pull/Push/清理步骤 |
 | 2.0 | 从原 `2026-07-11-data-sync-spec.md` 拆分，拆分文件同步到独立 spec |
 | 1.0 | 创建 spec 初稿 |
@@ -90,6 +91,7 @@ module: sync
 - [ ] 无 updated_at 列的表（mood_types 等）直接全量覆盖
 - [ ] LWW 中 `updated_at` 相等时跳过而非覆盖
 - [ ] 所有步骤成功后更新 `last_sync_time`（整体原子性）
+- [ ] `last_sync_time` 更新为 `sync_cutoff_time`（sync_once 入口的开始时间 T0，而非结束时间 T_end）；前提：依赖云端 LWW 幂等性（`updated_at` 相等跳过覆盖）。详见 ADR [2026-07-25-global-task-state](../adr/2026-07-25-global-task-state.md) 全局前提 4
 
 ### 动态表同步
 
@@ -200,7 +202,7 @@ module: sync
 
 | 接口 | 说明 | 约束 |
 |------|------|------|
-| `sync_once(tables, directories)` | 执行一次完整同步 | 定义对比 → 墓碑 Pull → 数据 Pull → 墓碑 Push → 数据 Push → 文件同步 → 墓碑清理 → 更新 last_sync_time（全部成功才更新） |
+| `sync_once(tables, directories)` | 执行一次完整同步 | 定义对比 → 墓碑 Pull → 数据 Pull → 墓碑 Push → 数据 Push → 文件同步 → 墓碑清理 → 更新 `last_sync_time = sync_cutoff_time`（入口开始时间 T0，全部成功才更新） |
 | `_sync_dynamic_tables_definitions(remote_url, api_key)` | 拉取云端定义 → slug 对比 → 双向建表 | 返回更新后的动态表 slug 列表 |
 | `_create_local_dynamic_tables(slug_to_fields)` | 本地建动态数据表 | 委托给 SyncRepository.create_local_data_tables() |
 | `_rebuild_remote_dynamic_tables(remote_url, api_key)` | 发送本地定义给云端重建 | POST /api/sync/rebuild-dynamic-tables |
@@ -220,10 +222,17 @@ module: sync
 5. push_to_remote                    → 推送本地数据库变更
 6. _sync_files_full_flow             → 文件三阶段同步
 7. _cleanup_deletion_log             → 清理 created_at <= last_sync_time 的墓碑
-8. 更新 last_sync_time               → 全部成功后才更新
+8. 更新 last_sync_time               → 全部成功后更新为 sync_cutoff_time（入口开始时间 T0）
 ```
 
-**顺序原因**：墓碑 Pull 在数据 Pull 之前，避免云端已删记录被数据 Pull 写回；墓碑 Push 在数据 Push 之前，确保云端先收到删除意图再处理数据变更。
+**顺序原因**：墓碑 Pull 在数据 Pull 之前，避免云端已删记录被数据 Pull 写回；墓碑 Push 在数据 Push 之前，确保云端先收到删除意图再处理数据变更；墓碑清理在更新 `last_sync_time` 之前，用旧 `last_sync_time` 清理过期墓碑，刚 Pull/Push 产生的墓碑（`created_at > 旧 last_sync_time`）不会被误清。
+
+**`last_sync_time` 更新点设计**（v2.2 新增，对齐 ADR [2026-07-25-global-task-state](../adr/2026-07-25-global-task-state.md) 全局前提 4）：
+- 入口记录 `sync_cutoff_time = datetime.now(timezone.utc).isoformat()`（开始时间 T0）
+- 全部步骤成功后 `set_setting("sync.last_sync_time", sync_cutoff_time)`
+- **关键收益**：避免 sync 期间其他任务（dreaming / AgentLoop）写入的数据被永久排除——若用结束时间 T_end，这些数据的 `updated_at` 落在 (T0, T_end) 区间，会被永久排除在下次 sync 之外
+- **代价**：下次 sync 会重复 Push 本次已 Push 过的数据（`updated_at > T0` 但实际已 Push），但云端 LWW 幂等处理（`updated_at` 相等跳过覆盖），无副作用
+- **前提条件**：依赖云端 LWW 幂等性。若未来 LWW 改为非幂等（如 `updated_at` 相等也覆盖），需重新评估
 
 ### Sync Cloud API — 云端同步端点
 
