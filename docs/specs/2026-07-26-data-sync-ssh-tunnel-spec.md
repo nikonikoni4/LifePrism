@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-26
-updated_at: 2026-07-26
-last_updated: 初版，从 PRD `.scratch/ssh-tunnel-integration/prd.md` 提炼 SSH 隧道模块的技术契约，与 data-sync-core-spec / data-sync-files-spec 并列为 data-sync 模块的第三个子 spec
+updated_at: 2026-07-27
+last_updated: 新增"Windows GSSAPI 禁用"设计决策（asyncssh.connect 传 gss_host='' 修复 PyInstaller 打包环境 win32timezone 缺失）；Functional Checklist 新增打包环境 SSH 隧道连接验证项；同步对齐 flow v1.1 反常设计 5
 abstract: SSH 隧道子模块规格，定义 SSH 隧道（无域名场景下的安全传输通道）的连接管理 API、状态机、密钥存储、remote_url 拦截规则、运行模式守卫与 SyncClient 集成契约。作为 HTTP/HTTPS 之外的可选连接方式，非侵入式兼容现有同步流程。
 ---
 
@@ -12,6 +12,7 @@ abstract: SSH 隧道子模块规格，定义 SSH 隧道（无域名场景下的�
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.1 | 新增"Windows GSSAPI 禁用"设计决策（`asyncssh.connect` 传 `options=SSHClientConnectionOptions(gss_host='')`）；Functional Checklist 新增"打包环境 SSH 隧道能正常连接"验证项；同步对齐 flow v1.1 反常设计 5 |
 | 1.0 | 创建 spec 初稿：定义 SSH 隧道连接管理 API、SSHTunnel 类对外接口、SyncClient SSH 集成方法、配置 Schema、状态机规则、设计决策与已知限制 |
 
 ## Overview
@@ -93,6 +94,7 @@ abstract: SSH 隧道子模块规格，定义 SSH 隧道（无域名场景下的�
 - [ ] 关闭 LifePrism 时优雅关闭 SSH 隧道连接，不留孤儿进程
 - [ ] SSH 隧道启用时本地监听端口被占用能给出明确错误（如"端口 8102 已被其他程序占用"）
 - [ ] SSH 隧道未就绪时跳过本次同步并记录 WARNING，下次同步周期自动恢复
+- [ ] Windows 打包环境（PyInstaller）下 SSH 隧道能正常连接，不因 `No module named 'win32timezone'` 失败（显式禁用 GSSAPI）
 
 ### 测试连接
 
@@ -316,6 +318,27 @@ SSH 隧道作为可选连接方式，对现有 HTTP/HTTPS 流程零侵入：
 - 成熟稳定（PyPI 上活跃维护）
 - 支持 ed25519 密钥
 - 支持本地端口转发
+
+### Windows GSSAPI 禁用（v1.1 新增）
+
+**背景**：PyInstaller 打包环境未收集 `win32timezone`（pywin32 子模块），asyncssh 在 Windows 上默认初始化 GSSClient 会触发 `sspi → win32timezone` 导入链，抛 `ModuleNotFoundError`。asyncssh `connection.py:3317` 的 try/except 只捕获 `GSSError` 不捕获 `ModuleNotFoundError`，异常直接冒泡使 SSH 隧道连接失败。
+
+**决策**：在 `SSHTunnel.connect()` 中显式传 `options=asyncssh.SSHClientConnectionOptions(gss_host='')`，利用 asyncssh `connection.py:3314` 的 `if gss_host:` 短路判断（空字符串为 falsy）跳过 GSSClient 实例化。
+
+**为何不通过 `lifeprism.spec` hiddenimports 收集 pywin32 子模块**：
+- `win32timezone` 可能只是冰山一角，`sspi.ClientAuth()` 内部可能还触发其他 pywin32 子模块导入（如 `win32security`、`win32cred`），需穷举所有子模块
+- pywin32 升级或 asyncssh 升级可能引入新子模块依赖，维护成本高
+- 项目用密钥认证，GSSAPI 是不需要的功能，禁用比打包完整依赖更符合最小依赖原则
+
+**为何不在 `lifeprism.spec` 添加 asyncssh 到 hiddenimports**：asyncssh 是纯 Python 包，PyInstaller 静态分析理论上能自动发现。实际打包产物中 asyncssh 模块已正确包含（通过 PYZ 归档嵌入 exe），问题不在 asyncssh 本身而在其运行时调用的 pywin32 子模块。
+
+**影响**：仅禁用 GSSAPI 认证（项目不使用），不影响密钥认证、kex_algs、known_hosts 验证、重连逻辑。
+
+**相关位置**：
+- `lifeprism/sync/ssh_tunnel.py:179`（`asyncssh.connect` 调用）
+- `test/core/unit/sync/test_ssh_tunnel.py::test_connect_disables_gssapi`（回归测试）
+- `docs/flows/2026-07-26-ssh-tunnel-flow.md` 反常设计 5
+- `docs/history-bugs/2026-07-27-packaged-win32timezone-gssapi.md`（bug 历史记录）
 
 ### 已知限制
 

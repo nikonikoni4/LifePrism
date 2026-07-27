@@ -1,3 +1,10 @@
+## 2026-07-27-packaged-win32timezone-gssapi
+
+- updated_at: 2026-07-27
+- path: `docs/history-bugs/2026-07-27-packaged-win32timezone-gssapi.md`
+- 触发规则：在排查打包环境（PyInstaller）SSH 隧道连接失败、日志出现 `No module named 'win32timezone'`、修改 `ssh_tunnel.py` 中 `asyncssh.connect` 参数、讨论 asyncssh GSSAPI 禁用方案、对比"显式禁用 GSSAPI"vs"lifeprism.spec 添加 pywin32 hiddenimports"时阅读
+- 内容摘要：**打包环境 bug（P1，已修复 2026-07-27）** — PyInstaller 打包环境未收集 `win32timezone`（pywin32 子模块），asyncssh 在 Windows 上默认初始化 GSSClient 触发 `sspi → win32timezone` 导入链抛 `ModuleNotFoundError`；asyncssh `connection.py:3317` 的 try/except 只捕获 `GSSError` 不捕获 `ModuleNotFoundError`，异常直接冒泡使 SSH 隧道启动失败。修复方案：在 `asyncssh.connect()` 传 `options=asyncssh.SSHClientConnectionOptions(gss_host='')`，利用 `if gss_host:` 短路判断跳过 GSSClient 实例化。为何不用 hiddenimports 方案：`win32timezone` 可能只是冰山一角，`sspi.ClientAuth()` 内部可能还触发其他 pywin32 子模块导入，穷举维护成本高；项目用密钥认证，禁用 GSSAPI 比打包完整依赖更符合最小依赖原则。
+
 ## 2026-07-25-sync-last-sync-time-update-point-data-loss
 
 - updated_at: 2026-07-25

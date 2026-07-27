@@ -268,6 +268,32 @@ class TestConnectErrorTransparency:
             assert call_kwargs.get("port") == tunnel_kwargs["port"]
             assert call_kwargs.get("username") == tunnel_kwargs["username"]
 
+    async def test_connect_disables_gssapi(self, tunnel_kwargs, mock_connection):
+        """Regression: 验证 asyncssh.connect 传入 gss_host='' 禁用 GSSAPI
+
+        背景：PyInstaller 打包环境未收集 win32timezone（pywin32 子模块），
+        asyncssh 默认初始化 GSSClient 会触发 sspi → win32timezone 导入链，
+        抛 ModuleNotFoundError 使 SSH 隧道启动失败。
+        修复：显式传 options=SSHClientConnectionOptions(gss_host='') 跳过 GSSClient 初始化。
+        详见 docs/history-bugs/2026-07-27-packaged-win32timezone-gssapi.md
+        """
+        from lifeprism.sync.ssh_tunnel import SSHTunnel
+
+        conn, _ = mock_connection
+        with patch("asyncssh.connect", new=AsyncMock(return_value=conn)) as mock_connect:
+            tunnel = SSHTunnel(**tunnel_kwargs)
+            await tunnel.connect()
+            # 验证传入了 options 参数
+            call_kwargs = mock_connect.await_args.kwargs
+            assert "options" in call_kwargs, "asyncssh.connect 必须传入 options 参数以禁用 GSSAPI"
+            # 验证 options 是 SSHClientConnectionOptions 实例且 gss_host 为空字符串
+            options = call_kwargs["options"]
+            assert isinstance(options, asyncssh.SSHClientConnectionOptions)
+            assert options.gss_host == '', (
+                "gss_host 必须为空字符串以跳过 GSSClient 初始化，"
+                "否则打包环境会因 win32timezone 缺失而失败"
+            )
+
     async def test_connect_starts_local_port_forwarding(self, tunnel_kwargs, mock_connection):
         """connect() 成功后启动本地端口转发，参数与构造参数一致"""
         from lifeprism.sync.ssh_tunnel import SSHTunnel

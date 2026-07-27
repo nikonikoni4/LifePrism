@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-26
-updated_at: 2026-07-26
-last_updated: 初版，从 PRD `.scratch/ssh-tunnel-integration/prd.md` 和 spec `2026-07-26-data-sync-ssh-tunnel-spec.md` 提炼 SSH 隧道完整生命周期数据流，覆盖启用、测试、启动、运行、重连、关闭 6 条链路
+updated_at: 2026-07-27
+last_updated: 反常设计 5 更新为"显式禁用 GSSAPI"（修复 PyInstaller 打包环境 win32timezone 缺失导致 SSH 隧道启动失败）；同步对齐 docs/history-bugs/2026-07-27-packaged-win32timezone-gssapi.md
 abstract: SSH 隧道生命周期数据流，覆盖"前端切换到 SSH 模式 → 后端生成密钥"、"测试连接"、"SyncClient 启动隧道"、"sync_once 在 SSH 模式下"、"隧道断开重连"、"关闭隧道"共 6 条链路。Flow 对象为 SSHTunnel 实例（SyncClient._ssh_tunnel 引用），状态机为 DISCONNECTED/CONNECTING/CONNECTED/RECONNECTING/FAILED。
 ---
 
@@ -10,6 +10,7 @@ abstract: SSH 隧道生命周期数据流，覆盖"前端切换到 SSH 模式 �
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.1 | 反常设计 5 从"依赖 asyncssh 内部回退"改为"显式禁用 GSSAPI"（`asyncssh.connect` 传 `options=SSHClientConnectionOptions(gss_host='')`），修复 PyInstaller 打包环境 `No module named 'win32timezone'` 导致 SSH 隧道启动失败 |
 | 1.0 | 创建文档初稿，覆盖 SSH 隧道 6 条生命周期链路 |
 
 # 数据流：SSHTunnel 生命周期
@@ -391,13 +392,20 @@ stateDiagram-v2
 **影响范围**：用户感知隧道失败的途径是同步日志中的 WARNING/ERROR（"SSH 隧道未就绪"），或主动点击"测试连接"验证；隧道状态不实时显示在前端（已知限制 7）。
 **相关位置**：`lifeprism/sync/sync_client.py:342-347`。
 
-### 反常设计 5：Windows asyncssh GSSAPI 加载失败
+### 反常设计 5：Windows 显式禁用 asyncssh GSSAPI
 
-**设计意图**：asyncssh 在 Windows 上初始化 GSSClient 时调用 win32api，部分环境 DLL 加载失败。
-**当前实现**：lifeprism 代码未做特殊处理，依赖 asyncssh 内部回退；若 GSSAPI 初始化抛 ImportError，asyncssh 会跳过 GSSAPI 认证，仅使用 publickey 认证。
-**为什么是反常的**：理论上 asyncssh 应在 Windows 上自动禁用 GSSAPI，但实际行为依赖 win32api 是否安装完整（pywin32 包）。
-**影响范围**：开发环境（Windows + anaconda）若 pywin32 安装异常，asyncssh.connect 会抛 ImportError 而非回退；生产打包环境通常正常。
-**相关位置**：asyncssh 库内部 `asyncssh/gss_win32.py`，lifeprism 未直接调用。
+**设计意图**：asyncssh 在 Windows 上默认初始化 GSSClient（即使项目用密钥认证），触发 `sspi → win32timezone` 导入链。PyInstaller 打包环境未收集 `win32timezone`（pywin32 子模块），导致 `ModuleNotFoundError`；asyncssh `connection.py:3317` 的 try/except 只捕获 `GSSError` 不捕获 `ModuleNotFoundError`，异常直接冒泡使 SSH 隧道连接失败。
+
+**当前实现**：`asyncssh.connect()` 传入 `options=asyncssh.SSHClientConnectionOptions(gss_host='')`，利用 asyncssh `connection.py:3314` 的 `if gss_host:` 短路判断（空字符串为 falsy）跳过 GSSClient 实例化，从源头避免触发 sspi 导入链。
+
+**为什么是反常的**：理论上 asyncssh 应在 Windows 上自动处理 pywin32 子模块缺失（扩大 try/except 范围或运行时探测），或其 `gss.py` 顶层 try/except `ImportError` 应能兜底。但 `gss_win32.py` 顶层 `from sspi import ClientAuth` 导入成功（sspi 模块对象本身能加载），真正的 `win32timezone` 导入发生在运行时 `ClientAuth()` 调用内部，不在 `gss.py` 的 try/except 覆盖范围内。显式禁用是对 asyncssh GSSAPI 行为的 workaround。
+
+**影响范围**：仅禁用 GSSAPI 认证（项目不使用，仅用 publickey 认证），不影响密钥认证、kex_algs、known_hosts 验证、重连逻辑。开发环境（pywin32 完整）和打包环境行为一致。
+
+**相关位置**：
+- `lifeprism/sync/ssh_tunnel.py:179`（`asyncssh.connect` 调用，传 `gss_host=''`）
+- `test/core/unit/sync/test_ssh_tunnel.py::test_connect_disables_gssapi`（回归测试）
+- `docs/history-bugs/2026-07-27-packaged-win32timezone-gssapi.md`（bug 历史记录）
 
 ## 相关文档
 

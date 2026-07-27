@@ -182,6 +182,14 @@ class SSHTunnel:
                 username=self.username,
                 client_keys=[key_obj],
                 known_hosts=None,  # 信任主机密钥（生产应使用 known_hosts 文件）
+                # 显式禁用 GSSAPI：asyncssh 在 Windows 默认初始化 GSSClient 会触发
+                # sspi → win32timezone 导入链，PyInstaller 打包环境未收集该 pywin32 子模块
+                # 导致 ModuleNotFoundError。asyncssh connection.py 的 try/except 只捕获
+                # GSSError 不捕获 ModuleNotFoundError，异常直接冒泡使连接失败。
+                # gss_host='' 利用 connection.py:3314 的 `if gss_host:` 短路判断（空字符串
+                # 为 falsy）跳过 GSSClient 实例化。项目用密钥认证，无需 GSSAPI。
+                # 详见 docs/flows/2026-07-26-ssh-tunnel-flow.md 反常设计 5
+                options=asyncssh.SSHClientConnectionOptions(gss_host=""),
             )
         except asyncssh.PermissionDenied as e:
             self._state = ConnectionState.FAILED
