@@ -4,6 +4,10 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+# lifeprism.log 大小限制与备份数
+LIFEPRISM_LOG_MAX_BYTES = 1 * 1024 * 1024  # 1MB
+LIFEPRISM_LOG_BACKUP_COUNT = 1  # 仅保留 1 份 lifeprism.old.log
+
 DEBUG = logging.DEBUG
 INFO = logging.INFO
 WARNING = logging.WARNING
@@ -56,12 +60,51 @@ _file_handler: logging.FileHandler | None = None
 _uvicorn_file_logging_added = False
 
 
+class _LifeprismRotatingFileHandler(RotatingFileHandler):
+    """lifeprism.log 专用 RotatingFileHandler：1MB 滚动 + 1 份 .old.log 备份。
+
+    stdlib RotatingFileHandler 的备份命名是 `lifeprism.log.1`，无法配置为
+    `lifeprism.old.log`。此子类覆盖 doRollover：
+    - 关闭当前 stream
+    - 用 os.replace 原子覆盖已有的 lifeprism.old.log（旧备份被淘汰）
+    - 重新打开 lifeprism.log 写入
+
+    保留 backupCount>0 时父类逻辑未使用（此 handler 固定 backupCount=1），
+    覆盖 doRollover 即可实现自定义命名。
+    """
+
+    def doRollover(self):
+        if self.stream:
+            self.stream.close()
+            self.stream = None
+        # 原子改名：原 lifeprism.log → lifeprism.old.log（覆盖已有 .old.log）
+        old_log = Path(self.baseFilename).with_suffix(".old.log")
+        try:
+            # 若目标已存在，先删除（os.replace 在 Windows 上会覆盖，但显式删除更稳妥）
+            if os.path.exists(old_log):
+                os.remove(old_log)
+            os.rename(self.baseFilename, old_log)
+        except OSError:
+            # LEGITIMATE: 辅助操作兜底 — 改名失败时退化为直接截断重写，不丢日志写入能力
+            with open(self.baseFilename, "w", encoding=self.encoding):
+                pass
+        if not self.delay:
+            self.stream = self._open()
+
+
 def setup_file_logging(log_dir: Path) -> None:
     """
-    为 root logger 添加 FileHandler
+    为 root logger 添加 FileHandler（RotatingFileHandler，1MB 滚动 + 1 份 .old.log 备份）
 
     由 settings_manager 初始化完成后调用，传入日志目录路径。
     所有通过 get_logger() 创建的 logger 都会自动继承此 FileHandler。
+
+    设计决策：
+    - 限制 lifeprism.log 大小为 1MB，超过时将原文件改名为 lifeprism.old.log，
+      再新建 lifeprism.log 继续写入。
+    - 仅保留 1 份备份（lifeprism.old.log），再次滚动时旧 .old.log 被覆盖。
+    - 启动时不再清空已有 lifeprism.log（追加写入），由 1MB 滚动自然淘汰旧日志。
+    - 幂等性：重复调用不会重复添加 handler。
 
     Args:
         log_dir: 日志目录路径（如 lifeprismData/debug_logs）
@@ -73,10 +116,12 @@ def setup_file_logging(log_dir: Path) -> None:
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "lifeprism.log"
-        # 每次启动时清空旧日志
-        if log_file.exists():
-            log_file.write_text("", encoding="utf-8")
-        file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+        file_handler = _LifeprismRotatingFileHandler(
+            log_file,
+            maxBytes=LIFEPRISM_LOG_MAX_BYTES,
+            backupCount=LIFEPRISM_LOG_BACKUP_COUNT,
+            encoding="utf-8",
+        )
         file_handler.setFormatter(TruncatingFormatter(_LOG_FORMAT))
         logging.getLogger().addHandler(file_handler)
         _file_handler = file_handler

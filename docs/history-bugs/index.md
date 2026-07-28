@@ -1,3 +1,17 @@
+## 2026-07-27-bootstrap-md-recurring-after-overwrite
+
+- updated_at: 2026-07-27
+- path: `docs/history-bugs/2026-07-27-bootstrap-md-recurring-after-overwrite.md`
+- 触发规则：在排查 `bootstrap.md` 反复出现、引导流程反复触发、修改 `resource_initializer.py` 中 `OVERWRITE_DIR_LIST` / `OVERWRITE_FILE_LIST` / 优先级顺序、讨论"整目录覆盖"绕过"单文件保护"的优先级设计、设计防御性编程模式（保护逻辑必须最高优先级）、复发性 bug 的防御性测试时阅读
+- 内容摘要：**复发性 bug（P2，已修复 2026-07-27）** — `bootstrap.md` 是 Agent 首次引导文件，用户完成引导删除后不应再生成。此 bug 在项目历史中多次复发，每次根因不同。第 2 次复发由 commit `7f4f3b62` 将 `"agent"` 加入 `OVERWRITE_DIR_LIST` 引入，导致整目录强制覆盖绕过了优先级 3 的 bootstrap.md 跳过逻辑。第 3 次（隐患）即使第 2 次修复后，bootstrap.md 跳过逻辑仍位于优先级 3，可被优先级 2 的整目录覆盖绕过——若未来 `"agent"` 再次误入 `OVERWRITE_DIR_LIST`，bug 立即复发。修复方案：将 bootstrap.md 跳过逻辑提前到优先级 0（最高，早于所有覆盖逻辑），使其成为不可绕过的防御性保护。新增防御性测试 `test_bootstrap_md_not_overwritten_even_if_agent_in_dir_list` 模拟历史 bug 场景。沉淀教训：硬性保护逻辑必须放在所有覆盖逻辑之前，不能依赖配置正确性。
+
+## 2026-07-27-ssh-tunnel-disconnects-after-period
+
+- updated_at: 2026-07-27
+- path: `docs/history-bugs/2026-07-27-ssh-tunnel-disconnects-after-period.md`
+- 触发规则：在排查 SSH 隧道运行一段时间后无法连接、日志出现 `[WinError 121] 信号灯超时时间已到`、httpx 报 `502 Bad Gateway` 但云端无请求记录、sync_once 首次成功后续全部失败、云端重启后短暂恢复、讨论云端 sshd `ClientAliveInterval=0` 死连接累积、阿里云 DDoS 防护触发 IP 暂封、SSH 测试连接按钮端口冲突时阅读
+- 内容摘要：**SSH 隧道连接 bug（P1，未修复，根因未确定 2026-07-27）** — SSH 隧道启动后首次 sync_once 成功（约 35s），但运行 10 分钟以上后所有定时 sync_once 均失败，表现为 `[WinError 121] 信号灯超时时间已到` + httpx 误导性 `502 Bad Gateway`。SSH keep-alive 检测到断开后自动重连成功，但重连后仍无法访问云端 8102 服务；云端重启后能短暂恢复一次同步。**可能根因（未最终确定）**：假设 1（云端 sshd `ClientAliveInterval=0` 死连接累积触发阿里云 DDoS 防护 IP 暂封）、假设 2（云端 8102 服务崩溃）、假设 3（测试连接按钮新建独立隧道与 SyncClient 隧道 local_port 冲突）。已确认问题出在云端（失败时段云端日志无任何请求记录）。待排查项：验证云端 sshd 配置、`ss -tnp | grep :22 | wc -l` 僵尸连接数、阿里云 DDoS 防护日志、`systemctl status lifeprism` 服务状态。
+
 ## 2026-07-27-packaged-win32timezone-gssapi
 
 - updated_at: 2026-07-27

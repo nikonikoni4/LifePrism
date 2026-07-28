@@ -873,7 +873,9 @@ class SyncClient:
         # 1. 刷新 current_hash（同时扫描文件，复用扫描结果避免重复扫描）
         # _refresh_current_hashes 会扫描文件并 upsert state（parent_hash=existing or None, current_hash=计算值）
         # 返回扫描到的文件相对路径列表，供后续 _push_files 和 _advance_local_parent 复用
-        file_list = self._refresh_current_hashes(directories)
+        # skip_template_filter=True：首次同步跳过 template_hashes 过滤，
+        # 让系统提示词（agent.md/soul.md/tool.md）能推送到云端 agent_only 服务器
+        file_list = self._refresh_current_hashes(directories, skip_template_filter=True)
         if not file_list:
             logger.info("无文件需要推送")
             return []
@@ -1466,7 +1468,7 @@ class SyncClient:
         logger.info("_scan_sync_files: 扫描到 %d 个待同步文件", len(files))
         return files
 
-    def _refresh_current_hashes(self, directories):
+    def _refresh_current_hashes(self, directories, *, skip_template_filter: bool = False):
         """同步前全量扫描：刷新 file_sync_state 中所有文件的 current_hash
 
         遍历 directories 下所有文件（排除 chat_history.json），
@@ -1477,10 +1479,19 @@ class SyncClient:
         1. 空文件：content.strip() 后为空（从根本上解决空文档覆盖 bug 根因）
         2. Template 文件：hash 在 template_hashes 集合中（不携带用户数据，不应触发同步冲突）
 
+        参数 skip_template_filter 用于首次同步场景：
+        - 默认 False（增量同步）：保留 template_hashes 过滤，避免 OVERWRITE_FILE_LIST
+          覆盖的系统提示词与云端旧版本触发不必要的 AI 合并（PRD 决策 8 设计意图）
+        - True（首次同步）：跳过 template_hashes 过滤，让 template 文件正常进入
+          file_sync_state 和推送列表。云端 agent_only 模式跳过 initialize_resources()，
+          依赖首次同步全量推送获取系统提示词（agent.md/soul.md/tool.md 等）
+
         参考 ADR v2.1 决策 1：hash 更新逻辑 - 同步前刷新 current_hash。
+        参考 bug 2026-07-28-initial-sync-template-files-not-pushed：首次同步过滤范围修正
 
         Args:
             directories: 文件同步目录列表（相对 lifeprism_data_path）
+            skip_template_filter: 是否跳过 template_hashes 过滤（首次同步传 True）
 
         Returns:
             list[str]: 扫描到且通过过滤的文件相对路径列表（供调用方复用，避免重复扫描）
@@ -1518,7 +1529,9 @@ class SyncClient:
             new_hash = compute_file_hash(content_bytes)
 
             # 过滤条件 2（PRD 决策 8）：template hash 命中不写入 file_sync_state
-            if new_hash in template_hashes:
+            # 首次同步场景（skip_template_filter=True）跳过此过滤，让 template 文件
+            # 正常推送，避免云端 agent_only 模式永久缺失系统提示词
+            if not skip_template_filter and new_hash in template_hashes:
                 skipped_template.append(rel_path)
                 continue
 
