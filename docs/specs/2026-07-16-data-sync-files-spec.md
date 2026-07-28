@@ -272,5 +272,5 @@ AI 工具权限：ReadFileTool、WriteFileTool、EditFileTool、FileTreeTool、S
 
 - **数据库同步 + 动态表 + 心跳路由**：[`docs/specs/2026-07-16-data-sync-core-spec.md`](./2026-07-16-data-sync-core-spec.md) — 静态表、动态表、心跳、配置初始化
 - **同步模块总览**：[`docs/specs/2026-07-16-data-sync-overview.md`](./2026-07-16-data-sync-overview.md) — 子模块架构、依赖规则、跨层交互
-- **ADR 时间线**：[`docs/adr/2026-07-16-sync-system-timeline.md`](../adr/2026-07-16-sync-system-timeline.md)
+- **ADR 时间线**：[`docs/adr/2026-07-27-sync-system-timeline.md`](../adr/2026-07-27-sync-system-timeline.md)
 - **数据流**：[`docs/flows/2026-07-11-data-sync-flow.md`](../flows/2026-07-11-data-sync-flow.md)

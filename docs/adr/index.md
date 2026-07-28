@@ -1,10 +1,16 @@
 ---
-version: 2.2
+version: 2.3
 created_at: 2026-04-10
-updated_at: 2026-07-25
-last_updated: 新增 global-task-state ADR（全局任务状态互斥机制：引入 GlobalTaskState 单例协调本地任务与云端同步互斥，backup_documents 并入 10点任务）
+updated_at: 2026-07-27
+last_updated: 新增 ssh-tunnel-encryption ADR（SSH 隧道作为云端同步加密通道：在家庭 IP 变动+国内 ICP 备案复杂场景下，新增 SSH 隧道模式与 HTTP/HTTPS 并存，降低加密门槛）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## ssh-tunnel-encryption
+- updated_at: 2026-07-27
+- path: `docs/adr/2026-07-27-ssh-tunnel-encryption.md`
+- 触发规则：当需要理解为什么新增 SSH 隧道模式、HTTP/HTTPS/SSH 三种模式并存的选型依据、外部环境约束（家庭 IP 变动、ICP 备案复杂）如何驱动技术选型、或修改 sync.connection_mode 配置时读取
+- 内容摘要：在家庭网络 IP 变动 + 国内服务器 ICP 备案复杂的场景下，新增 SSH 隧道作为云端同步的加密通道，与已有 HTTP/HTTPS 模式并存。9 个决策前提（IP 变动、防火墙限制、HTTP 明文风险、HTTPS 需证书、证书需域名、域名需备案、流程复杂不可接受、三种模式并存、用户熟悉 SSH）。4 个可选方案：A（HTTPS+域名+备案，备选）、B（HTTP+API Key，内网测试用）、C（SSH 隧道，当前选择）、D（VPN/内网穿透，用户不熟悉否决）。备选触发：备案完成→A，内网测试→B，熟悉 VPN→D。
 
 ## global-task-state
 - updated_at: 2026-07-25
@@ -73,10 +79,10 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 - 内容摘要：文件冲突解决从 LLM 自主合并改为 diff3 算法 + LLM 辅助合并（无工具），消除 AI 截断数据风险。修订原 ADR `2026-07-14-file-sync-conflict-resolution.md` 决策 3（原决策为 AI 驱动合并 + LLM 有文件工具）。触发原因：2026-07-16 behavior.md 被破坏事件证明 LLM 自主合并不安全。具体决策：基于 difflib 自研 diff3（约 150 行代码，无外部依赖，避免 merge3 包 GPL 协议纠纷）、CONFLICT_RESOLVE `tools = []`、冲突标记 `<<<<<<< LP-LOCAL-{hash8} #{n}`、LLM 输出 JSON 替换指令、串行处理（理解 B，一个冲突一次 LLM 调用）、3 次重试降级 keep_ours。未来需要多端同步时切换到完整 git-like 方案。
 
 ## sync-system-timeline
-- updated_at: 2026-07-16
-- path: `docs/adr/2026-07-16-sync-system-timeline.md`
+- updated_at: 2026-07-27
+- path: `docs/adr/2026-07-27-sync-system-timeline.md`
 - 触发规则：需要理解数据同步系统的完整决策历程、各 ADR 之间的因果关系、哪些是主动设计哪些是 Bug 驱动修正、或做同步模块整体复盘时读取
-- 内容摘要：数据同步系统的完整决策时间线，串联原始方案讨论（7/8）→ 核心架构决策（7/9）→ 文件同步重构（7/14，Bug 驱动）→ 动态表同步重构（7/16，Bug 驱动）四个阶段。标注 6/9 个决策为 Bug 驱动修正。包含决策依赖图、主动设计 vs Bug 驱动分类、未解决问题索引。
+- 内容摘要：数据同步系统的完整决策时间线，串联原始方案讨论（7/8）→ 核心架构决策（7/9）→ 文件同步重构（7/14，Bug 驱动）→ 动态表同步重构（7/16，Bug 驱动）→ 冲突与备份策略（7/17）→ 删除同步与数据库重构（7/22-7/24，Bug 驱动）→ 全局任务状态互斥（7/25）→ SSH 隧道加密通道（7/27）八个阶段。标注 4 种触发类型：主动设计（8 个）、Bug 驱动（10 个）、事故驱动（2 个）、外部环境约束（1 个）。包含决策依赖图、主动设计 vs Bug 驱动分类、前提→风险文档索引。
 
 ## dynamic-tables-sync-definition-comparison
 - updated_at: 2026-07-16

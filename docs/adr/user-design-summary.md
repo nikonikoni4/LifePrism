@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-25
-updated_at: 2026-07-25
-last_updated: 初始化项目级用户设计原则摘要（迁移 2026-07-25 global-task-state ADR 的设计原则）
+updated_at: 2026-07-27
+last_updated: 新增 SSH 隧道加密通道决策的设计原则（外部环境约束驱动技术选型、熟悉度作为方案筛选条件、多模式并存而非替换）
 abstract: LifeWatch-AI 项目级用户设计原则聚合文档，记录用户在架构决策中的判断方式和设计偏好，供后续 agent 参考以保持决策一致性。
 ---
 
@@ -18,6 +18,9 @@ abstract: LifeWatch-AI 项目级用户设计原则聚合文档，记录用户在
 - **任务冲突时稀缺方等待、高频方放弃**：当两类任务互斥冲突时，频率低/成本高的任务（如 10点 dreaming 含 LLM 调用）应有限等待（5 分钟超时降级），频率高/成本低的任务（如 10分钟一次的云端同步）应直接放弃本次。判断标准：周期长短 + 单次执行成本。放弃高频任务后通过 ping 端点保持心跳。驱动 [2026-07-25-global-task-state.md](./2026-07-25-global-task-state.md) 的"云端放弃 + 本地等待"不对称策略
 - **backup 并入有补执行能力的任务以解决不补备份问题**：当独立 cron 任务因 skip_compensation=True 不补执行导致长期失效（如凌晨 3 点用户不开机），将其并入已有 skip_compensation=False 的任务（如 10点 dreaming）作为子步骤，自动获得补执行能力。判断标准：原 cron 触发时间是否与用户使用习惯冲突。驱动 [2026-07-25-global-task-state.md](./2026-07-25-global-task-state.md) 的 backup_documents 并入 10点任务
 - **SQLite Online Backup API 不阻塞读写，可豁免互斥**：数据库备份用 sqlite3.Connection.backup() 时按 page 复制，不阻塞业务读写，无需参与全局任务状态互斥。判断标准：备份方式是否为 Online Backup API（shutil.copy2 则必须参与互斥）。驱动 [2026-07-25-global-task-state.md](./2026-07-25-global-task-state.md) 决策 6
+- **外部环境约束驱动技术选型**：技术方案选型不从"方案本身优劣"出发，而是从外部环境约束（ICP 备案复杂、家庭 IP 变动、个人熟悉度）反推可行方案。判断标准：外部环境约束是否可接受，而非技术方案是否最优。HTTPS+域名+备案在技术上最规范，但备案流程复杂不可接受 → 转 SSH 隧道。驱动 [2026-07-27-ssh-tunnel-encryption.md](./2026-07-27-ssh-tunnel-encryption.md)
+- **熟悉度作为方案筛选条件**：在多个替代方案中，以"是否熟悉"作为筛选条件。用户不因其他方案在技术上可能更优而选择不熟悉的方案——明确否决 VPN/内网穿透工具，理由是"我都不熟悉"。熟悉度门槛高于技术优势。判断标准：用户是否能独立维护该方案。驱动 [2026-07-27-ssh-tunnel-encryption.md](./2026-07-27-ssh-tunnel-encryption.md) 否决方案 D
+- **多模式并存而非替换**：引入新方案时保留旧模式，根据外部环境变化切换。HTTP/HTTPS/SSH 三种模式并存，显式标注备选触发条件（备案完成→HTTPS，内网测试→HTTP）。判断标准：外部环境是否可能变化。驱动 [2026-07-27-ssh-tunnel-encryption.md](./2026-07-27-ssh-tunnel-encryption.md) 决策逻辑
 
 ## 给后续 agent 的参考
 

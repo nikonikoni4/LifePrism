@@ -802,7 +802,7 @@ stateDiagram-v2
 - **[Agent 执行引擎]**：`docs/specs/2026-07-06-llm-agent-spec.md` — AgentLoop 消息处理
 
 ### ADR
-- **[同步系统决策时间线]**：`docs/adr/2026-07-16-sync-system-timeline.md`
+- **[同步系统决策时间线]**：`docs/adr/2026-07-27-sync-system-timeline.md`
 - **[文件同步冲突处理]**：`docs/adr/2026-07-14-file-sync-conflict-resolution.md`
 - **[动态表同步定义对比]**：`docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md`
 - **[LWW 冲突解决]**：`docs/adr/2026-07-09-lww-conflict-resolution.md`

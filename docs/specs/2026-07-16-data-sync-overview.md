@@ -89,7 +89,7 @@ abstract: 数据同步模块总览，定义模块整体职责、子模块分层�
 
 ## 相关文档
 
-- **ADR 时间线**：[`docs/adr/2026-07-16-sync-system-timeline.md`](../adr/2026-07-16-sync-system-timeline.md)
+- **ADR 时间线**：[`docs/adr/2026-07-27-sync-system-timeline.md`](../adr/2026-07-27-sync-system-timeline.md)
 - **数据流 - 核心同步**：[`docs/flows/2026-07-11-data-sync-flow.md`](../flows/2026-07-11-data-sync-flow.md)
 - **数据流 - SSH 隧道生命周期**：[`docs/flows/2026-07-26-ssh-tunnel-flow.md`](../flows/2026-07-26-ssh-tunnel-flow.md)
 - **SSH 隧道已知限制**：[`docs/known-limitations/ssh-tunnel-limitations.md`](../known-limitations/ssh-tunnel-limitations.md)
