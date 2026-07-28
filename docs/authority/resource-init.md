@@ -1,9 +1,9 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-04-18
-updated_at: 2026-04-18
-last_updated: 初始版本
-abstract: 资源文件体系权威参考，定义 templates/ 模板目录结构、资源初始化机制（开发/打包环境）、懒加载目录以及数据迁移时的资源处理
+updated_at: 2026-07-27
+last_updated: 补充强制覆盖策略章节，明确 OVERWRITE_DIR_LIST 与 OVERWRITE_FILE_LIST 的优先级与适用场景
+abstract: 资源文件体系权威参考，定义 templates/ 模板目录结构、资源初始化机制（含强制覆盖策略）、懒加载目录以及数据迁移时的资源处理
 ---
 
 ## 版本历史
@@ -11,6 +11,7 @@ abstract: 资源文件体系权威参考，定义 templates/ 模板目录结构�
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
 | 1.0 | 2026-04-18 | 初始版本 |
+| 1.1 | 2026-07-27 | 补充强制覆盖策略章节（OVERWRITE_DIR_LIST + OVERWRITE_FILE_LIST + bootstrap.md 特殊跳过），修正"仅复制不覆盖"的描述 |
 
 ---
 
@@ -82,11 +83,15 @@ def initialize_resources() -> None:
     else:
         templates_dir = Path(__file__).resolve().parent.parent.parent / "templates"
 
+    # 记录初始化前 agent/chat 目录是否已存在（用于 bootstrap.md 特殊跳过）
+    agent_chat_existed_before = (data_path / "agent/chat").exists()
+
     for source in templates_dir.rglob("*"):
         if not source.is_file():
             continue
 
         rel = source.relative_to(templates_dir)
+        rel_posix = rel.as_posix()
 
         # config/ 目录映射到固定路径
         if rel.parts[0] == "config":
@@ -95,11 +100,23 @@ def initialize_resources() -> None:
         else:
             target = data_path / rel
 
-        # 仅当目标不存在时复制（不覆盖用户数据）
-        if target.exists():
+        # 优先级 1：OVERWRITE_FILE_LIST 命中 → 强制覆盖
+        if rel_posix in OVERWRITE_FILE_LIST:
+            shutil.copy2(source, target)
             continue
 
-        target.parent.mkdir(parents=True, exist_ok=True)
+        # 优先级 2：OVERWRITE_DIR_LIST 命中 → 强制覆盖
+        if rel.parts[0] in OVERWRITE_DIR_LIST:
+            shutil.copy2(source, target)
+            continue
+
+        # 优先级 3：bootstrap.md 特殊跳过
+        if rel_posix == "agent/chat/bootstrap.md" and agent_chat_existed_before:
+            continue
+
+        # 优先级 4：仅复制不覆盖
+        if target.exists():
+            continue
         shutil.copy2(source, target)
 ```
 
@@ -113,11 +130,67 @@ def initialize_resources() -> None:
 | `templates/user/...` | `{lifeprism_data_path}/user/...` |
 | `templates/...` (其他) | `{lifeprism_data_path}/...` |
 
+### 强制覆盖策略
+
+`initialize_resources()` 按以下优先级处理每个模板文件（高优先级先命中先处理）：
+
+| 优先级 | 命中条件 | 行为 | 适用场景 |
+|--------|---------|------|---------|
+| 1 | `OVERWRITE_FILE_LIST` 精确路径命中 | 强制覆盖 | 混杂系统提示词与用户数据的目录（如 `agent/chat/` 下的 `soul.md`/`agent.md`/`tool.md`） |
+| 2 | `OVERWRITE_DIR_LIST` 第一级子目录命中 | 强制覆盖 | 纯系统级、无用户数据的目录（如 `prompts/`） |
+| 3 | `agent/chat/bootstrap.md` 且 `agent/chat` 目录已存在 | 跳过复制 | 用户完成引导删除 `bootstrap.md` 后不再复制，避免反复出现 |
+| 4 | 其余文件 | 仅复制不覆盖 | 保护用户数据（`identity.md`、`classify_preference.md` 等） |
+
+#### `OVERWRITE_DIR_LIST` — 目录白名单
+
+```python
+OVERWRITE_DIR_LIST = ["prompts"]
+```
+
+仅包含纯系统级、无用户数据的目录。整个目录下所有文件强制覆盖。
+
+**历史背景**：原实现包含 `["prompts", "tool", "agent"]`，其中：
+- `"tool"` 是无效配置（`templates/` 下无此第一级子目录）
+- `"agent"` 会导致 `agent/chat/` 下所有文件被强制覆盖，误伤 `identity.md`（用户数据）和 `bootstrap.md`（引导文件，被删除后反复出现）
+
+v1.1 修复后 `agent` 移出 `OVERWRITE_DIR_LIST`，改为通过 `OVERWRITE_FILE_LIST` 精确控制系统提示词的覆盖。
+
+#### `OVERWRITE_FILE_LIST` — 文件白名单
+
+```python
+OVERWRITE_FILE_LIST = {
+    "agent/README.md",
+    "agent/chat/agent.md",
+    "agent/chat/soul.md",
+    "agent/chat/tool.md",
+    "agent/classify/agent.md",
+    "agent/skills/knowledge-learning/SKILL.md",
+}
+```
+
+仅包含 `agent/` 下的系统级提示词文件，精确匹配相对 `templates/` 的 POSIX 路径。新增 `agent/` 下的系统提示词时需同步加入此白名单。
+
+**未列入白名单的 `agent/` 文件遵循"仅复制不覆盖"原则**：
+- `agent/chat/identity.md`：用户在引导流程中编辑，保存 AI 名称
+- `agent/chat/bootstrap.md`：引导文件，由优先级 3 特殊处理
+- `agent/classify/classify_preference.md`：用户分类偏好，用户主动写入
+- `agent/chat/tool copy.md`：`tool.md` 的旧版备份（建议手动清理）
+
+#### `bootstrap.md` 特殊跳过
+
+`bootstrap.md` 是 Chat Agent 的首次引导文件，引导完成后由 Agent 调用 `delete_bootstrap` 工具删除。为避免反复出现，特殊处理逻辑如下：
+
+- **首次启动**：`agent/chat` 目录不存在 → `agent_chat_existed_before = False` → 走优先级 4 复制
+- **后续启动**：`agent/chat` 目录已存在 → `agent_chat_existed_before = True` → 跳过复制
+
+此逻辑在循环外计算一次 `agent_chat_existed_before`，避免循环中目录被创建后误判。
+
 ### 关键特性
 
-1. **仅复制不覆盖**: 只有目标文件不存在时才复制，保护用户数据
-2. **按需创建目录**: `mkdir(parents=True, exist_ok=True)` 自动创建父目录
-3. **打包环境隔离**: `sys._MEIPASS` 是 PyInstaller 的只读内嵌文件系统
+1. **分级覆盖策略**: 通过 `OVERWRITE_FILE_LIST` 与 `OVERWRITE_DIR_LIST` 精确控制系统提示词覆盖，保护用户数据
+2. **bootstrap.md 反复出现防护**: 用户完成引导删除后不再复制
+3. **按需创建目录**: `mkdir(parents=True, exist_ok=True)` 自动创建父目录
+4. **打包环境隔离**: `sys._MEIPASS` 是 PyInstaller 的只读内嵌文件系统
 
 ---
 
