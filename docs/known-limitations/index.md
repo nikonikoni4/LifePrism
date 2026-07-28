@@ -125,6 +125,17 @@
 - **临时方案**: 各项限制均有对应的临时排查/恢复步骤，详见 `ssh-tunnel-limitations.md` 各限制的"临时方案或计划改进"章节
 - **相关文档**: 部署文档 `docs/deployment/cloud-https-setup.md` 模式 C、PRD `.scratch/ssh-tunnel-integration/prd.md` Out of Scope、代码实现 `lifeprism/sync/ssh_tunnel.py:172`
 
+### 13. 云端 API 端口默认绑定 127.0.0.1（无法公网 http 直连）
+
+- **文件**: `cloud-api-default-bind-localhost.md`
+- **状态**: `acknowledged`（已确认，当前 PRD 范围下有意接受的设计选择）
+- **严重程度**: 低（设计选择，非缺陷；SSH 隧道模式下功能不受影响）
+- **影响范围**: 云端 agent-only 模式下所有尝试通过公网 http 直接访问 8102 端口的场景
+- **问题描述**: `lifeprism/server/main_agent_only.py:136` 默认返回 `127.0.0.1`，导致云端 8102 端口仅本机可访问，公网无法通过 `http://<云端IP>:8102` 直接访问同步 API。这是 SSH 隧道方案的服务端基础设计（关闭公网暴露以保障安全），但 Nginx 反代、调试或未走 SSH 隧道的直连场景需通过环境变量 `LIFEPRISM_API_HOST=0.0.0.0` 覆盖才能访问
+- **触发条件**: 用户尝试通过公网 IP 直接 http 访问 8102、部署 Nginx 反代时未设置 `LIFEPRISM_API_HOST`、调试场景下从外部网络 curl 云端 8102 端口
+- **临时方案**: 启动 agent-only 前设置 `export LIFEPRISM_API_HOST=0.0.0.0`
+- **相关文档**: 代码实现 `lifeprism/server/main_agent_only.py:136`、SSH 隧道方案 Issue `.scratch/ssh-tunnel-integration/issues/01-8102-bind-localhost.md`、SSH 隧道已知限制 `ssh-tunnel-limitations.md`
+
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 
 ## 说明
