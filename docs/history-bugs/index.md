@@ -1,3 +1,10 @@
+## 2026-08-04-settings-apikey-not-saved-and-provider-switch-pollution
+
+- updated_at: 2026-08-04
+- path: `docs/history-bugs/2026-08-04-settings-apikey-not-saved-and-provider-switch-pollution.md`
+- 触发规则：在排查设置界面 API Key 保存后查看仍是旧值、custom(OpenAI SDK) provider 模型无法使用报 "API key format is incorrect"、cloud_init.yaml 中多个 provider 的 api_key 都是同一个脱敏值（如 sk-c...6yom）、切换 provider 后 apiKey 输入框残留旧值、修改 `SettingsApp.tsx` 中 `handleApiKeyBlur`/`handleProviderChange`、修改 `provider_manager.py` 中 `DEFAULT_PROVIDER_CONFIG` 的 custom `env_key`、修改 `setting_service.update_api_key` 返回值检查、新增 providers.yaml 迁移脚本时阅读
+- 内容摘要：**设置界面 bug（P1，已修复 2026-08-04）** — 4 个关联 bug 共同导致 custom provider 永远无法使用 + 切换 provider 时各 provider 的 api_key 互相污染为脱敏值。Bug A：前端 `handleApiKeyBlur` 掩码检测用 `*` 但后端脱敏格式是 `{前4}...{后4}`（如 `sk-c...6yom`），脱敏值被当作真实 key 保存。Bug B：`handleProviderChange` 切换 provider 时未刷新 `apiKey` state，残留旧 provider 脱敏值，结合 Bug A 被误保存到新 provider。Bug C：`DEFAULT_PROVIDER_CONFIG` 中 custom 的 `env_key: ""` 为空，`_set_api_key_to_keyring_by_provider` 因 username=None 跳过写入，`get_api_key` 也直接返回 None，`build_llm_client` 用 `"no-key"` 调用 API 报错。Bug D：`setting_service.update_api_key` 未检查 `set_api_key` 返回值，失败仍打印"已安全保存"日志误导排查。修复方案：Bug C 修改 `DEFAULT_PROVIDER_CONFIG` + 新增迁移脚本 `p003_add_custom_env_key.py`（config_version 2→3）；Bug D 提前校验 env_key 并检查返回值，失败抛 ValueError（API 层转 HTTP 400）；Bug A 前端掩码检测改为匹配 `...` 和 `***`；Bug B 切换 provider 时立即保存并从后端加载新 provider 的脱敏 api_key。遗留：历史脏数据（keyring 中被污染的脱敏值）需用户手动重新输入。
+
 ## 2026-07-27-bootstrap-md-recurring-after-overwrite
 
 - updated_at: 2026-07-27
