@@ -38,7 +38,7 @@ DEFAULT_PROVIDER_CONFIG = {
         {
             "name": "custom",
             "keywords": [],
-            "env_key": "",
+            "env_key": "api_key_custom",
             "display_name": "Custom(OpenAI SDK)",
             "litellm_prefix": "",
             "skip_prefixes": [],

@@ -470,7 +470,7 @@ const SettingsApp: React.FC = () => {
         };
     };
 
-    const handleProviderChange = (newProvider: string) => {
+    const handleProviderChange = async (newProvider: string) => {
         const providerId = providerIdMap[newProvider] || '';
         const historySnapshot = getProviderHistorySnapshot(providerId);
         const providerConfig = getDefaultProviderConfig(providerId);
@@ -480,11 +480,21 @@ const SettingsApp: React.FC = () => {
         setProvider(newProvider);
         setModelName(nextModel);
         setApiBase(nextApiBase);
-        triggerAutoSave({
+        // 立即保存（非防抖），确保后端 provider 已切换后再读取 api_key
+        await immediateSave({
             provider: newProvider,
             model: nextModel,
             api_base: nextApiBase,
         });
+        // 切换 provider 后从后端加载新 provider 的脱敏 api_key
+        // 避免输入框残留旧 provider 的脱敏值，被 onBlur 误保存到新 provider
+        try {
+            const settings = await SettingsAPI.getSettings();
+            setApiKey(settings.api_key || '');
+        } catch (err) {
+            // 加载失败时清空，避免残留旧值
+            setApiKey('');
+        }
         // 如果 screenshot_monitor 已开启，自动测试新模型的 VLM 能力
         if (screenshotMonitor) {
             setIsVlmTesting(true);
@@ -567,8 +577,10 @@ const SettingsApp: React.FC = () => {
     };
 
     const handleApiKeyBlur = async () => {
-        // Only save if it's a new key (not masked)
-        if (apiKey && !apiKey.includes('*') && apiKey.length > 0) {
+        // 只有用户输入了真实 key 才保存，跳过后端脱敏值
+        // 后端脱敏格式有两种：">8 字符时为 {前4}...{后4}"（如 sk-c...6yom），"<=8 字符时为 ***"
+        const isMasked = apiKey === '***' || (apiKey.length > 0 && apiKey.includes('...'));
+        if (apiKey && !isMasked && apiKey.length > 0) {
             try {
                 // 传递 provider_id 而非显示名称
                 await SettingsAPI.updateApiKey(apiKey, providerIdMap[provider]);

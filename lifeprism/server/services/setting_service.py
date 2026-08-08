@@ -127,12 +127,30 @@ def update_api_key(api_key: str, provider_id: str | None = None) -> bool:
 
     Returns:
         bool: 是否成功
+
+    Raises:
+        ValueError: 当 provider 的 env_key 为空（无法保存到 keyring）或 keyring 写入失败时
     """
     if provider_id:
         # 将显示名称转换为 provider_id（如果传入的是显示名称）
         actual_provider_id = provider_manager.get_provider_id(provider_id)
+        # 提前校验 env_key，避免 set_api_key 静默失败（env_key 为空时 keyring 写入被跳过）
+        env_key = provider_manager.get_keyring_username(actual_provider_id)
+        if not env_key:
+            logger.error(
+                "保存 API Key 失败: provider=%s 的 env_key 为空，无法写入 keyring",
+                actual_provider_id,
+            )
+            raise ValueError(f"Provider '{actual_provider_id}' 的 env_key 未配置，无法保存 API Key")
         logger.info("正在更新 %s 的 API Key...", actual_provider_id)
-        settings.set_api_key(api_key, actual_provider_id)
+        success = settings.set_api_key(api_key, actual_provider_id)
+        if not success:
+            logger.error(
+                "保存 API Key 失败: provider=%s, keyring 写入返回 False", actual_provider_id
+            )
+            raise ValueError(
+                f"Provider '{actual_provider_id}' 的 API Key 保存失败（keyring 写入错误）"
+            )
         logger.info("%s 的 API Key 已安全保存到系统密钥管理器", actual_provider_id)
     else:
         logger.info("正在更新 API Key...")

@@ -8,6 +8,7 @@ Config 迁移脚本注册表
 from . import (
     p001_baseline,
     p002_add_xiaomi_mimo,
+    p003_add_custom_env_key,
     s001_baseline,
     s002_add_monitor_type,
     s003_add_vlm_fields,
@@ -30,4 +31,5 @@ SETTINGS_MIGRATIONS = [
 PROVIDERS_MIGRATIONS = [
     p001_baseline,
     p002_add_xiaomi_mimo,
+    p003_add_custom_env_key,
 ]
