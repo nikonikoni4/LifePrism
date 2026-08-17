@@ -127,7 +127,7 @@ class TestConflictResolveToolRegistration:
 
         captured = {}
 
-        async def mock_run_agent_loop(session, system_prompt, tools, tool_registry):
+        async def mock_run_agent_loop(session, prefix_messages, tools, tool_registry):
             captured["tools"] = tools
             captured["registry"] = tool_registry
             return LLMResponse(content="合并后的内容"), []
@@ -135,7 +135,10 @@ class TestConflictResolveToolRegistration:
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
-            patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"),
+            patch(
+                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                return_value=[{"role": "system", "content": "系统提示"}],
+            ),
             patch.object(
                 agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()
             ),
@@ -162,14 +165,17 @@ class TestConflictResolveToolRegistration:
 
         captured = {}
 
-        async def mock_run_agent_loop(session, system_prompt, tools, tool_registry):
+        async def mock_run_agent_loop(session, prefix_messages, tools, tool_registry):
             captured["registry"] = tool_registry
             return LLMResponse(content="合并后的内容"), []
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
-            patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"),
+            patch(
+                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                return_value=[{"role": "system", "content": "系统提示"}],
+            ),
             patch.object(
                 agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()
             ),
@@ -197,14 +203,17 @@ class TestConflictResolveToolRegistration:
 
         captured = {}
 
-        async def mock_run_agent_loop(session, system_prompt, tools, tool_registry):
+        async def mock_run_agent_loop(session, prefix_messages, tools, tool_registry):
             captured["registry"] = tool_registry
             return LLMResponse(content="合并后的内容"), []
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
-            patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"),
+            patch(
+                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                return_value=[{"role": "system", "content": "系统提示"}],
+            ),
             patch.object(
                 agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()
             ),
@@ -231,14 +240,17 @@ class TestConflictResolveToolRegistration:
 
         captured = {}
 
-        async def mock_run_agent_loop(session, system_prompt, tools, tool_registry):
+        async def mock_run_agent_loop(session, prefix_messages, tools, tool_registry):
             captured["registry"] = tool_registry
             return LLMResponse(content="合并后的内容"), []
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
-            patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"),
+            patch(
+                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                return_value=[{"role": "system", "content": "系统提示"}],
+            ),
             patch.object(
                 agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()
             ),

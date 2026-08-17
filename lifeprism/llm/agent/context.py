@@ -85,8 +85,59 @@ class Context:
             return (msg.extra or {}).get("system_prompt", "")
 
     @staticmethod
-    def build_prompt(system_prompt: str, message: list[dict[str, Any]]):
-        return [{"role": "system", "content": system_prompt}] + message
+    def build_prefix_messages(msg: InboundMessage) -> list[dict[str, Any]]:
+        """构建前缀消息：system prompt + 可选的 custom prompt 注入
+
+        前缀消息位于稳定前缀区（system 之后、会话历史之前），在每次 LLM 调用的
+        组装期动态拼接，不写入 session 历史（对 auto_compact 免疫、修改即时生效）。
+
+        custom prompt 仅 CHAT 类型且内容非空时注入，以 user role 承载
+        （层级低于 system，用户规则不凌驾于系统规则），
+        参考 ADR docs/adr/2026-08-18-custom-prompt-user-role-injection.md
+
+        Args:
+            msg: 入站消息
+
+        Returns:
+            list[dict[str, Any]]: 前缀消息列表，至少包含一条 system 消息
+        """
+        prefix = [{"role": "system", "content": Context.build_system_prompt(msg)}]
+        if msg.type == MessageType.CHAT:
+            custom_message = Context._build_custom_prompt_message()
+            if custom_message:
+                prefix.append(custom_message)
+        return prefix
+
+    @staticmethod
+    def _build_custom_prompt_message() -> dict[str, Any] | None:
+        """构建 custom prompt 注入消息
+
+        读取 agent/chat/custom_prompt.md，内容 strip 后为空（含文件不存在）时返回 None。
+        文件内容保持纯净，来源说明与管理方式在拼接时注入 system-reminder 块内。
+
+        Returns:
+            dict[str, Any] | None: user role 注入消息；无内容时返回 None
+        """
+        custom_prompt_path = settings.lifeprism_data_path / "agent/chat/custom_prompt.md"
+        content = Context._read_file(str(custom_prompt_path))
+        # "空"的定义与 sync/file_filter.is_empty_content 对齐：strip 后为空视为无内容
+        if not content or not content.strip():
+            return None
+        agent_chat_dir = settings.lifeprism_data_path / "agent/chat"
+        return {
+            "role": "user",
+            "content": (
+                "<system-reminder>\n"
+                "# custom prompt\n"
+                f"以下内容来自 {custom_prompt_path}，是用户为 AI 制定的自定义规则，"
+                "优先级高于默认行为，必须遵守。\n"
+                "管理方式：你可以用 write_file/edit_file 直接修改该文件；"
+                f"也可以在 {agent_chat_dir} 下创建其他规则文件"
+                "（需在该文件内列出文件链接和内容摘要，按需用 read_file 渐进加载）。\n\n"
+                f"{content}\n"
+                "</system-reminder>"
+            ),
+        }
 
     @staticmethod
     def _build_identity() -> str:
@@ -233,9 +284,9 @@ if __name__ == "__main__":
 
     print("\n==================================================================")
 
-    # 如果还需要测试最终 build_prompt 合并消息的效果可以看下面：
-    print("\n============== 测试 build_prompt 合并 User Message ===============")
-    final_messages = Context.build_prompt((sys_prompt or ""), [{"role": "user", "content": "你好"}])
+    # 如果还需要测试最终 build_prefix_messages 合并消息的效果可以看下面：
+    print("\n============== 测试 build_prefix_messages 合并 User Message ===============")
+    final_messages = Context.build_prefix_messages(mock_msg) + [{"role": "user", "content": "你好"}]
     import json
 
     print(json.dumps(final_messages, ensure_ascii=False, indent=2))

@@ -72,7 +72,7 @@ class AgentLoop:
     async def _run_agent_loop(
         self,
         session: Session,
-        system_prompt: str,
+        prefix_messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         tool_registry: ToolRegistry,
     ) -> tuple[LLMResponse, list[dict[str, Any]]]:
@@ -80,7 +80,8 @@ class AgentLoop:
 
         Args:
             session: 会话对象
-            system_prompt: 系统提示词
+            prefix_messages: 前缀消息（system prompt + 可选 custom prompt 注入），
+                位于会话历史之前的稳定前缀区，由 Context.build_prefix_messages 组装
             tools: 工具定义列表
 
         Returns:
@@ -90,7 +91,7 @@ class AgentLoop:
                   每个 tool_call 包含: id, name, arguments, result, is_error(bool)
         """
         llm = create_llm_client()
-        messages = Context.build_prompt(system_prompt, session.get_history_message())
+        messages = prefix_messages + session.get_history_message()
         logger.info("LLM 调用开始, session=%s", session.id)
         # logger.debug("构建的 messages 数量=%s", len(messages))
         # for idx, msg in enumerate(messages):
@@ -209,7 +210,7 @@ class AgentLoop:
                     "tool_calls": round_tool_calls,
                 }
             )
-            messages = Context.build_prompt(system_prompt, session.get_history_message())
+            messages = prefix_messages + session.get_history_message()
             logger.debug("第%s次 llm调用开始， message 长度 %s", tool_call_count + 1, len(messages))
             logger.debug(messages)
             # # 添加详细的消息结构日志
@@ -273,7 +274,7 @@ class AgentLoop:
                 "system",
                 content=f"已达到最大工具调用次数 {MAX_TOOL_CALL}，请直接向用户说明当前情况，让用户判断是否继续工作。",
             )
-            messages = Context.build_prompt(system_prompt, session.get_history_message())
+            messages = prefix_messages + session.get_history_message()
             response = await llm.chat(messages=messages)
             if response.finish_reason == "error":
                 raise LLMResponseError(
@@ -473,8 +474,8 @@ class AgentLoop:
                 return
 
             # ======================= common message process =========================
-            # 1. 构建system prompt
-            system_prompt = Context.build_system_prompt(msg)
+            # 1. 构建前缀消息（system prompt + 可选 custom prompt 注入）
+            prefix_messages = Context.build_prefix_messages(msg)
 
             # 2. 构建tool description
             tool_registry = ToolRegistry()
@@ -531,7 +532,7 @@ class AgentLoop:
 
             # 4. 调用 LLM
             result, tool_call_chain = await self._run_agent_loop(
-                session, system_prompt, tools, tool_registry
+                session, prefix_messages, tools, tool_registry
             )
 
             # 5. 保存 assistant 回复并发布结果
