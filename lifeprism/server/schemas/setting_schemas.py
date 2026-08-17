@@ -64,6 +64,11 @@ class SettingItems(BaseModel):
     screenshot_retention_days: int = Field(description="截图保留天数")
     cleanup_check_interval_seconds: int = Field(description="截图清理扫描周期 (秒)")
     screenshot_monitor: bool = Field(default=False, description="截图监控开关")
+    afk_timeout_media: float = Field(
+        default=3600.0,
+        ge=300.0,
+        description="媒体播放时的 AFK 上限（秒），实际只对 is_any_video_playing() 场景生效",
+    )
     is_vlm: dict[str, bool] = Field(default={}, description="VLM 能力缓存")
     screen_analysis_ignore: list[str] = Field(
         default_factory=list, description="截图分析忽略的分类 ID 列表"
@@ -102,6 +107,7 @@ class UpdateSettingsRequest(BaseModel):
     screenshot_retention_days: int | None = None
     cleanup_check_interval_seconds: int | None = None
     screenshot_monitor: bool | None = None
+    afk_timeout_media: float | None = None
     monitor_type: str | None = None
     screen_analysis_ignore: list[str] | None = None
     timezone: str | None = None

@@ -193,7 +193,8 @@ module: config
 | `classification_mode` | str | `"classify_graph"` | 分类模式 |
 | `long_log_threshold` | int | `600` | 长日志阈值（秒） |
 | `poll_time` | float | `1.0` | 轮询间隔（秒） |
-| `afk_timeout` | float | `180.0` | AFK 超时（秒） |
+| `afk_timeout` | float | `180.0` | AFK 超时（秒），非媒体场景生效 |
+| `afk_timeout_media` | float | `3600.0` | 媒体播放时的 AFK 上限（秒，最小 300）。实际只对 `is_any_video_playing()=True` 的场景生效，避免全屏看视频/玩游戏离开后时长无限积累 |
 | `scheduled_screenshot_interval_seconds` | int | `60` | 定时截图间隔（秒） |
 | `active_screenshot_frequency_level` | int | `2` | 主动截图频率等级（1/2/3） |
 | `screenshot_retention_days` | int | `3` | 截图保留天数（最小 3） |

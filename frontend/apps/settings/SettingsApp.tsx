@@ -20,7 +20,8 @@ import {
     Info,
     ChevronDown,
     Trash2,
-    AlertTriangle
+    AlertTriangle,
+    Clock
 } from 'lucide-react';
 import { SettingsAPI } from './api';
 import type { ProviderInfo, ProviderModelHistory, SettingsResponse, QRCodeResponse, QRCodeStatusResponse } from './types';
@@ -106,6 +107,7 @@ const SettingsApp: React.FC = () => {
     const [screenshotMonitor, setScreenshotMonitor] = useState(false);
     const [screenshotFrequencyLevel, setScreenshotFrequencyLevel] = useState(2);
     const [screenshotRetentionDays, setScreenshotRetentionDays] = useState(7);
+    const [afkTimeoutMedia, setAfkTimeoutMedia] = useState(3600);
     const [isVlmTesting, setIsVlmTesting] = useState(false);
     const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | null>(null);
     const [isVlmConfig, setIsVlmConfig] = useState<Record<string, boolean>>({}); // 完整 is_vlm 配置
@@ -220,6 +222,7 @@ const SettingsApp: React.FC = () => {
                 setScreenshotMonitor(settings.screenshot_monitor || false);
                 setScreenshotFrequencyLevel(settings.active_screenshot_frequency_level || 2);
                 setScreenshotRetentionDays(settings.screenshot_retention_days || 7);
+                setAfkTimeoutMedia(settings.afk_timeout_media ?? 3600);
                 setIsVlmConfig(settings.is_vlm || {}); // 保存完整 is_vlm 配置
                 setScreenAnalysisIgnore(settings.screen_analysis_ignore || []);
                 setCategories(cats);
@@ -319,12 +322,13 @@ const SettingsApp: React.FC = () => {
             data_cleaning_threshold: filterDuration,
             active_screenshot_frequency_level: screenshotFrequencyLevel,
             screenshot_retention_days: screenshotRetentionDays,
+            afk_timeout_media: afkTimeoutMedia,
             monitor_type: monitorType,
             screen_analysis_ignore: screenAnalysisIgnore,
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, timezone, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, monitorType, screenAnalysisIgnore, debouncedSave]);
+    }, [nickname, timezone, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, afkTimeoutMedia, monitorType, screenAnalysisIgnore, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
@@ -1168,6 +1172,37 @@ const SettingsApp: React.FC = () => {
                         </button>
 
                         <span className="text-xs font-bold text-slate-400 uppercase ml-1">秒</span>
+                    </div>
+                </div>
+            </section>
+
+            {/* 离开判定 */}
+            <section className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-amber-50 rounded-xl text-amber-500">
+                        <Clock size={20} />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-800">离开判定</h2>
+                </div>
+
+                <div className="space-y-6">
+                    {/* 媒体播放超时 */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">媒体播放超时（秒）</label>
+                        <p className="text-xs text-slate-400 mt-1 mb-3">
+                            全屏看视频或玩游戏（媒体播放）时，超过此时长无键鼠输入则判定为离开。非媒体场景不受此项影响（使用更短的基础超时）。
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number"
+                                min={300}
+                                value={afkTimeoutMedia}
+                                onChange={(e) => setAfkTimeoutMedia(Math.max(300, parseInt(e.target.value) || 3600))}
+                                onBlur={() => triggerAutoSave({ afk_timeout_media: afkTimeoutMedia })}
+                                className="w-32 bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all"
+                            />
+                            <span className="text-xs font-bold text-slate-400 uppercase">秒（最小 300）</span>
+                        </div>
                     </div>
                 </div>
             </section>

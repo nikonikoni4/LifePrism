@@ -63,7 +63,12 @@ contract_refs:
 
 ### 1. AFK 粗粒度状态
 
-沿用现有 `afk_timeout = 180s` 判断用户是否彻底不在工作状态。
+AFK 判定由 `WindowMonitor._compute_afk_state(idle_time, video_playing)` 实现，区分媒体与非媒体场景：
+
+- 非媒体场景：`idle_time > afk_timeout`（默认 180s）→ AFK
+- 媒体播放场景（`is_any_video_playing()=True`）：`idle_time > afk_timeout_media`（默认 3600s）→ AFK
+
+媒体场景使用更长超时，避免看视频/玩游戏时被误判；同时设有上限，避免用户离开后视频继续播放导致时长无限积累。`afk_timeout_media` 实际只对媒体场景生效（非媒体场景由更短的 `afk_timeout` 先触发）。
 
 - `AFK = True`：固定截图和主动截图都不执行
 - `AFK = False`：允许继续判断主动截图逻辑

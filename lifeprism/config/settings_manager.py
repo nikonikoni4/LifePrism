@@ -70,6 +70,7 @@ class SettingsManager:
         "data_cleaning_threshold": 10,
         "poll_time": 1.0,
         "afk_timeout": 180.0,
+        "afk_timeout_media": 3600.0,  # 媒体播放时的 AFK 上限（秒），实际只对 is_any_video_playing() 场景生效
         "exclude_titles": [],
         "model_history": {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
         "monitor_type": "lifeprism",

@@ -1,3 +1,10 @@
+## 2026-08-14-monitor-media-afk-no-upper-bound
+
+- updated_at: 2026-08-14
+- path: `docs/history-bugs/2026-08-14-monitor-media-afk-no-upper-bound.md`
+- 触发规则：在排查"全屏看视频/玩游戏后窗口时长远超实际使用时间"、修改 `WindowMonitor` 的 AFK 判定逻辑、修改 `is_any_video_playing()` 或 `powercfg /requests` 相关逻辑、调整 `afk_timeout` 或 `afk_timeout_media` 配置、设计基于电源请求或媒体状态的 AFK 豁免逻辑时阅读
+- 内容摘要：**边界条件 bug（P2，已修复 2026-08-14）** — `WindowMonitor.run()` 的 AFK 判定 `idle_time > afk_timeout and not is_any_video_playing()` 在媒体播放时（`is_any_video_playing()=True`）恒返回 False，永不判 AFK。全屏看视频或玩游戏时用户离开后，窗口时长持续积累直到视频/游戏停止或用户回来。根因：豁免逻辑写成无上限的恒等式，缺少"信号存在但长时间无输入仍判 AFK"的兜底；参考 aw-watcher-afk 时未审视"媒体播放=用户在消费内容"的假设是否覆盖"媒体播放但用户已离开"场景。修复方案：引入 `afk_timeout_media`（默认 3600s/60分钟，最小 300s）作为媒体场景 AFK 上限，抽取 `_compute_afk_state(idle_time, video_playing)` 方法区分媒体/非媒体场景，非媒体场景仍用 `afk_timeout=180s` 不受影响。新增 6 个回归测试覆盖判定边界。配置项已暴露到前端"离开判定"区块。沉淀教训：豁免逻辑必须有上限。
+
 ## 2026-08-04-settings-apikey-not-saved-and-provider-switch-pollution
 
 - updated_at: 2026-08-04

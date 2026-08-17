@@ -46,6 +46,7 @@ export interface Settings {
     screenshot_monitor?: boolean;
     active_screenshot_frequency_level?: number;
     screenshot_retention_days?: number;
+    afk_timeout_media?: number;
     is_vlm?: Record<string, boolean>;
     screen_analysis_ignore?: string[];
     timezone?: string;
@@ -77,6 +78,7 @@ export interface UpdateSettingsRequest {
     is_vlm?: Record<string, boolean>;
     screen_analysis_ignore?: string[];
     timezone?: string;
+    afk_timeout_media?: number;
 }
 
 /** 更新 API Key 请求 */

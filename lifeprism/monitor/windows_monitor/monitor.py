@@ -25,6 +25,9 @@ class WindowMonitor:
         self.poll_time = settings.get("poll_time", 1.0)
         self.exclude_titles = settings.get("exclude_titles", [])
         self.afk_timeout = settings.get("afk_timeout", 180.0)
+        # 媒体播放时的 AFK 上限（秒）。非媒体场景由 afk_timeout 生效，此项实际只对
+        # is_any_video_playing()=True 的场景起作用，避免全屏看视频/玩游戏离开后时长无限积累。
+        self.afk_timeout_media = settings.get("afk_timeout_media", 3600.0)
 
         self.current_app: str | None = None
         self.current_title: str | None = None
@@ -40,6 +43,23 @@ class WindowMonitor:
 
     def _should_exclude(self, title: str) -> bool:
         return any(pattern.search(title) for pattern in self._exclude_patterns)
+
+    def _compute_afk_state(self, idle_time: float, video_playing: bool) -> bool:
+        """根据空闲时间和媒体播放状态判定是否 AFK。
+
+        - 媒体播放时使用 afk_timeout_media（更长，避免看视频被误判）
+        - 非媒体时使用 afk_timeout（基础短超时）
+
+        Args:
+            idle_time: 距离最后一次键鼠输入的秒数
+            video_playing: is_any_video_playing() 的返回值
+
+        Returns:
+            True 表示判定为 AFK
+        """
+        if video_playing:
+            return idle_time > self.afk_timeout_media
+        return idle_time > self.afk_timeout
 
     def _flush(self):
         """将当前在内存中的事件保存到存储中"""
@@ -78,8 +98,8 @@ class WindowMonitor:
                 now_tick = get_tick_count()
                 idle_time = now_tick - last_input
 
-                # 如果超过阈值且没有视频播放请求，判定为 AFK
-                currently_afk = idle_time > self.afk_timeout and not is_any_video_playing()
+                # 媒体播放时使用更长的 afk_timeout_media，非媒体使用 afk_timeout
+                currently_afk = self._compute_afk_state(idle_time, is_any_video_playing())
 
                 if currently_afk:
                     if not self.is_afk:
