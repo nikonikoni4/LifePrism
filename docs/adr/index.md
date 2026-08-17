@@ -1,10 +1,16 @@
 ---
-version: 2.3
+version: 2.4
 created_at: 2026-04-10
-updated_at: 2026-07-27
-last_updated: 新增 ssh-tunnel-encryption ADR（SSH 隧道作为云端同步加密通道：在家庭 IP 变动+国内 ICP 备案复杂场景下，新增 SSH 隧道模式与 HTTP/HTTPS 并存，降低加密门槛）
+updated_at: 2026-08-18
+last_updated: 新增 custom-prompt-user-role-injection ADR（chat agent 自定义规则以 user role 前缀区动态注入，同构 Claude Code 机制）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## custom-prompt-user-role-injection
+- updated_at: 2026-08-18
+- path: `docs/adr/2026-08-18-custom-prompt-user-role-injection.md`
+- 触发规则：当需要理解 chat agent 自定义规则（custom_prompt.md）为什么以 user role 而非 system 注入、注入位置为何在组装期前缀区而非会话历史、`<system-reminder>` 包裹与说明文本的设计依据、或修改 Context.build_prefix_messages / 注入格式时读取
+- 内容摘要：用户自定义规则采用 user role 前缀区动态注入（方案 B），否决 system prompt 追加（方案 A，备选）与首轮持久化（方案 C，compact 会压缩丢失）。4 个决策前提：Claude Code 实证以 user role 注入 CLAUDE.md（已验证）、用户规则不应凌驾于系统规则（角色层级即注入缓解）、tools->system->messages 稳定前缀缓存共识、provider 接受连续 user 消息（假设，待实测）。备选触发：规则完全无法遵守时切回方案 A。同步零改动（agent/ 白名单 + 空文件过滤天然覆盖）。
 
 ## ssh-tunnel-encryption
 - updated_at: 2026-07-27
