@@ -1175,3 +1175,216 @@ class TestTextFieldRegression:
 
         # 录入正常
         repository.create_entry(type_id=type_id, data={"field": "值"})
+
+
+# ==================== 字段级过滤测试（2026-08-18 新增） ====================
+
+
+class TestQueryEntriesFieldFilters:
+    """测试 query_entries() 的 filters 字段级过滤"""
+
+    def _setup_sport_type(self, repository):
+        """创建含 text/integer/float 三种字段类型的运动记录类型，录入 4 条记录"""
+        type_id = repository.create_type(
+            name="运动记录",
+            slug="filter_sport",
+            fields=[
+                {"field_name": "内容", "field_key": "content", "field_type": "text"},
+                {"field_name": "心率(bpm)", "field_key": "heart_rate", "field_type": "integer"},
+                {"field_name": "里程(km)", "field_key": "distance", "field_type": "float"},
+            ],
+        )
+        repository.create_entry(
+            type_id=type_id, data={"content": "晨跑", "heart_rate": 120, "distance": 5.0}
+        )
+        repository.create_entry(
+            type_id=type_id, data={"content": "夜跑", "heart_rate": 150, "distance": 8.5}
+        )
+        repository.create_entry(
+            type_id=type_id, data={"content": "游泳", "heart_rate": 110, "distance": 1.0}
+        )
+        repository.create_entry(
+            type_id=type_id, data={"content": "完成100%计划", "heart_rate": 100, "distance": 2.0}
+        )
+        return type_id
+
+    def test_filter_eq_integer(self, repository):
+        """eq 过滤 integer 字段：只返回精确匹配的记录"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "heart_rate", "op": "eq", "value": 120}]
+        )
+        assert total == 1
+        assert entries[0]["content"] == "晨跑"
+
+    def test_filter_gt_integer(self, repository):
+        """gt 过滤 integer 字段：返回大于阈值的记录"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "heart_rate", "op": "gt", "value": 120}]
+        )
+        assert total == 1
+        assert entries[0]["content"] == "夜跑"
+
+    def test_filter_gte_float_with_numeric_string(self, repository):
+        """gte 过滤 float 字段：数值字符串自动转换后比较"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "distance", "op": "gte", "value": "8.5"}]
+        )
+        assert total == 1
+        assert entries[0]["content"] == "夜跑"
+
+    def test_filter_lt_float(self, repository):
+        """lt 过滤 float 字段"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "distance", "op": "lt", "value": 2.0}]
+        )
+        assert total == 1
+        assert entries[0]["content"] == "游泳"
+
+    def test_filter_contains_text(self, repository):
+        """contains 过滤 text 字段：模糊包含匹配"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "content", "op": "contains", "value": "跑"}]
+        )
+        assert total == 2
+        assert {e["content"] for e in entries} == {"晨跑", "夜跑"}
+
+    def test_filter_contains_escapes_like_wildcards(self, repository):
+        """contains 值含 % 通配符：按字面匹配而非通配（ESCAPE 转义生效）"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "content", "op": "contains", "value": "%"}]
+        )
+        # 未转义时 % 会匹配所有 4 条；转义后只匹配字面含 % 的 1 条
+        assert total == 1
+        assert entries[0]["content"] == "完成100%计划"
+
+    def test_filter_in_text(self, repository):
+        """in 过滤 text 字段：命中列表中的任意值"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id,
+            filters=[{"field_key": "content", "op": "in", "value": ["晨跑", "游泳"]}],
+        )
+        assert total == 2
+        assert {e["content"] for e in entries} == {"晨跑", "游泳"}
+
+    def test_filter_ne_integer(self, repository):
+        """ne 过滤 integer 字段"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id, filters=[{"field_key": "heart_rate", "op": "ne", "value": 120}]
+        )
+        assert total == 3
+        assert "晨跑" not in {e["content"] for e in entries}
+
+    def test_filter_multiple_conditions_are_and(self, repository):
+        """多条件组合：AND 语义"""
+        type_id = self._setup_sport_type(repository)
+        entries, total = repository.query_entries(
+            type_id=type_id,
+            filters=[
+                {"field_key": "heart_rate", "op": "gte", "value": 110},
+                {"field_key": "content", "op": "contains", "value": "跑"},
+            ],
+        )
+        assert total == 2
+        assert {e["content"] for e in entries} == {"晨跑", "夜跑"}
+
+    def test_filter_combined_with_date_range(self, repository):
+        """filters 与 date_range 组合：AND 语义"""
+        type_id = self._setup_sport_type(repository)
+        # 时间范围限定后 2 条记录（相对其余靠后创建），再叠加数值过滤
+        all_entries, _ = repository.query_entries(type_id=type_id)
+        event_times = sorted(e["event_time"] for e in all_entries)
+        mid_time = event_times[2]  # 只保留时间最靠后的 2 条
+        entries, total = repository.query_entries(
+            type_id=type_id,
+            date_range=(mid_time, None),
+            filters=[{"field_key": "heart_rate", "op": "lt", "value": 105}],
+        )
+        # 靠后的 2 条为「游泳(110)」「完成100%计划(100)」，lt 105 只命中后者
+        assert total == 1
+        assert entries[0]["content"] == "完成100%计划"
+
+    def test_filter_no_filters_returns_all(self, repository):
+        """不传 filters：行为不变（向后兼容）"""
+        type_id = self._setup_sport_type(repository)
+        _, total = repository.query_entries(type_id=type_id)
+        assert total == 4
+
+    def test_filter_invalid_field_key_raises_with_valid_fields(self, repository):
+        """field_key 不存在：抛 ValidationError(INVALID_FIELD_KEY)，details 含 valid_fields"""
+        type_id = self._setup_sport_type(repository)
+        with pytest.raises(ValidationError) as exc_info:
+            repository.query_entries(
+                type_id=type_id,
+                filters=[{"field_key": "wrong_field", "op": "eq", "value": 1}],
+            )
+        assert exc_info.value.code == "INVALID_FIELD_KEY"
+        valid_fields = exc_info.value.details["valid_fields"]
+        assert {f["field_key"] for f in valid_fields} == {"content", "heart_rate", "distance"}
+
+    def test_filter_invalid_op_for_text_field_raises(self, repository):
+        """text 字段使用数值比较 op：抛 ValidationError(INVALID_FILTER_OP)，details 含 allowed_ops"""
+        type_id = self._setup_sport_type(repository)
+        with pytest.raises(ValidationError) as exc_info:
+            repository.query_entries(
+                type_id=type_id,
+                filters=[{"field_key": "content", "op": "gt", "value": "a"}],
+            )
+        assert exc_info.value.code == "INVALID_FILTER_OP"
+        assert set(exc_info.value.details["allowed_ops"]) == {"eq", "ne", "in", "contains"}
+
+    def test_filter_invalid_op_for_integer_field_raises(self, repository):
+        """integer 字段使用 contains：抛 ValidationError(INVALID_FILTER_OP)"""
+        type_id = self._setup_sport_type(repository)
+        with pytest.raises(ValidationError) as exc_info:
+            repository.query_entries(
+                type_id=type_id,
+                filters=[{"field_key": "heart_rate", "op": "contains", "value": "12"}],
+            )
+        assert exc_info.value.code == "INVALID_FILTER_OP"
+        assert set(exc_info.value.details["allowed_ops"]) == {
+            "eq",
+            "ne",
+            "in",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+        }
+
+    def test_filter_value_type_mismatch_raises(self, repository):
+        """integer 字段过滤值非数值：抛 ValidationError(INVALID_FIELD_VALUE)"""
+        type_id = self._setup_sport_type(repository)
+        with pytest.raises(ValidationError) as exc_info:
+            repository.query_entries(
+                type_id=type_id,
+                filters=[{"field_key": "heart_rate", "op": "eq", "value": "abc"}],
+            )
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+        assert exc_info.value.details["invalid_fields"][0]["field_key"] == "heart_rate"
+
+    def test_filter_in_with_empty_list_raises(self, repository):
+        """op=in 且 value 为空数组：抛 ValidationError(INVALID_FIELD_VALUE)"""
+        type_id = self._setup_sport_type(repository)
+        with pytest.raises(ValidationError) as exc_info:
+            repository.query_entries(
+                type_id=type_id,
+                filters=[{"field_key": "heart_rate", "op": "in", "value": []}],
+            )
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+
+    def test_filter_in_with_mixed_invalid_values_raises(self, repository):
+        """op=in 且列表中混入类型不匹配值：抛 ValidationError(INVALID_FIELD_VALUE)"""
+        type_id = self._setup_sport_type(repository)
+        with pytest.raises(ValidationError):
+            repository.query_entries(
+                type_id=type_id,
+                filters=[{"field_key": "heart_rate", "op": "in", "value": [120, "abc"]}],
+            )

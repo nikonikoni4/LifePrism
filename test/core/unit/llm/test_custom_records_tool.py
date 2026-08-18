@@ -18,6 +18,7 @@ if project_root not in sys.path:
 
 from lifeprism.llm.agent.tools.base import ERROR, SUCCESS
 from lifeprism.llm.agent.tools.custom_records_tool import QueryCustomRecordEntriesTool
+from lifeprism.utils.exceptions import ValidationError
 
 
 @pytest.mark.core
@@ -98,3 +99,159 @@ class TestQueryCustomRecordEntriesTool:
 
         assert result.startswith(ERROR)
         assert "type_id" in result
+
+
+# ==================== filters 字段级过滤测试（2026-08-18 新增） ====================
+
+
+@pytest.mark.core
+class TestQueryEntriesFilters:
+    """QueryCustomRecordEntriesTool filters 参数测试"""
+
+    @pytest.mark.asyncio
+    async def test_filters_passed_through_to_repository(self):
+        """filters 参数应原样透传给 repository.query_entries"""
+        tool = QueryCustomRecordEntriesTool()
+        filters = [{"field_key": "heart_rate", "op": "gt", "value": 100}]
+
+        with patch(
+            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+        ) as mock_repo:
+            mock_repo.query_entries.return_value = ([], 0)
+
+            result = await tool.execute(type_id="crt-abc12345", filters=filters)
+
+        assert result.startswith(SUCCESS)
+        mock_repo.query_entries.assert_called_once()
+        call_kwargs = mock_repo.query_entries.call_args.kwargs
+        assert call_kwargs["filters"] == filters
+        assert call_kwargs["type_id"] == "crt-abc12345"
+
+    @pytest.mark.asyncio
+    async def test_filters_omitted_passes_none(self):
+        """不传 filters：透传 None（向后兼容）"""
+        tool = QueryCustomRecordEntriesTool()
+
+        with patch(
+            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+        ) as mock_repo:
+            mock_repo.query_entries.return_value = ([], 0)
+
+            await tool.execute(type_id="crt-abc12345")
+
+        call_kwargs = mock_repo.query_entries.call_args.kwargs
+        assert call_kwargs["filters"] is None
+
+    @pytest.mark.asyncio
+    async def test_filters_not_list_returns_plain_error(self):
+        """filters 非数组：返回普通错误提示（非 JSON）"""
+        tool = QueryCustomRecordEntriesTool()
+
+        result = await tool.execute(type_id="crt-abc12345", filters={"field_key": "x"})
+
+        assert result.startswith(ERROR)
+        assert "filters" in result
+
+    @pytest.mark.asyncio
+    async def test_invalid_field_key_returns_structured_error(self):
+        """field_key 无效：ValidationError 转为结构化 JSON（含 valid_fields）"""
+        tool = QueryCustomRecordEntriesTool()
+
+        with patch(
+            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+        ) as mock_repo:
+            mock_repo.query_entries.side_effect = ValidationError(
+                message="过滤字段不存在: wrong_field",
+                code="INVALID_FIELD_KEY",
+                details={
+                    "invalid_keys": ["wrong_field"],
+                    "valid_fields": [
+                        {"field_key": "heart_rate", "field_name": "心率(bpm)", "field_type": "integer"}
+                    ],
+                },
+            )
+
+            result = await tool.execute(
+                type_id="crt-abc12345",
+                filters=[{"field_key": "wrong_field", "op": "eq", "value": 1}],
+            )
+
+        assert result.startswith(ERROR)
+        payload = json.loads(result[len(ERROR):])
+        assert payload["error"] == "INVALID_FIELD_KEY"
+        assert payload["valid_fields"][0]["field_key"] == "heart_rate"
+
+    @pytest.mark.asyncio
+    async def test_invalid_op_returns_allowed_ops(self):
+        """op 无效：结构化错误含 allowed_ops，引导 AI 修正"""
+        tool = QueryCustomRecordEntriesTool()
+
+        with patch(
+            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+        ) as mock_repo:
+            mock_repo.query_entries.side_effect = ValidationError(
+                message="过滤操作符无效: contains（字段 heart_rate 类型 integer）",
+                code="INVALID_FILTER_OP",
+                details={
+                    "field_key": "heart_rate",
+                    "op": "contains",
+                    "allowed_ops": ["eq", "gt", "gte", "lt", "lte", "ne", "in"],
+                },
+            )
+
+            result = await tool.execute(
+                type_id="crt-abc12345",
+                filters=[{"field_key": "heart_rate", "op": "contains", "value": "12"}],
+            )
+
+        assert result.startswith(ERROR)
+        payload = json.loads(result[len(ERROR):])
+        assert payload["error"] == "INVALID_FILTER_OP"
+        assert "contains" not in payload["allowed_ops"]
+        assert "gte" in payload["allowed_ops"]
+
+    @pytest.mark.asyncio
+    async def test_invalid_value_returns_invalid_fields(self):
+        """value 类型不匹配：结构化错误含 invalid_fields"""
+        tool = QueryCustomRecordEntriesTool()
+
+        with patch(
+            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+        ) as mock_repo:
+            mock_repo.query_entries.side_effect = ValidationError(
+                message="过滤值类型不匹配: heart_rate",
+                code="INVALID_FIELD_VALUE",
+                details={
+                    "invalid_fields": [
+                        {"field_key": "heart_rate", "value": "abc", "expected_type": "integer"}
+                    ]
+                },
+            )
+
+            result = await tool.execute(
+                type_id="crt-abc12345",
+                filters=[{"field_key": "heart_rate", "op": "eq", "value": "abc"}],
+            )
+
+        assert result.startswith(ERROR)
+        payload = json.loads(result[len(ERROR):])
+        assert payload["error"] == "INVALID_FIELD_VALUE"
+        assert payload["invalid_fields"][0]["field_key"] == "heart_rate"
+
+    @pytest.mark.asyncio
+    async def test_filters_schema_declared_in_parameters(self):
+        """parameters schema 应声明 filters 参数及全部操作符枚举"""
+        params = QueryCustomRecordEntriesTool().parameters
+        assert "filters" in params["properties"]
+        items = params["properties"]["filters"]["items"]
+        assert set(items["properties"]["op"]["enum"]) == {
+            "eq",
+            "ne",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "contains",
+            "in",
+        }
+        assert set(items["required"]) == {"field_key", "op", "value"}

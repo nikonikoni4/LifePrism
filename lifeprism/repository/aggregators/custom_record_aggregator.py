@@ -44,6 +44,20 @@ class CustomRecordRepository:
     _SLUG_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
     _FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
+    # 字段级过滤：op -> SQL 比较符映射（in/contains 单独处理，需多占位符/ESCAPE）
+    _FILTER_OP_TO_SQL = {
+        "eq": "=",
+        "ne": "!=",
+        "gt": ">",
+        "gte": ">=",
+        "lt": "<",
+        "lte": "<=",
+    }
+
+    # 各 field_type 允许的过滤操作符
+    _TEXT_FILTER_OPS = {"eq", "ne", "in", "contains"}
+    _NUMERIC_FILTER_OPS = {"eq", "ne", "in", "gt", "gte", "lt", "lte"}
+
     # P2: field_type → SQLite 列类型映射
     _FIELD_TYPE_TO_SQL = {
         "text": "TEXT",
@@ -576,27 +590,159 @@ class CustomRecordRepository:
                 cause=e,
             ) from e
 
+    def _build_field_filters(
+        self, type_id: str, filters: list[dict[str, Any]]
+    ) -> tuple[list[str], list[Any]]:
+        """
+        构建字段级过滤 WHERE 子句（全参数化，field_key 已对照字段定义校验）
+
+        每项 filter 形如 {"field_key": str, "op": str, "value": Any}：
+        - 通用 op：eq / ne / in（value 为非空数组）
+        - text 字段额外：contains（LIKE 模糊匹配，ESCAPE 转义通配符）
+        - integer/float 字段额外：gt / gte / lt / lte
+
+        Args:
+            type_id: 类型 ID
+            filters: 过滤条件列表，多条件间为 AND 关系
+
+        Returns:
+            tuple: (WHERE 子句列表, 参数列表)
+
+        Raises:
+            ValidationError: field_key 不存在 / op 不适用于该字段类型 / value 类型不匹配
+        """
+        fields = self._get_fields_by_type_id(type_id)
+        field_type_map = {f["field_key"]: f["field_type"] for f in fields}
+
+        clauses: list[str] = []
+        params: list[Any] = []
+        for flt in filters:
+            key = flt.get("field_key")
+            op = flt.get("op")
+            value = flt.get("value")
+
+            # 校验 field_key 存在
+            if key not in field_type_map:
+                valid_fields = [
+                    {
+                        "field_key": f["field_key"],
+                        "field_name": f["field_name"],
+                        "field_type": f["field_type"],
+                    }
+                    for f in fields
+                ]
+                raise ValidationError(
+                    message=f"过滤字段不存在: {key}",
+                    code="INVALID_FIELD_KEY",
+                    details={"invalid_keys": [key], "valid_fields": valid_fields},
+                )
+            ftype = field_type_map[key]
+
+            # 校验 op 适用于该字段类型
+            allowed_ops = self._TEXT_FILTER_OPS if ftype == "text" else self._NUMERIC_FILTER_OPS
+            if op not in allowed_ops:
+                raise ValidationError(
+                    message=f"过滤操作符无效: {op}（字段 {key} 类型 {ftype}）",
+                    code="INVALID_FILTER_OP",
+                    details={
+                        "field_key": key,
+                        "op": op,
+                        "allowed_ops": sorted(allowed_ops),
+                    },
+                )
+
+            # in：value 必须是非空数组，逐项按 field_type 转换
+            if op == "in":
+                if not isinstance(value, list) or not value:
+                    raise ValidationError(
+                        message=f"过滤值无效: op=in 要求 value 为非空数组（字段 {key}）",
+                        code="INVALID_FIELD_VALUE",
+                        details={
+                            "invalid_fields": [
+                                {"field_key": key, "value": value, "expected_type": f"{ftype} 数组"}
+                            ]
+                        },
+                    )
+                converted: list[Any] = []
+                for v in value:
+                    cv = self._coerce_field_value(key, v, ftype)
+                    if cv is _INVALID_SENTINEL:
+                        raise ValidationError(
+                            message=f"过滤值类型不匹配: {key}",
+                            code="INVALID_FIELD_VALUE",
+                            details={
+                                "invalid_fields": [
+                                    {"field_key": key, "value": v, "expected_type": ftype}
+                                ]
+                            },
+                        )
+                    converted.append(cv)
+                placeholders = ",".join("?" * len(converted))
+                clauses.append(f"{key} IN ({placeholders})")
+                params.extend(converted)
+                continue
+
+            # contains：仅 text 字段，LIKE 匹配，转义通配符
+            if op == "contains":
+                if value is None:
+                    raise ValidationError(
+                        message=f"过滤值无效: op=contains 要求 value 为非空值（字段 {key}）",
+                        code="INVALID_FIELD_VALUE",
+                        details={
+                            "invalid_fields": [
+                                {"field_key": key, "value": value, "expected_type": "text"}
+                            ]
+                        },
+                    )
+                text_val = value if isinstance(value, str) else str(value)
+                escaped = text_val.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                clauses.append(f"{key} LIKE ? ESCAPE '\\'")
+                params.append(f"%{escaped}%")
+                continue
+
+            # 标量比较：eq/ne/gt/gte/lt/lte
+            cv = self._coerce_field_value(key, value, ftype)
+            if cv is _INVALID_SENTINEL or cv is None:
+                raise ValidationError(
+                    message=f"过滤值类型不匹配: {key}",
+                    code="INVALID_FIELD_VALUE",
+                    details={
+                        "invalid_fields": [
+                            {"field_key": key, "value": value, "expected_type": ftype}
+                        ]
+                    },
+                )
+            sql_op = self._FILTER_OP_TO_SQL[op]
+            clauses.append(f"{key} {sql_op} ?")
+            params.append(cv)
+
+        return clauses, params
+
     def query_entries(
         self,
         type_id: str,
         date_range: tuple[str | None, str | None] | None = None,
         page: int = 1,
         page_size: int = 50,
+        filters: list[dict[str, Any]] | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """
-        按时间范围分页查询记录（date_range 过滤 event_time，按 event_time DESC 排序）
+        按时间范围与字段级过滤条件分页查询记录（按 event_time DESC 排序）
 
         Args:
             type_id: 类型 ID
             date_range: (start, end) 元组，任一侧可为 None 表示不加约束；None 整体不筛选
             page: 页码，从 1 开始
             page_size: 每页条数
+            filters: 字段级过滤条件列表 [{field_key, op, value}]，多条件 AND；
+                     None 表示不过滤（详见 _build_field_filters）
 
         Returns:
             tuple: (记录列表, 总记录数)
 
         Raises:
             EntityNotFoundError: 类型不存在
+            ValidationError: filters 中 field_key/op/value 无效
             DataAccessError: 数据库操作失败
         """
         _, data_table = self._get_type_and_table(type_id)
@@ -611,6 +757,10 @@ class CustomRecordRepository:
             if end:
                 where_clauses.append("event_time <= ?")
                 params.append(end)
+        if filters:
+            filter_clauses, filter_params = self._build_field_filters(type_id, filters)
+            where_clauses.extend(filter_clauses)
+            params.extend(filter_params)
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         offset = (page - 1) * page_size

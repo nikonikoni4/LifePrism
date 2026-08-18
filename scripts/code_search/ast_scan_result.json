@@ -1,7 +1,7 @@
 {
   "total_files": 241,
-  "total_definitions": 2263,
-  "total_calls": 6957,
+  "total_definitions": 2264,
+  "total_calls": 6970,
   "definitions": {
     "config.cloud_config_generator.CloudConfigGenerator": {
       "line": 44,
@@ -5654,87 +5654,92 @@
       "name": "CustomRecordRepository"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.__init__": {
-      "line": 79,
+      "line": 93,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.__init__"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.create_type": {
-      "line": 93,
+      "line": 107,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.create_type"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository._query_one": {
-      "line": 242,
+      "line": 256,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository._query_one"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository._query_all": {
-      "line": 253,
+      "line": 267,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository._query_all"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository._get_fields_by_type_id": {
-      "line": 264,
+      "line": 278,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository._get_fields_by_type_id"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.list_types": {
-      "line": 274,
+      "line": 288,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.list_types"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.get_type_by_id": {
-      "line": 297,
+      "line": 311,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.get_type_by_id"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.get_type_fields": {
-      "line": 325,
+      "line": 339,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.get_type_fields"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.delete_type": {
-      "line": 337,
+      "line": 351,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.delete_type"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository._coerce_field_value": {
-      "line": 403,
+      "line": 417,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository._coerce_field_value"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository._get_type_and_table": {
-      "line": 457,
+      "line": 471,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository._get_type_and_table"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.create_entry": {
-      "line": 468,
+      "line": 482,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.create_entry"
     },
+    "repository.aggregators.custom_record_aggregator.CustomRecordRepository._build_field_filters": {
+      "line": 593,
+      "module": "repository.aggregators.custom_record_aggregator",
+      "name": "CustomRecordRepository._build_field_filters"
+    },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.query_entries": {
-      "line": 579,
+      "line": 721,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.query_entries"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.get_entry": {
-      "line": 642,
+      "line": 792,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.get_entry"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.delete_entry": {
-      "line": 676,
+      "line": 826,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.delete_entry"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.update_type_config": {
-      "line": 743,
+      "line": 893,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.update_type_config"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.update_field_role": {
-      "line": 808,
+      "line": 958,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.update_field_role"
     },
@@ -7604,37 +7609,37 @@
       "name": "HabitCheckinProvider.create_checkin"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.get_checkin_by_date": {
-      "line": 604,
+      "line": 598,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.get_checkin_by_date"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.delete_checkin": {
-      "line": 621,
+      "line": 615,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.delete_checkin"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.delete_by_habit_id": {
-      "line": 649,
+      "line": 643,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.delete_by_habit_id"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.get_checkin_dates_by_challenge": {
-      "line": 685,
+      "line": 679,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.get_checkin_dates_by_challenge"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.count_checkins_by_challenge": {
-      "line": 705,
+      "line": 699,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.count_checkins_by_challenge"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.get_today_checkins": {
-      "line": 726,
+      "line": 720,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.get_today_checkins"
     },
     "repository.providers.habit_providers.HabitCheckinProvider.get_checkins_in_date_range": {
-      "line": 753,
+      "line": 747,
       "module": "repository.providers.habit_providers",
       "name": "HabitCheckinProvider.get_checkins_in_date_range"
     },
@@ -10474,7 +10479,7 @@
       "name": "QueryCustomRecordEntriesTool.__init__"
     },
     "llm.agent.tools.custom_records_tool.QueryCustomRecordEntriesTool.execute": {
-      "line": 291,
+      "line": 335,
       "module": "llm.agent.tools.custom_records_tool",
       "name": "QueryCustomRecordEntriesTool.execute"
     },
@@ -10754,42 +10759,42 @@
       "name": "_search_string"
     },
     "llm.agent.tools.habit_tool._get_habit_service": {
-      "line": 30,
+      "line": 29,
       "module": "llm.agent.tools.habit_tool",
       "name": "_get_habit_service"
     },
     "llm.agent.tools.habit_tool._format_frequency": {
-      "line": 41,
+      "line": 40,
       "module": "llm.agent.tools.habit_tool",
       "name": "_format_frequency"
     },
     "llm.agent.tools.habit_tool._format_settlement": {
-      "line": 50,
+      "line": 49,
       "module": "llm.agent.tools.habit_tool",
       "name": "_format_settlement"
     },
     "llm.agent.tools.habit_tool._format_habit": {
-      "line": 65,
+      "line": 64,
       "module": "llm.agent.tools.habit_tool",
       "name": "_format_habit"
     },
     "llm.agent.tools.habit_tool.query_user_habits": {
-      "line": 87,
+      "line": 86,
       "module": "llm.agent.tools.habit_tool",
       "name": "query_user_habits"
     },
     "llm.agent.tools.habit_tool.checkin_habit_today": {
-      "line": 96,
+      "line": 95,
       "module": "llm.agent.tools.habit_tool",
       "name": "checkin_habit_today"
     },
     "llm.agent.tools.habit_tool.cancel_checkin_today": {
-      "line": 109,
+      "line": 108,
       "module": "llm.agent.tools.habit_tool",
       "name": "cancel_checkin_today"
     },
     "llm.agent.tools.habit_tool.backfill_checkin": {
-      "line": 122,
+      "line": 121,
       "module": "llm.agent.tools.habit_tool",
       "name": "backfill_checkin"
     },
@@ -10834,22 +10839,22 @@
       "name": "CancelCheckinHabitTool.__init__"
     },
     "llm.agent.tools.habit_tool.CancelCheckinHabitTool.execute": {
-      "line": 266,
+      "line": 263,
       "module": "llm.agent.tools.habit_tool",
       "name": "CancelCheckinHabitTool.execute"
     },
     "llm.agent.tools.habit_tool.BackfillCheckinTool": {
-      "line": 280,
+      "line": 277,
       "module": "llm.agent.tools.habit_tool",
       "name": "BackfillCheckinTool"
     },
     "llm.agent.tools.habit_tool.BackfillCheckinTool.__init__": {
-      "line": 283,
+      "line": 280,
       "module": "llm.agent.tools.habit_tool",
       "name": "BackfillCheckinTool.__init__"
     },
     "llm.agent.tools.habit_tool.BackfillCheckinTool.execute": {
-      "line": 318,
+      "line": 315,
       "module": "llm.agent.tools.habit_tool",
       "name": "BackfillCheckinTool.execute"
     },
@@ -18103,7 +18108,11 @@
       },
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 334
+        "line": 382
+      },
+      {
+        "from": "llm.agent.tools.custom_records_tool.execute",
+        "line": 396
       },
       {
         "from": "llm.agent.tools.lifeprismsystem.create_user_mood",
@@ -25851,15 +25860,15 @@
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 175
+        "line": 189
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 193
+        "line": 207
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 543
+        "line": 557
       },
       {
         "from": "repository.providers.deletion_log_provider.write_tombstone_with_cursor",
@@ -31367,289 +31376,335 @@
     "repository.aggregators.custom_record_aggregator.DeletionLogProvider": [
       {
         "from": "repository.aggregators.custom_record_aggregator.__init__",
-        "line": 89
+        "line": 103
       }
     ],
     "repository.aggregators.custom_record_aggregator.ValidationError": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 119
+        "line": 133
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 127
+        "line": 141
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 135
+        "line": 149
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 145
+        "line": 159
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 158
+        "line": 172
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 498
+        "line": 512
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 533
+        "line": 547
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 634
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 644
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 657
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 670
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 688
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 706
       }
     ],
     "repository.aggregators.custom_record_aggregator.list": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 150
+        "line": 164
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.query_entries",
-        "line": 624
+        "line": 774
       }
     ],
     "repository.aggregators.custom_record_aggregator.set": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 155
+        "line": 169
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 493
+        "line": 507
       }
     ],
     "repository.aggregators.custom_record_aggregator.DuplicateEntityError": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 168
+        "line": 182
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 227
+        "line": 241
       }
     ],
     "repository.aggregators.custom_record_aggregator.enumerate": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 192
+        "line": 206
       }
     ],
     "repository.aggregators.custom_record_aggregator.DataAccessError": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 234
+        "line": 248
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.list_types",
-        "line": 291
+        "line": 305
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.get_type_by_id",
-        "line": 319
+        "line": 333
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_type",
-        "line": 395
+        "line": 409
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 573
+        "line": 587
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.query_entries",
-        "line": 636
+        "line": 786
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.get_entry",
-        "line": 670
+        "line": 820
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_entry",
-        "line": 725
+        "line": 875
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 797
+        "line": 947
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_field_role",
-        "line": 842
+        "line": 992
       }
     ],
     "repository.aggregators.custom_record_aggregator.str": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_type",
-        "line": 236
+        "line": 250
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.list_types",
-        "line": 293
+        "line": 307
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.get_type_by_id",
-        "line": 321
+        "line": 335
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_type",
-        "line": 397
+        "line": 411
       },
       {
         "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 423
+        "line": 437
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 575
+        "line": 589
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 697
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.query_entries",
-        "line": 638
+        "line": 788
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.get_entry",
-        "line": 672
+        "line": 822
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_entry",
-        "line": 727
+        "line": 877
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 799
+        "line": 949
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_field_role",
-        "line": 844
+        "line": 994
       }
     ],
     "repository.aggregators.custom_record_aggregator.dict": [
       {
         "from": "repository.aggregators.custom_record_aggregator._query_one",
-        "line": 251
+        "line": 265
       },
       {
         "from": "repository.aggregators.custom_record_aggregator._query_all",
-        "line": 262
+        "line": 276
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.query_entries",
-        "line": 632
+        "line": 782
       }
     ],
     "repository.aggregators.custom_record_aggregator.zip": [
       {
         "from": "repository.aggregators.custom_record_aggregator._query_one",
-        "line": 251
+        "line": 265
       },
       {
         "from": "repository.aggregators.custom_record_aggregator._query_all",
-        "line": 262
+        "line": 276
       }
     ],
     "repository.aggregators.custom_record_aggregator.EntityNotFoundError": [
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_type",
-        "line": 364
+        "line": 378
       },
       {
         "from": "repository.aggregators.custom_record_aggregator._get_type_and_table",
-        "line": 464
+        "line": 478
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_entry",
-        "line": 706
+        "line": 856
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_entry",
-        "line": 733
+        "line": 883
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 804
+        "line": 954
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_field_role",
-        "line": 849
+        "line": 999
       }
     ],
     "repository.aggregators.custom_record_aggregator.CustomRecordFieldProvider": [
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_type",
-        "line": 378
+        "line": 392
       }
     ],
     "repository.aggregators.custom_record_aggregator.CustomRecordTypeProvider": [
       {
         "from": "repository.aggregators.custom_record_aggregator.delete_type",
-        "line": 386
+        "line": 400
       }
     ],
     "repository.aggregators.custom_record_aggregator.isinstance": [
       {
         "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 427
+        "line": 441
       },
       {
         "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 429
+        "line": 443
       },
-      {
-        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 431
-      },
-      {
-        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 444
-      },
-      {
-        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 446
-      }
-    ],
-    "repository.aggregators.custom_record_aggregator.int": [
-      {
-        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 437
-      }
-    ],
-    "repository.aggregators.custom_record_aggregator.float": [
       {
         "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
         "line": 445
       },
       {
         "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
-        "line": 448
+        "line": 458
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
+        "line": 460
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 656
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 697
+      }
+    ],
+    "repository.aggregators.custom_record_aggregator.int": [
+      {
+        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
+        "line": 451
+      }
+    ],
+    "repository.aggregators.custom_record_aggregator.float": [
+      {
+        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
+        "line": 459
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._coerce_field_value",
+        "line": 462
       }
     ],
     "repository.aggregators.custom_record_aggregator.sorted": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 499
+        "line": 513
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 502
+        "line": 516
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 650
       }
     ],
     "repository.aggregators.custom_record_aggregator.tuple": [
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
-        "line": 563
+        "line": 577
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.query_entries",
-        "line": 629
+        "line": 779
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.query_entries",
-        "line": 631
+        "line": 781
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 793
+        "line": 943
+      }
+    ],
+    "repository.aggregators.custom_record_aggregator.len": [
+      {
+        "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
+        "line": 680
       }
     ],
     "repository.aggregators.goal_aggregator.get_logger": [
@@ -34213,15 +34268,15 @@
       },
       {
         "from": "repository.providers.habit_providers.get_checkin_by_date",
-        "line": 615
+        "line": 609
       },
       {
         "from": "repository.providers.habit_providers.get_checkin_dates_by_challenge",
-        "line": 696
+        "line": 690
       },
       {
         "from": "repository.providers.habit_providers.get_checkins_in_date_range",
-        "line": 784
+        "line": 778
       }
     ],
     "repository.providers.habit_providers.generate_id": [
@@ -34255,7 +34310,7 @@
       },
       {
         "from": "repository.providers.habit_providers.get_checkins_in_date_range",
-        "line": 781
+        "line": 775
       }
     ],
     "repository.providers.habit_providers.zip": [
@@ -34265,7 +34320,7 @@
       },
       {
         "from": "repository.providers.habit_providers.get_checkins_in_date_range",
-        "line": 781
+        "line": 775
       }
     ],
     "repository.providers.habit_providers.DataAccessError": [
@@ -34279,22 +34334,32 @@
       },
       {
         "from": "repository.providers.habit_providers.delete_checkin",
-        "line": 647
+        "line": 641
       },
       {
         "from": "repository.providers.habit_providers.delete_by_habit_id",
-        "line": 683
+        "line": 677
       },
       {
         "from": "repository.providers.habit_providers.count_checkins_by_challenge",
-        "line": 724
+        "line": 718
       },
       {
         "from": "repository.providers.habit_providers.get_today_checkins",
-        "line": 751
+        "line": 745
       }
     ],
     "repository.providers.habit_providers.len": [
+      {
+        "from": "repository.providers.habit_providers.get_today_checkins",
+        "line": 734
+      },
+      {
+        "from": "repository.providers.habit_providers.get_checkins_in_date_range",
+        "line": 766
+      }
+    ],
+    "repository.providers.habit_providers.list": [
       {
         "from": "repository.providers.habit_providers.get_today_checkins",
         "line": 740
@@ -34302,16 +34367,6 @@
       {
         "from": "repository.providers.habit_providers.get_checkins_in_date_range",
         "line": 772
-      }
-    ],
-    "repository.providers.habit_providers.list": [
-      {
-        "from": "repository.providers.habit_providers.get_today_checkins",
-        "line": 746
-      },
-      {
-        "from": "repository.providers.habit_providers.get_checkins_in_date_range",
-        "line": 778
       }
     ],
     "repository.providers.journal_provider.get_logger": [
@@ -41847,15 +41902,15 @@
       },
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 327
+        "line": 375
       },
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 329
+        "line": 377
       },
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 331
+        "line": 379
       }
     ],
     "llm.agent.tools.custom_records_tool.isinstance": [
@@ -41869,7 +41924,11 @@
       },
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 301
+        "line": 343
+      },
+      {
+        "from": "llm.agent.tools.custom_records_tool.execute",
+        "line": 348
       }
     ],
     "llm.agent.tools.custom_records_tool.local_to_utc_iso": [
@@ -41881,23 +41940,23 @@
     "llm.agent.tools.custom_records_tool.len": [
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 301
+        "line": 348
       }
     ],
     "llm.agent.tools.custom_records_tool.build_utc_time_range": [
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 305
+        "line": 352
       },
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 309
+        "line": 356
       }
     ],
     "llm.agent.tools.custom_records_tool.int": [
       {
         "from": "llm.agent.tools.custom_records_tool.execute",
-        "line": 321
+        "line": 368
       }
     ],
     "llm.agent.tools.filesystem.get_logger": [
@@ -42553,45 +42612,45 @@
     "llm.agent.tools.habit_tool._format_frequency": [
       {
         "from": "llm.agent.tools.habit_tool._format_habit",
-        "line": 70
+        "line": 69
       }
     ],
     "llm.agent.tools.habit_tool._get_habit_service": [
       {
         "from": "llm.agent.tools.habit_tool.query_user_habits",
-        "line": 89
+        "line": 88
       },
       {
         "from": "llm.agent.tools.habit_tool.checkin_habit_today",
-        "line": 98
+        "line": 97
       },
       {
         "from": "llm.agent.tools.habit_tool.cancel_checkin_today",
-        "line": 112
+        "line": 111
       },
       {
         "from": "llm.agent.tools.habit_tool.backfill_checkin",
-        "line": 132
+        "line": 123
       }
     ],
     "llm.agent.tools.habit_tool.len": [
       {
         "from": "llm.agent.tools.habit_tool.query_user_habits",
-        "line": 92
+        "line": 91
       }
     ],
     "llm.agent.tools.habit_tool._format_habit": [
       {
         "from": "llm.agent.tools.habit_tool.query_user_habits",
-        "line": 93
+        "line": 92
       },
       {
         "from": "llm.agent.tools.habit_tool.checkin_habit_today",
-        "line": 102
+        "line": 101
       },
       {
         "from": "llm.agent.tools.habit_tool.cancel_checkin_today",
-        "line": 115
+        "line": 114
       },
       {
         "from": "llm.agent.tools.habit_tool.backfill_checkin",
@@ -42601,11 +42660,11 @@
     "llm.agent.tools.habit_tool._format_settlement": [
       {
         "from": "llm.agent.tools.habit_tool.checkin_habit_today",
-        "line": 105
+        "line": 104
       },
       {
         "from": "llm.agent.tools.habit_tool.cancel_checkin_today",
-        "line": 118
+        "line": 117
       },
       {
         "from": "llm.agent.tools.habit_tool.backfill_checkin",
@@ -42615,7 +42674,7 @@
     "llm.agent.tools.habit_tool.get_local_today": [
       {
         "from": "llm.agent.tools.habit_tool.cancel_checkin_today",
-        "line": 111
+        "line": 110
       }
     ],
     "llm.agent.tools.habit_tool.BackfillCheckInRequest": [
@@ -42645,19 +42704,19 @@
     "llm.agent.tools.habit_tool.cancel_checkin_today": [
       {
         "from": "llm.agent.tools.habit_tool.execute",
-        "line": 271
+        "line": 268
       }
     ],
     "llm.agent.tools.habit_tool.isinstance": [
       {
         "from": "llm.agent.tools.habit_tool.execute",
-        "line": 324
+        "line": 321
       }
     ],
     "llm.agent.tools.habit_tool.backfill_checkin": [
       {
         "from": "llm.agent.tools.habit_tool.execute",
-        "line": 326
+        "line": 323
       }
     ],
     "llm.agent.tools.lifeprismsystem.str": [
@@ -52727,7 +52786,11 @@
       },
       {
         "to": "json.dumps",
-        "line": 334
+        "line": 382
+      },
+      {
+        "to": "json.dumps",
+        "line": 396
       },
       {
         "to": "re.match",
@@ -52743,15 +52806,15 @@
       },
       {
         "to": "llm.agent.tools.custom_records_tool.utc_to_local_display",
-        "line": 327
+        "line": 375
       },
       {
         "to": "llm.agent.tools.custom_records_tool.utc_to_local_display",
-        "line": 329
+        "line": 377
       },
       {
         "to": "llm.agent.tools.custom_records_tool.utc_to_local_display",
-        "line": 331
+        "line": 379
       },
       {
         "to": "llm.agent.tools.custom_records_tool.isinstance",
@@ -52763,7 +52826,11 @@
       },
       {
         "to": "llm.agent.tools.custom_records_tool.isinstance",
-        "line": 301
+        "line": 343
+      },
+      {
+        "to": "llm.agent.tools.custom_records_tool.isinstance",
+        "line": 348
       },
       {
         "to": "llm.agent.tools.custom_records_tool.local_to_utc_iso",
@@ -52771,19 +52838,19 @@
       },
       {
         "to": "llm.agent.tools.custom_records_tool.len",
-        "line": 301
+        "line": 348
       },
       {
         "to": "llm.agent.tools.custom_records_tool.build_utc_time_range",
-        "line": 305
+        "line": 352
       },
       {
         "to": "llm.agent.tools.custom_records_tool.build_utc_time_range",
-        "line": 309
+        "line": 356
       },
       {
         "to": "llm.agent.tools.custom_records_tool.int",
-        "line": 321
+        "line": 368
       }
     ],
     "llm.agent.tools.lifeprismsystem.create_user_mood": [
@@ -60947,97 +61014,97 @@
     "repository.aggregators.custom_record_aggregator.create_type": [
       {
         "to": "uuid.uuid4",
-        "line": 175
+        "line": 189
       },
       {
         "to": "uuid.uuid4",
-        "line": 193
+        "line": 207
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 119
+        "line": 133
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 127
+        "line": 141
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 135
+        "line": 149
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 145
+        "line": 159
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 158
+        "line": 172
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.list",
-        "line": 150
+        "line": 164
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.set",
-        "line": 155
+        "line": 169
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.DuplicateEntityError",
-        "line": 168
+        "line": 182
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.DuplicateEntityError",
-        "line": 227
+        "line": 241
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.enumerate",
-        "line": 192
+        "line": 206
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 234
+        "line": 248
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 236
+        "line": 250
       }
     ],
     "repository.aggregators.custom_record_aggregator.create_entry": [
       {
         "to": "uuid.uuid4",
-        "line": 543
+        "line": 557
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 498
+        "line": 512
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.ValidationError",
-        "line": 533
+        "line": 547
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.set",
-        "line": 493
+        "line": 507
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 573
+        "line": 587
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 575
+        "line": 589
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.sorted",
-        "line": 499
+        "line": 513
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.sorted",
-        "line": 502
+        "line": 516
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.tuple",
-        "line": 563
+        "line": 577
       }
     ],
     "repository.providers.deletion_log_provider.write_tombstone_with_cursor": [
@@ -65435,199 +65502,245 @@
     "repository.aggregators.custom_record_aggregator.__init__": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DeletionLogProvider",
-        "line": 89
+        "line": 103
+      }
+    ],
+    "repository.aggregators.custom_record_aggregator._build_field_filters": [
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 634
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 644
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 657
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 670
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 688
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 706
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.str",
+        "line": 697
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
+        "line": 656
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
+        "line": 697
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.sorted",
+        "line": 650
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.len",
+        "line": 680
       }
     ],
     "repository.aggregators.custom_record_aggregator.query_entries": [
       {
         "to": "repository.aggregators.custom_record_aggregator.list",
-        "line": 624
+        "line": 774
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 636
+        "line": 786
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 638
+        "line": 788
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.dict",
-        "line": 632
+        "line": 782
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.tuple",
-        "line": 629
+        "line": 779
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.tuple",
-        "line": 631
+        "line": 781
       }
     ],
     "repository.aggregators.custom_record_aggregator.list_types": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 291
+        "line": 305
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 293
+        "line": 307
       }
     ],
     "repository.aggregators.custom_record_aggregator.get_type_by_id": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 319
+        "line": 333
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 321
+        "line": 335
       }
     ],
     "repository.aggregators.custom_record_aggregator.delete_type": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 395
+        "line": 409
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 397
+        "line": 411
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 364
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.CustomRecordFieldProvider",
         "line": 378
       },
       {
+        "to": "repository.aggregators.custom_record_aggregator.CustomRecordFieldProvider",
+        "line": 392
+      },
+      {
         "to": "repository.aggregators.custom_record_aggregator.CustomRecordTypeProvider",
-        "line": 386
+        "line": 400
       }
     ],
     "repository.aggregators.custom_record_aggregator.get_entry": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 670
+        "line": 820
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 672
+        "line": 822
       }
     ],
     "repository.aggregators.custom_record_aggregator.delete_entry": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 725
+        "line": 875
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 727
+        "line": 877
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 706
+        "line": 856
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 733
+        "line": 883
       }
     ],
     "repository.aggregators.custom_record_aggregator.update_type_config": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 797
+        "line": 947
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 799
+        "line": 949
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 804
+        "line": 954
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.tuple",
-        "line": 793
+        "line": 943
       }
     ],
     "repository.aggregators.custom_record_aggregator.update_field_role": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 842
+        "line": 992
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 844
+        "line": 994
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 849
+        "line": 999
       }
     ],
     "repository.aggregators.custom_record_aggregator._coerce_field_value": [
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 423
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.isinstance",
-        "line": 427
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.isinstance",
-        "line": 429
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.isinstance",
-        "line": 431
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.isinstance",
-        "line": 444
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.isinstance",
-        "line": 446
-      },
-      {
-        "to": "repository.aggregators.custom_record_aggregator.int",
         "line": 437
       },
       {
-        "to": "repository.aggregators.custom_record_aggregator.float",
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
+        "line": 441
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
+        "line": 443
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
         "line": 445
       },
       {
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
+        "line": 458
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.isinstance",
+        "line": 460
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.int",
+        "line": 451
+      },
+      {
         "to": "repository.aggregators.custom_record_aggregator.float",
-        "line": 448
+        "line": 459
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.float",
+        "line": 462
       }
     ],
     "repository.aggregators.custom_record_aggregator._query_one": [
       {
         "to": "repository.aggregators.custom_record_aggregator.dict",
-        "line": 251
+        "line": 265
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.zip",
-        "line": 251
+        "line": 265
       }
     ],
     "repository.aggregators.custom_record_aggregator._query_all": [
       {
         "to": "repository.aggregators.custom_record_aggregator.dict",
-        "line": 262
+        "line": 276
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.zip",
-        "line": 262
+        "line": 276
       }
     ],
     "repository.aggregators.custom_record_aggregator._get_type_and_table": [
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 464
+        "line": 478
       }
     ],
     "repository.aggregators.goal_aggregator.<module>": [
@@ -67789,35 +67902,35 @@
     "repository.providers.habit_providers.get_checkin_by_date": [
       {
         "to": "repository.providers.habit_providers.QueryOptions",
-        "line": 615
+        "line": 609
       }
     ],
     "repository.providers.habit_providers.get_checkin_dates_by_challenge": [
       {
         "to": "repository.providers.habit_providers.QueryOptions",
-        "line": 696
+        "line": 690
       }
     ],
     "repository.providers.habit_providers.get_checkins_in_date_range": [
       {
         "to": "repository.providers.habit_providers.QueryOptions",
-        "line": 784
+        "line": 778
       },
       {
         "to": "repository.providers.habit_providers.dict",
-        "line": 781
+        "line": 775
       },
       {
         "to": "repository.providers.habit_providers.zip",
-        "line": 781
+        "line": 775
       },
       {
         "to": "repository.providers.habit_providers.len",
-        "line": 772
+        "line": 766
       },
       {
         "to": "repository.providers.habit_providers.list",
-        "line": 778
+        "line": 772
       }
     ],
     "repository.providers.habit_providers.create_habit": [
@@ -67871,33 +67984,33 @@
       },
       {
         "to": "repository.providers.habit_providers.DataAccessError",
-        "line": 683
+        "line": 677
       }
     ],
     "repository.providers.habit_providers.delete_checkin": [
       {
         "to": "repository.providers.habit_providers.DataAccessError",
-        "line": 647
+        "line": 641
       }
     ],
     "repository.providers.habit_providers.count_checkins_by_challenge": [
       {
         "to": "repository.providers.habit_providers.DataAccessError",
-        "line": 724
+        "line": 718
       }
     ],
     "repository.providers.habit_providers.get_today_checkins": [
       {
         "to": "repository.providers.habit_providers.DataAccessError",
-        "line": 751
+        "line": 745
       },
       {
         "to": "repository.providers.habit_providers.len",
-        "line": 740
+        "line": 734
       },
       {
         "to": "repository.providers.habit_providers.list",
-        "line": 746
+        "line": 740
       }
     ],
     "repository.providers.journal_provider.<module>": [
@@ -74127,59 +74240,59 @@
     "llm.agent.tools.habit_tool._format_habit": [
       {
         "to": "llm.agent.tools.habit_tool._format_frequency",
-        "line": 70
+        "line": 69
       }
     ],
     "llm.agent.tools.habit_tool.query_user_habits": [
       {
         "to": "llm.agent.tools.habit_tool._get_habit_service",
-        "line": 89
+        "line": 88
       },
       {
         "to": "llm.agent.tools.habit_tool.len",
-        "line": 92
+        "line": 91
       },
       {
         "to": "llm.agent.tools.habit_tool._format_habit",
-        "line": 93
+        "line": 92
       }
     ],
     "llm.agent.tools.habit_tool.checkin_habit_today": [
       {
         "to": "llm.agent.tools.habit_tool._get_habit_service",
-        "line": 98
+        "line": 97
       },
       {
         "to": "llm.agent.tools.habit_tool._format_habit",
-        "line": 102
+        "line": 101
       },
       {
         "to": "llm.agent.tools.habit_tool._format_settlement",
-        "line": 105
+        "line": 104
       }
     ],
     "llm.agent.tools.habit_tool.cancel_checkin_today": [
       {
         "to": "llm.agent.tools.habit_tool._get_habit_service",
-        "line": 112
+        "line": 111
       },
       {
         "to": "llm.agent.tools.habit_tool._format_habit",
-        "line": 115
+        "line": 114
       },
       {
         "to": "llm.agent.tools.habit_tool._format_settlement",
-        "line": 118
+        "line": 117
       },
       {
         "to": "llm.agent.tools.habit_tool.get_local_today",
-        "line": 111
+        "line": 110
       }
     ],
     "llm.agent.tools.habit_tool.backfill_checkin": [
       {
         "to": "llm.agent.tools.habit_tool._get_habit_service",
-        "line": 132
+        "line": 123
       },
       {
         "to": "llm.agent.tools.habit_tool._format_habit",
@@ -74209,15 +74322,15 @@
       },
       {
         "to": "llm.agent.tools.habit_tool.cancel_checkin_today",
-        "line": 271
+        "line": 268
       },
       {
         "to": "llm.agent.tools.habit_tool.isinstance",
-        "line": 324
+        "line": 321
       },
       {
         "to": "llm.agent.tools.habit_tool.backfill_checkin",
-        "line": 326
+        "line": 323
       }
     ],
     "llm.agent.tools.lifeprismsystem._parse_iso_time": [

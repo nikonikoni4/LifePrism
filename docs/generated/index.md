@@ -146,3 +146,10 @@
 - path: `docs/generated/025/2026-08-18-code-review-habit-agent-tools.md`
 - 触发规则：审查习惯打卡模块 LLM Agent 工具（新增 habit_tool.py 4 个工具 + 修复 HabitCheckinProvider 重复打卡 bug）时查看
 - 内容摘要：习惯打卡 Agent 工具的 8 维度代码审查报告。审查新增 habit_tool.py（4 个工具：QueryUserHabitsTool/CheckinHabitTool/CancelCheckinHabitTool/BackfillCheckinTool）+ habit_providers.py 重复打卡 bug 修复（on_conflict 从 replace 改为 ignore）+ loop.py 工具注册 + 测试文件。发现 2 个问题（置信度 ≥ 80）：1 个架构违规（backfill_checkin 绕过 Service 层直接调用 habit_repository.get_current_challenge，违反文件头注释"不直连 repository"约定，85）、1 个死代码（on_conflict="ignore" 使 except sqlite3.IntegrityError 永不触发且日志消息"打卡记录已存在"已不准确，85）。正向：工具返回类型全为 str 符合规范、延迟导入解决循环依赖、参数校验完整、错误分层清晰、测试覆盖主要场景、bug 修复有 history-bug 文档。
+
+## 2026-08-18-code-review-custom-records-field-filter
+
+- updated_at: 2026-08-18
+- path: `docs/generated/026/2026-08-18-code-review-custom-records-field-filter.md`
+- 触发规则：审查自定义记录模块 query_custom_record_entries 工具新增字段级过滤（filters）功能时查看
+- 内容摘要：自定义记录模块字段级过滤功能的 8 维度代码审查报告。审查 3 个核心代码文件（aggregator 新增 _build_field_filters 私有方法 + tool 新增 filters 参数与 ValidationError 结构化处理）+ 2 个测试文件（17 集成测试 + 7 单元测试）+ spec v1.2 同步更新。未发现置信度 ≥ 80 的问题（No issues found）。正向：SQL 全参数化 + field_key 白名单校验 + LIKE 通配符 ESCAPE 转义构成完整注入防护；错误分层合规（Repository 抛 ValidationError，Tool 层捕获转结构化 JSON 引导 AI 重试）；测试覆盖全面（含 LIKE 通配符转义、空数组、混合无效值等边界）；复用 _coerce_field_value 保持类型转换一致；spec 与代码同步。

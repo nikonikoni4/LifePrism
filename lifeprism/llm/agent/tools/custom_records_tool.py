@@ -259,6 +259,12 @@ class QueryCustomRecordEntriesTool(Tool):
         return (
             "查询某个自定义记录类型的记录列表，按事件时间倒序返回。\n"
             "可通过 date_range 按事件时间筛选（格式 YYYY-MM-DD），任一侧可省略。\n"
+            "可通过 filters 按字段值过滤（如「心率大于100」「内容包含跑步」），"
+            "field_key 必须来自该类型字段定义（list_custom_record_types 获取），多条件间为 AND：\n"
+            "- 通用 op：eq（等于）、ne（不等于）、in（在列表中，value 为数组）\n"
+            "- text 字段额外：contains（模糊包含，不区分位置）\n"
+            "- integer/float 字段额外：gt、gte、lt、lte（数值比较）\n"
+            "若 field_key 或 op 无效，返回结构化错误（含 valid_fields / allowed_ops），请据此修正后重试。\n"
             "limit 控制返回条数（默认 50，AI 场景一次拿够，无需分页）。"
         )
 
@@ -278,6 +284,44 @@ class QueryCustomRecordEntriesTool(Tool):
                     "minItems": 2,
                     "maxItems": 2,
                 },
+                "filters": {
+                    "type": "array",
+                    "description": (
+                        "字段级过滤条件列表，多条件间为 AND。"
+                        "field_key 必须来自该类型字段定义；op 适用范围取决于字段类型："
+                        "通用 eq/ne/in；text 字段支持 contains；integer/float 字段支持 gt/gte/lt/lte"
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "field_key": {
+                                "type": "string",
+                                "description": "过滤字段的 field_key",
+                            },
+                            "op": {
+                                "type": "string",
+                                "description": "过滤操作符",
+                                "enum": [
+                                    "eq",
+                                    "ne",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "in",
+                                ],
+                            },
+                            "value": {
+                                "description": (
+                                    "过滤值：标量（eq/ne/比较类/contains）；"
+                                    "非空数组（in）。类型须与字段定义匹配"
+                                ),
+                            },
+                        },
+                        "required": ["field_key", "op", "value"],
+                    },
+                },
                 "limit": {
                     "type": "integer",
                     "description": "返回条数上限，默认 50",
@@ -292,9 +336,12 @@ class QueryCustomRecordEntriesTool(Tool):
         type_id = kwargs.get("type_id", "")
         date_range_raw = kwargs.get("date_range")
         limit = kwargs.get("limit", 50)
+        filters_raw = kwargs.get("filters")
 
         if not type_id:
             return f"{ERROR}参数缺失：type_id 必填"
+        if filters_raw is not None and not isinstance(filters_raw, list):
+            return f"{ERROR}参数错误：filters 必须是数组"
 
         # date_range：Agent 提供本地 YYYY-MM-DD → execute 层转 UTC 范围
         date_range = None
@@ -319,6 +366,7 @@ class QueryCustomRecordEntriesTool(Tool):
                 date_range=date_range,
                 page=1,
                 page_size=int(limit),
+                filters=filters_raw,
             )
 
             # 输出转换：UTC ISO → 本地 YYYY-MM-DD HH:MM:SS（显示用字段）
@@ -332,5 +380,19 @@ class QueryCustomRecordEntriesTool(Tool):
 
             result = {"entries": entries, "total": total_count}
             return f"{SUCCESS}{json.dumps(result, ensure_ascii=False)}"
+        except ValidationError as e:
+            # filters 中 field_key/op/value 无效：返回结构化 JSON，
+            # 引导 AI 根据 valid_fields / allowed_ops 重新解析后重试
+            error_payload = {
+                "error": e.code or "VALIDATION_ERROR",
+                "message": e.message,
+            }
+            if e.details.get("valid_fields"):
+                error_payload["valid_fields"] = e.details["valid_fields"]
+            if e.details.get("allowed_ops"):
+                error_payload["allowed_ops"] = e.details["allowed_ops"]
+            if e.details.get("invalid_fields"):
+                error_payload["invalid_fields"] = e.details["invalid_fields"]
+            return f"{ERROR}{json.dumps(error_payload, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}查询自定义记录失败: {e}"

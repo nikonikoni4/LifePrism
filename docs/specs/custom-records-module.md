@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-07-07
-updated_at: 2026-07-11
-last_updated: 补充多正文叠加、空字段过滤、ChatPanel集成、表格/模板对比视图；修正API端点表和布局引擎描述；更新Functional Checklist为已验证状态
+updated_at: 2026-08-18
+last_updated: query_custom_record_entries 新增字段级过滤 filters（eq/ne/in/contains/数值比较），Repository query_entries 支持结构化校验错误
 abstract: 自定义记录模块是顶级独立模块，允许用户通过自然语言创建任意结构化数据类型。采用 SQLite 动态建表 + meta 表元数据驱动方案，L1/L2/L3 三层布局引擎实现自适应卡片展示，支持多个正文叠加和空字段自动过滤，集成 ChatPanel AI 对话录入。
 ---
 
@@ -14,6 +14,7 @@ abstract: 自定义记录模块是顶级独立模块，允许用户通过自然�
 | ---- | -------- |
 | 1.0  | 创建 spec 初稿 |
 | 1.1  | 修正布局引擎输出结构（main→mains[] 支持多正文叠加）；补充空字段过滤规则和 title fallback 机制；补充 ChatPanel AI 集成、表格视图、模板对比视图、FieldRoleModal 交互说明；补充 GET /types/{type_id} 端点到主表；补充分页 total 字段说明；Functional Checklist 标记已验证功能；更新 key_function 行号 |
+| 1.2  | query_custom_record_entries 新增 filters 字段级过滤参数（通用 eq/ne/in；text 字段 contains；integer/float 字段 gt/gte/lt/lte），多条件 AND，无效参数返回结构化错误引导重试 |
 
 ## Overview
 
@@ -23,7 +24,7 @@ abstract: 自定义记录模块是顶级独立模块，允许用户通过自然�
 
 - **类型管理**：用户通过 AI 或表单创建记录类型（定义名称、slug、字段列表），系统动态建表
 - **记录录入**：AI 解析自然语言为字段值或用户手动表单录入，写入对应的动态数据表
-- **记录查询**：按类型 + 日期范围查询记录，支持分页
+- **记录查询**：按类型 + 日期范围 + 字段级过滤条件查询记录，支持分页
 - **展示配置**：用户可调整类型展示配置（卡片模板/图标/强调色）和字段展示角色
 - **自适应展示**：L1/L2/L3 三层布局引擎自动选择最优卡片布局，支持多正文叠加
 - **AI 对话集成**：ChatPanel 侧边栏面板，支持自然语言创建类型和录入数据
@@ -120,6 +121,8 @@ abstract: 自定义记录模块是顶级独立模块，允许用户通过自然�
 - [x] create_custom_record_type：创建新类型，slug/field_key 校验失败返回结构化错误
 - [x] create_custom_record_entry：录入记录，field_key 错误返回 valid_fields 引导重试
 - [x] query_custom_record_entries：按日期范围查询记录，支持 limit 控制返回条数
+- [x] query_custom_record_entries filters：字段级过滤（通用 eq/ne/in；text 字段 contains；integer/float 字段 gt/gte/lt/lte），多条件 AND，可与 date_range 组合
+- [x] query_custom_record_entries 过滤校验：field_key/op/value 无效时返回结构化错误（INVALID_FIELD_KEY 含 valid_fields、INVALID_FILTER_OP 含 allowed_ops、INVALID_FIELD_VALUE 含 invalid_fields）
 - [x] AI Tool 直接调用 Repository 层（绕过 Service），返回 SUCCESS/ERROR 前缀字符串
 
 ## Technical Contract
@@ -340,7 +343,7 @@ CREATE TABLE IF NOT EXISTS custom_<slug> (
 | `list_custom_record_types` | 无 | 类型列表 JSON | 列出所有类型及字段定义 |
 | `create_custom_record_type` | name, slug, fields[], description? | `SUCCESS {type_id, name, slug}` / `ERROR ...` | 创建类型，校验失败返回结构化错误 |
 | `create_custom_record_entry` | type_id, data{} | `SUCCESS {entry_id, type_id}` / `ERROR ...` | 录入记录，field_key 错误返回 valid_fields 引导重试 |
-| `query_custom_record_entries` | type_id, date_range?, limit? | 记录列表 JSON | 查询记录，按 created_at 倒序，AI 场景默认 50 条 |
+| `query_custom_record_entries` | type_id, date_range?, filters?, limit? | 记录列表 JSON | 查询记录，按 event_time 倒序，AI 场景默认 50 条。filters 为字段级过滤 `[{field_key, op, value}]`，多条件 AND：通用 eq/ne/in；text 字段 contains；integer/float 字段 gt/gte/lt/lte；无效参数返回结构化错误引导重试 |
 
 > **Tool 返回格式**：所有 Tool 的 `execute()` 返回字符串，以 `SUCCESS` 或 `ERROR` 前缀标识结果状态。错误时返回结构化 JSON 供 Agent 解析重试。
 
