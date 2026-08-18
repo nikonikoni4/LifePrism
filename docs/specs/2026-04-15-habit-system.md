@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-04-15
-updated_at: 2026-04-19
-last_updated: 新增习惯链条Timeline节点时间计算规则
+updated_at: 2026-08-18
+last_updated: 新增 Agent 工具小节（查询+打卡/补签暴露给 LLM Agent，经 habit_tool.py 走 HabitService）
 abstract: 习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统、打卡与补签、状态流转、链条Timeline时间计算等核心功能的业务规则和技术契约
 id: habit-system-v1
 title: 习惯系统
@@ -31,6 +31,7 @@ contract_refs:
 | ---- | -------- |
 | 1.0 | 创建spec初稿，从旧PRD迁移并核对代码实现 |
 | 1.1 | 新增习惯链条Timeline节点时间计算规则 |
+| 1.2 | 新增 Agent 工具小节：习惯查询/打卡/取消打卡/补签暴露给 LLM Agent |
 
 ## Overview
 
@@ -336,6 +337,21 @@ Timeline 节点时间采用**后端计算、前端显示**的分离架构：
 - `GET /habit-chains/{chain_id}` - 获取链条详情
 - `PATCH /habit-chains/{chain_id}` - 更新链条
 - `DELETE /habit-chains/{chain_id}` - 删除链条
+
+### 2.1 Agent 工具（LLM Tool）
+
+习惯系统的只读查询 + 打卡操作通过 `lifeprism/llm/agent/tools/habit_tool.py` 暴露给 LLM Agent（CHAT 消息类型注册），全部复用 HabitService 业务规则：
+
+| 工具名 | 对应 Service 方法 | 说明 |
+|--------|------------------|------|
+| `query_user_habits` | `get_habits` | 查询习惯列表（等级/频率/Streak/挑战进度/今日打卡状态） |
+| `checkin_habit` | `checkin_today` | 今日打卡，含结算提示 |
+| `cancel_checkin_habit` | `cancel_checkin` | 取消今日打卡 |
+| `backfill_checkin` | `backfill_checkin` | 批量补签（工具内部获取当前 challenge_id） |
+
+**暴露范围边界**（2026-08-18 决策）：习惯的创建/修改/删除/暂停恢复/结算动作**不暴露**给 Agent。原因：修改等级/频率会触发挑战重建（取消当前挑战 + streakBase 重算），删除为硬删除级联不可恢复，结算动作设计上需要用户确认。若未来需要暴露，须重新评估副作用并更新本节。
+
+**同步说明**：habits / habit_challenges / habit_checkins 三表均在 `SYNC_TABLES` 中，云端 Agent 可完整使用上述工具；云端 `anchorInfo` 为 null（链条表不同步，降级可用）。
 
 ### 3. 核心算法
 

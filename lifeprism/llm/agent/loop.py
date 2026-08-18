@@ -8,6 +8,9 @@ from lifeprism.config import settings
 from lifeprism.llm.agent.context import Context
 from lifeprism.llm.agent.tools import (
     ERROR,
+    BackfillCheckinTool,
+    CancelCheckinHabitTool,
+    CheckinHabitTool,
     CreateCustomRecordEntryTool,
     CreateCustomRecordTypeTool,
     DeleteBootstrapTool,
@@ -17,6 +20,7 @@ from lifeprism.llm.agent.tools import (
     QueryCustomRecordEntriesTool,
     QuerySessionHistoryTool,
     QuerySessionListTool,
+    QueryUserHabitsTool,
     ReadFileTool,
     SearchFileTool,
     SearchStringTool,
@@ -486,6 +490,10 @@ class AgentLoop:
                 tool_registry.register(UpdateUserBehaviorNoteTool())
                 tool_registry.register(UserMoodQuryTool())
                 tool_registry.register(UserMoodCreateTool())
+                tool_registry.register(QueryUserHabitsTool())
+                tool_registry.register(CheckinHabitTool())
+                tool_registry.register(CancelCheckinHabitTool())
+                tool_registry.register(BackfillCheckinTool())
                 tool_registry.register(ListCustomRecordTypesTool())
                 tool_registry.register(CreateCustomRecordTypeTool())
                 tool_registry.register(CreateCustomRecordEntryTool())

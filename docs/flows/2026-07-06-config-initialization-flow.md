@@ -74,15 +74,15 @@ class ConfigInitState:
 
 <key_function>
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager.__new__:92
-  - settings_manager.SettingsManager._initialize:101
-  - settings_manager.SettingsManager._resolve_config_base_path:147
-  - settings_manager.SettingsManager._load_config:254
-  - settings_manager.SettingsManager._resolve_default_data_path:165
-  - settings_manager.SettingsManager._setup_logging:218
-  - settings_manager.SettingsManager._check_data_path_safety:228
-  - settings_manager.SettingsManager._resolve_allowed_dir_paths:184
-  - settings_manager.SettingsManager._save_config:270
+  - settings_manager.SettingsManager.__new__:105
+  - settings_manager.SettingsManager._initialize:114
+  - settings_manager.SettingsManager._resolve_config_base_path:160
+  - settings_manager.SettingsManager._load_config:267
+  - settings_manager.SettingsManager._resolve_default_data_path:178
+  - settings_manager.SettingsManager._setup_logging:231
+  - settings_manager.SettingsManager._check_data_path_safety:241
+  - settings_manager.SettingsManager._resolve_allowed_dir_paths:197
+  - settings_manager.SettingsManager._save_config:283
 - lifeprism/config/provider_manager.py
   - provider_manager.ProviderManager.__new__:556
   - provider_manager.ProviderManager._initialize:566
@@ -90,7 +90,7 @@ class ConfigInitState:
 - lifeprism/config/migrations/config_migrator.py
   - config_migrator.run_config_migrations:22
 - lifeprism/utils/logger.py
-  - logger.setup_file_logging:59
+  - logger.setup_file_logging:95
 </key_function>
 
 ## 流程概览

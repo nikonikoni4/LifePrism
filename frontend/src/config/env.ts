@@ -19,4 +19,4 @@ export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 /**
  * 应用版本
  */
-export const appVersion = import.meta.env.VITE_APP_VERSION || '0.1.3';
+export const appVersion = import.meta.env.VITE_APP_VERSION || '0.2.0';

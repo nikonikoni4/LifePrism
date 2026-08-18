@@ -1,3 +1,10 @@
+## 2026-08-18-habit-checkin-replace-on-duplicate
+
+- updated_at: 2026-08-18
+- path: `docs/history-bugs/2026-08-18-habit-checkin-replace-on-duplicate.md`
+- 触发规则：在排查习惯同一天重复打卡不报错、completedCount 一天计 2 次、修改 `habit_providers.py` 的 `create_checkin`、为带业务 UNIQUE 约束的表编写插入方法、讨论 `_generic_insert` 的 `on_conflict` 策略（replace/ignore/abort）选择时阅读
+- 内容摘要：**数据正确性 bug（P1，已修复 2026-08-18）** - `HabitCheckinProvider.create_checkin` 未指定 `on_conflict`，落入基类默认 `'replace'`（为同步 LWW 设计），`UNIQUE(habit_id, date)` 冲突时 `INSERT OR REPLACE` 静默替换当天已有记录（新 id + 新 hash_id），不抛 IntegrityError，导致重复打卡被计入 2 次完成数、注释中的防御分支永不命中、被替换记录的 hash_id 无墓碑消失。修复为显式 `on_conflict="ignore"` 并依赖 rowcount=0 返回 None，service 层抛 ConflictError。教训：业务插入方法依赖 UNIQUE 去重时必须显式选 ignore/abort，不能假设 IntegrityError 会抛出。
+
 ## 2026-08-14-monitor-media-afk-no-upper-bound
 
 - updated_at: 2026-08-14

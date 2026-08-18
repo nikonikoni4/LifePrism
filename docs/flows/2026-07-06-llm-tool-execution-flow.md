@@ -66,8 +66,8 @@ class ToolExecutionTrace:
 
 <key_function>
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop._process_msg:463
-  - loop.AgentLoop._run_agent_loop:72
+  - loop.AgentLoop._process_msg:468
+  - loop.AgentLoop._run_agent_loop:76
 - lifeprism/llm/agent/tools/registry.py
   - registry.ToolRegistry.register:22
   - registry.ToolRegistry.get_definitions:42

@@ -112,8 +112,8 @@ class SessionLifecycleTrace:
   - manager.ChatHistoryManager.add_content:397
   - manager.ChatHistoryManager.save_history:424
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop._process_msg:463
-  - loop.AgentLoop.auto_compact:597
+  - loop.AgentLoop._process_msg:468
+  - loop.AgentLoop.auto_compact:606
 - lifeprism/llm/chat/chat_bot.py
   - chat_bot.ChatBot.chat:17
 </key_function>

@@ -586,13 +586,14 @@ class HabitCheckinProvider(LWBaseDataProvider):
             "completed_at": data.get("completed_at", now_str),
         }
 
-        try:
-            self._generic_insert(insert_data)
-            logger.info("创建打卡记录成功: %s", checkin_id)
-            return checkin_id
-        except sqlite3.IntegrityError:
+        # on_conflict='ignore'：UNIQUE(habit_id, date) 冲突时静默忽略并返回 None
+        # （默认 'replace' 会静默替换当天已有记录，导致重复打卡被计入完成数）
+        result = self._generic_insert(insert_data, on_conflict="ignore")
+        if result is None:
             logger.warning("打卡记录已存在: habit_id=%s, date=%s", data["habit_id"], data["date"])
             return None  # 重复打卡
+        logger.info("创建打卡记录成功: %s", checkin_id)
+        return checkin_id
 
     def get_checkin_by_date(self, habit_id: str, checkin_date: str) -> dict[str, Any] | None:
         """

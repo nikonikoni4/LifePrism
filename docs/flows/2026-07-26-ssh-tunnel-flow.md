@@ -92,11 +92,11 @@ _closed: bool                           # 控制保活循环退出的标志（cl
 - lifeprism/sync/ssh_tunnel.py
   - ssh_tunnel.SSHTunnel.__init__:92
   - ssh_tunnel.SSHTunnel.connect:138
-  - ssh_tunnel.SSHTunnel.close:261
-  - ssh_tunnel.SSHTunnel.start_keep_alive_loop:295
-  - ssh_tunnel.SSHTunnel._reconnect_with_backoff:315
-  - ssh_tunnel.SSHTunnel.test_connection:354
-  - ssh_tunnel.SSHTunnel._close_resources:272
+  - ssh_tunnel.SSHTunnel.close:269
+  - ssh_tunnel.SSHTunnel.start_keep_alive_loop:303
+  - ssh_tunnel.SSHTunnel._reconnect_with_backoff:323
+  - ssh_tunnel.SSHTunnel.test_connection:362
+  - ssh_tunnel.SSHTunnel._close_resources:280
 - lifeprism/sync/sync_client.py
   - sync_client.SyncClient._should_use_ssh_tunnel:254
   - sync_client.SyncClient._is_tunnel_ready:273
@@ -112,8 +112,8 @@ _closed: bool                           # 控制保活循环退出的标志（cl
   - main._start_ssh_tunnel 调用:349
   - main._stop_ssh_tunnel 调用:579
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager.get_storage_key:483
-  - settings_manager.SettingsManager.set_storage_key:502
+  - settings_manager.SettingsManager.get_storage_key:484
+  - settings_manager.SettingsManager.set_storage_key:503
 </key_function>
 
 ## 流程概览

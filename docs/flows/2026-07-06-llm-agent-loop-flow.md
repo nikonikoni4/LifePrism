@@ -96,13 +96,13 @@ class AgentExecutionTrace:
 
 <key_function>
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop.__init__:66
-  - loop.AgentLoop.loop:570
-  - loop.AgentLoop.stop:594
-  - loop.AgentLoop._process_msg:463
-  - loop.AgentLoop._process_cmd:319
-  - loop.AgentLoop._run_agent_loop:72
-  - loop.AgentLoop.auto_compact:597
+  - loop.AgentLoop.__init__:70
+  - loop.AgentLoop.loop:579
+  - loop.AgentLoop.stop:603
+  - loop.AgentLoop._process_msg:468
+  - loop.AgentLoop._process_cmd:324
+  - loop.AgentLoop._run_agent_loop:76
+  - loop.AgentLoop.auto_compact:606
 - lifeprism/llm/agent/context.py
   - context.Context.build_system_prompt:51
   - context.Context.build_prompt:86

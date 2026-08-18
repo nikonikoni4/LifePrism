@@ -139,3 +139,10 @@
 - path: `docs/generated/024/2026-07-26-code-review-ssh-tunnel-integration.md`
 - 触发规则：审查"SSH 隧道集成（7 个切片，19 个修改文件 + 7 个新增文件，+2513/-152 行）"工作区改动时查看
 - 内容摘要：SSH 隧道集成的 8 维度并行代码审查报告（4 个子 agent 并行审查 Security+Performance / Architecture+Code Quality / Best Practices+Testing / Documentation+注释合规）。审查 12 个代码文件 + 6 个测试文件 + 8 个文档文件。发现 8 个问题（置信度 ≥ 80）：1 个 P0 致命（_start_ssh_tunnel/_stop_ssh_tunnel 生命周期方法未在生产代码接入，SSH 隧道功能形同虚设，90）、1 个 P1 正确性（_reconnect_with_backoff 成功日志永远显示"经过 0 次尝试"，95）、1 个 P1 文档（sync-remote-url-access-rules.md 审计表行号与方法名已过期，90）、1 个 P1 安全（known_hosts=None 禁用主机密钥验证存在 MITM 风险，80）、1 个 P2 架构（_ensure_tunnel_ready() 为死代码偏离 PRD 设计，85）、1 个 P2 代码质量（SSH 隧道实例属性缺少类型注解，85）、1 个 P2 测试（_stop_ssh_tunnel() 完全无行为测试，85）、1 个 P2 代码质量（同一条件在不同位置使用不同日志级别，80）。正向：非侵入式原则成立（HTTP 模式行为不变）、三层守卫设计完整、_read_remote_url() docstring 警告符合规则 6 全部 4 项要求、前端 UI 测试覆盖充分（22 个新测试）、文档交叉引用全部有效。
+
+## 2026-08-18-code-review-habit-agent-tools
+
+- updated_at: 2026-08-18
+- path: `docs/generated/025/2026-08-18-code-review-habit-agent-tools.md`
+- 触发规则：审查习惯打卡模块 LLM Agent 工具（新增 habit_tool.py 4 个工具 + 修复 HabitCheckinProvider 重复打卡 bug）时查看
+- 内容摘要：习惯打卡 Agent 工具的 8 维度代码审查报告。审查新增 habit_tool.py（4 个工具：QueryUserHabitsTool/CheckinHabitTool/CancelCheckinHabitTool/BackfillCheckinTool）+ habit_providers.py 重复打卡 bug 修复（on_conflict 从 replace 改为 ignore）+ loop.py 工具注册 + 测试文件。发现 2 个问题（置信度 ≥ 80）：1 个架构违规（backfill_checkin 绕过 Service 层直接调用 habit_repository.get_current_challenge，违反文件头注释"不直连 repository"约定，85）、1 个死代码（on_conflict="ignore" 使 except sqlite3.IntegrityError 永不触发且日志消息"打卡记录已存在"已不准确，85）。正向：工具返回类型全为 str 符合规范、延迟导入解决循环依赖、参数校验完整、错误分层清晰、测试覆盖主要场景、bug 修复有 history-bug 文档。

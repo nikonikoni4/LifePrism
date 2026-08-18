@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated: 初始版本
+updated_at: 2026-08-18
+last_updated: 新增习惯打卡工具组（query_user_habits / checkin_habit / cancel_checkin_habit / backfill_checkin）
 abstract: Agent 执行引擎核心契约 — AgentLoop 主循环、Context 系统提示词构建、Skill 加载与匹配、Tool 注册/校验/安全沙箱、Event Bus 消息队列、Session 自动压缩
 module: llm-agent
 ---
@@ -14,6 +14,7 @@ module: llm-agent
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿 |
+| 1.1 | 新增习惯打卡工具组（habit_tool.py）：query_user_habits / checkin_habit / cancel_checkin_habit / backfill_checkin，仅 CHAT 消息类型注册 |
 
 ## Overview
 
@@ -157,6 +158,15 @@ module: llm-agent
 - [ ] UserMoodQuryTool (`query_user_mood`)：按时间范围和心情类型查询心情记录，返回格式化文本（评分、内容、影响因素）
 - [ ] UserMoodCreateTool (`create_user_mood`)：创建心情记录，通过 mood_type_id 自动获取评分，支持多选影响因素
 
+### 习惯打卡工具（habit_tool.py，走 HabitService 业务规则）
+
+- [ ] QueryUserHabitsTool (`query_user_habits`)：查询习惯列表（可按 status 过滤），返回等级/频率/Streak/今日打卡状态/当前挑战进度
+- [ ] CheckinHabitTool (`checkin_habit`)：今日打卡；重复打卡/暂停习惯/不存在 habit_id 返回 ERROR；触发挑战升级或失败预警时输出结算提示
+- [ ] CancelCheckinHabitTool (`cancel_checkin_habit`)：取消今日打卡（仅限当日，进度回退）
+- [ ] BackfillCheckinTool (`backfill_checkin`)：批量补签（过去 6 天内、挑战周期内、未打卡日期），逐日期返回成功/失败原因
+- [ ] 习惯工具通过延迟导入 HabitService 单例（services -> schedule_service -> llm 存在循环依赖，禁止模块级导入）
+- [ ] 暴露范围决策：仅查询+打卡/补签，不暴露习惯的创建/修改/删除/结算动作（避免挑战重建副作用与不可恢复删除）
+
 ### Session 查询工具
 
 - [ ] QuerySessionListTool (`query_session_list`)：遍历 JSONL 文件读取所有 session 的 metadata + 最后 user 消息，合并 chat_history.json 的最新总结
@@ -194,13 +204,13 @@ module: llm-agent
 
 <key_function>
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop.__init__:66
-  - loop.AgentLoop.loop:570
-  - loop.AgentLoop.stop:594
-  - loop.AgentLoop._process_msg:463
-  - loop.AgentLoop._process_cmd:319
-  - loop.AgentLoop._run_agent_loop:72
-  - loop.AgentLoop.auto_compact:597
+  - loop.AgentLoop.__init__:70
+  - loop.AgentLoop.loop:579
+  - loop.AgentLoop.stop:603
+  - loop.AgentLoop._process_msg:468
+  - loop.AgentLoop._process_cmd:324
+  - loop.AgentLoop._run_agent_loop:76
+  - loop.AgentLoop.auto_compact:606
 </key_function>
 
 **对外接口**：
@@ -252,7 +262,7 @@ module: llm-agent
 
 | MessageType | 注册的工具 |
 |-------------|-----------|
-| CHAT | UserActivitySummaryTool, UserComputerLogTool, UpdateUserBehaviorNoteTool, UserMoodQuryTool, UserMoodCreateTool, ReadFileTool, WriteFileTool, EditFileTool, FileTreeTool, SearchFileTool, SearchStringTool, QuerySessionListTool, QuerySessionHistoryTool, DeleteBootstrapTool（条件性） |
+| CHAT | UserActivitySummaryTool, UserComputerLogTool, UpdateUserBehaviorNoteTool, UserMoodQuryTool, UserMoodCreateTool, QueryUserHabitsTool, CheckinHabitTool, CancelCheckinHabitTool, BackfillCheckinTool, ListCustomRecordTypesTool, CreateCustomRecordTypeTool, CreateCustomRecordEntryTool, QueryCustomRecordEntriesTool, ReadFileTool, WriteFileTool, EditFileTool, FileTreeTool, SearchFileTool, SearchStringTool, QuerySessionListTool, QuerySessionHistoryTool, DeleteBootstrapTool（条件性） |
 | DREAM_TASK | UserActivitySummaryTool, UserComputerLogTool, ReadFileTool, WriteFileTool, EditFileTool, FileTreeTool, SearchFileTool, SearchStringTool |
 | CLASSIFY | 无 |
 
@@ -460,6 +470,10 @@ module: llm-agent
 | `create_or_update_user_behavior_note` | UpdateUserBehaviorNoteTool | lifeprismsystem.py | 行为备注 CRUD |
 | `query_user_mood` | UserMoodQuryTool | lifeprismsystem.py | 心情记录查询 |
 | `create_user_mood` | UserMoodCreateTool | lifeprismsystem.py | 心情记录创建 |
+| `query_user_habits` | QueryUserHabitsTool | habit_tool.py | 习惯列表查询（等级/频率/Streak/挑战进度/今日打卡状态） |
+| `checkin_habit` | CheckinHabitTool | habit_tool.py | 习惯今日打卡（含挑战升级/失败预警结算提示） |
+| `cancel_checkin_habit` | CancelCheckinHabitTool | habit_tool.py | 取消习惯今日打卡 |
+| `backfill_checkin` | BackfillCheckinTool | habit_tool.py | 习惯补签（过去 6 天内且在挑战周期内） |
 | `query_session_list` | QuerySessionListTool | session_query.py | 会话列表查询 |
 | `query_session_history` | QuerySessionHistoryTool | session_query.py | 会话历史查询 |
 | `delete_bootstrap` | DeleteBootstrapTool | delete_bootstrap.py | 删除 bootstrap.md |

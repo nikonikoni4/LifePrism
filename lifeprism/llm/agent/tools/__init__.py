@@ -14,6 +14,12 @@ from .filesystem import (
     SearchStringTool,
     WriteFileTool,
 )
+from .habit_tool import (
+    BackfillCheckinTool,
+    CancelCheckinHabitTool,
+    CheckinHabitTool,
+    QueryUserHabitsTool,
+)
 from .lifeprismsystem import (
     UpdateUserBehaviorNoteTool,
     UserActivitySummaryTool,
@@ -40,6 +46,10 @@ __all__ = [
     "SearchStringTool",
     "QuerySessionListTool",
     "QuerySessionHistoryTool",
+    "QueryUserHabitsTool",
+    "CheckinHabitTool",
+    "CancelCheckinHabitTool",
+    "BackfillCheckinTool",
     "ListCustomRecordTypesTool",
     "CreateCustomRecordTypeTool",
     "CreateCustomRecordEntryTool",

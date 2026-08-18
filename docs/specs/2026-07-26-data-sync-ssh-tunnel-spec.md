@@ -127,9 +127,9 @@ abstract: SSH 隧道子模块规格，定义 SSH 隧道（无域名场景下的�
 - lifeprism/sync/ssh_tunnel.py
   - ssh_tunnel.SSHTunnel.__init__:92
   - ssh_tunnel.SSHTunnel.connect:138
-  - ssh_tunnel.SSHTunnel.close:261
-  - ssh_tunnel.SSHTunnel.start_keep_alive_loop:295
-  - ssh_tunnel.SSHTunnel.test_connection:354
+  - ssh_tunnel.SSHTunnel.close:269
+  - ssh_tunnel.SSHTunnel.start_keep_alive_loop:303
+  - ssh_tunnel.SSHTunnel.test_connection:362
   - ssh_tunnel.SSHTunnel.is_connected:128
   - ssh_tunnel.SSHTunnel.connection_state:134
 </key_function>
