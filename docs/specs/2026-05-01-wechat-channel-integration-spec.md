@@ -102,12 +102,12 @@ WeChat Channel 是 LifePrism 的外部消息接入模块，通过微信平台实
 4. WechatChannel.start():
    - 初始化 WechatClient
    - 加载或创建认证状态
-   - 验证 Token 有效性
+   - 初始化 WechatMedia
    - 启动消息轮询任务 (_poll_loop)
 ```
 
 **启动条件：**
-- Token 存在且有效
+- Token 存在（有效性由 _poll_loop 首次调用 getupdates 暴露并自动 5s 重试，2026-08-19 移除启动时 token 预测试段以避免 lifespan 阻塞，详见 [ADR 2026-08-19-startup-optimization-phased-strategy](../adr/2026-08-19-startup-optimization-phased-strategy.md)）
 - `enabled = True`（隐含于 Token 检查）
 
 2. 注册成功之后的启动

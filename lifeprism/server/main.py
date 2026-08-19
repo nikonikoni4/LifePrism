@@ -395,7 +395,11 @@ async def lifespan(app: FastAPI):
     print(f"{'=' * 60}")
 
     # 发送 online 心跳事件（让云端尽早知道本地上线）
-    await send_heartbeat("online")
+    # 异步发送不阻塞 lifespan：本地模式（run_mode=full）下云端心跳检查仅在 agent_only 模式生效，
+    # 延迟几秒不影响消息路由；shutdown 的 offline 心跳保持 await 不变（必须发出再关闭）
+    import asyncio  # lifespan 函数后续有局部 import，需在此先行绑定以使用 create_task
+
+    app.state.online_heartbeat_task = asyncio.create_task(send_heartbeat("online"))
 
     from lifeprism.utils.logger import enable_uvicorn_file_logging
 
@@ -584,6 +588,12 @@ async def lifespan(app: FastAPI):
     # 发送 offline 心跳事件（同步完成后通知云端接管）
     # 关机场景也必须发送，让云端立即接管
     # 关机场景（skip_sync=True）使用 2s 超时，避免 10s 网络超时被 Electron 4s 强杀打断
+    # 先取消启动时未完成的 online 心跳任务，避免 offline 发出后 online 才到达云端造成状态倒置
+    online_task = getattr(app.state, "online_heartbeat_task", None)
+    if online_task is not None and not online_task.done():
+        online_task.cancel()
+        with suppress(asyncio.CancelledError, Exception):
+            await online_task
     heartbeat_timeout = 2.0 if skip_sync else 10.0
     try:
         await send_heartbeat("offline", timeout=heartbeat_timeout)

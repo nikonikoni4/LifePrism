@@ -160,7 +160,7 @@ module: llm-communication
 | 接口 | 说明 | 约束 |
 |------|------|------|
 | `__init__(config, bus)` | 初始化微信 Channel | 创建 wechat_dir/media_dir，初始化 client/auth/media 为 None |
-| `start()` | 启动 channel：初始化 client → 加载 token → 测试 token → 初始化 media → 启动轮询 | 无 token 时放弃启动并返回；token 测试失败仅记录日志不阻止启动 |
+| `start()` | 启动 channel：初始化 client → 加载 token → 初始化 media → 启动轮询 | 无 token 时放弃启动并返回；token 有效性由 _poll_loop 首次调用 getupdates 暴露并自动 5s 重试（2026-08-19 移除启动时 token 预测试段，避免 lifespan 阻塞，详见 [ADR 2026-08-19-startup-optimization-phased-strategy](../adr/2026-08-19-startup-optimization-phased-strategy.md)） |
 | `stop()` | 停止 channel：保存用户数据 → 取消轮询任务 → 关闭 HTTP 客户端 | 保存失败不阻止停止流程 |
 | `send(msg)` | 从 msg.extra 获取 wechat_user_id → 获取 context_token → 构建文本消息 → 发送 | msg.response.content 为空时跳过发送 |
 | `_poll_loop()` | 持续调用 getupdates 拉取新消息 → 逐个处理 → 更新 get_updates_buf 游标 | 网络/解析错误等待 5 秒后重试 |

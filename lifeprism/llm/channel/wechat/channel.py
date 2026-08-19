@@ -287,15 +287,6 @@ class WechatChannel(BaseChannel):
             logger.info("微信 channel 不存在 token，放弃启动")
             self._running = False
             return
-        # 测试 token 是否有效
-        try:
-            test_body = {"get_updates_buf": ""}
-            test_data = await self.client.api_post("ilink/bot/getupdates", test_body)
-            logger.info("Token 测试成功")
-            logger.debug("返回数据: %s", test_data)
-        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
-            logger.error("Token 测试失败: error=%s", e, exc_info=True)
-
         # 初始化媒体处理
         self.media = WechatMedia(self.client, self.media_dir)
 

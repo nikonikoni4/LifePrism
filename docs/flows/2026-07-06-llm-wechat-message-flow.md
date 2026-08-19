@@ -251,24 +251,19 @@ stateDiagram-v2
 **7. Token 分支判定 — 有 token 路径**
    将 token 设置到 client，继续启动
    状态: client.token→str | 持久化: ❌ | 跨模块: ❌
-   步骤: token 非空 → self.client.token = token → 进入测试阶段
+   步骤: token 非空 → self.client.token = token → 进入媒体初始化阶段
 
 **8. Token 分支判定 — 无 token 路径（qr_login 已注释）**
    当前实现中 qr_login 代码被注释，无 token 时直接放弃启动
    状态: _running=True→False | 持久化: ❌ | 跨模块: ❌
    步骤: 记录 INFO 日志 → 设置 _running=False → return（不执行后续初始化）
 
-**9. Token 测试 — client.api_post("ilink/bot/getupdates", {"get_updates_buf": ""})**
-   发送空游标的 getupdates 请求验证 token 有效性
-   状态: 无状态变化 | 持久化: ❌ | 跨模块: ❌
-   步骤: 构建测试请求体 → 调用 api_post → 成功仅记录 INFO / 失败仅记录 ERROR（不阻止启动）
+**9. WechatMedia.__init__(client, media_dir) — 初始化媒体处理**
+   创建媒体下载模块，确保 media_dir 目录存在
+   状态: media→WechatMedia, media_dir 目录创建 | 持久化: ✅ (目录创建) | 跨模块: ❌
+   步骤: 保存 client 引用 → mkdir parents=True exist_ok=True
 
-**10. WechatMedia.__init__(client, media_dir) — 初始化媒体处理**
-    创建媒体下载模块，确保 media_dir 目录存在
-    状态: media→WechatMedia, media_dir 目录创建 | 持久化: ✅ (目录创建) | 跨模块: ❌
-    步骤: 保存 client 引用 → mkdir parents=True exist_ok=True
-
-**11. asyncio.create_task(self._poll_loop()) — 启动轮询后台任务**
+**10. asyncio.create_task(self._poll_loop()) — 启动轮询后台任务**
     创建异步后台任务启动长轮询循环
     状态: _poll_task→asyncio.Task | 持久化: ❌ | 跨模块: ❌
     步骤: asyncio.create_task 创建协程任务 → 不 await（后台运行）
@@ -287,101 +282,101 @@ stateDiagram-v2
 
 ### 链路 2：消息轮询与解析
 
-**12. _poll_loop() — 长轮询主循环**
+**11. _poll_loop() — 长轮询主循环**
    持续调用 getupdates 拉取新消息，使用游标机制实现增量拉取
    状态: get_updates_buf 游标推进, poll_count 递增 | 持久化: ❌ | 跨模块: ✅ (channel→微信API)
    步骤: 进入 while _running 循环 → 构建请求体 {"get_updates_buf": 上次游标} → api_post "ilink/bot/getupdates" → 解析响应提取 get_updates_buf 和 msgs → msgs 非空则逐条调用 _handle_wechat_message → 更新 get_updates_buf 游标 → 循环继续
 
-**13. _poll_loop() 异常处理 — 网络错误分支**
+**12. _poll_loop() 异常处理 — 网络错误分支**
    捕获 HTTP 层错误，等待 5 秒后重试，不退出循环
    状态: 无状态变化 | 持久化: ❌ | 跨模块: ❌
    步骤: 捕获 httpx.HTTPStatusError / httpx.RequestError → 记录 ERROR 日志 → asyncio.sleep(5) → 下次循环重试
 
-**14. _poll_loop() 异常处理 — 数据解析错误分支**
+**13. _poll_loop() 异常处理 — 数据解析错误分支**
    捕获 JSON/字典键错误，等待 5 秒后重试，不退出循环
    状态: 无状态变化 | 持久化: ❌ | 跨模块: ❌
    步骤: 捕获 KeyError / ValueError → 记录 ERROR 日志 → asyncio.sleep(5) → 下次循环重试
 
-**15. WechatMessage.parse_message(msg) — 消息解析**
+**14. WechatMessage.parse_message(msg) — 消息解析**
    从微信原始消息中提取结构化字段：from_user_id、content、media、context_token
    状态: from_user_id→str, content→str, media→list[dict], context_token→str | 持久化: ❌ | 跨模块: ❌
    步骤: 提取 from_user_id 和 context_token → 遍历 item_list → 对 ITEM_TEXT(1) 追加 text 到 content → 对 ITEM_IMAGE(2)/VOICE(3)/FILE(4)/VIDEO(5) 将 {type, info} 推入 media 列表
 
-**16. BaseChannel.is_allowed(sender_id) — 权限检查**
+**15. BaseChannel.is_allowed(sender_id) — 权限检查**
    白名单检查：`"*"` 通配全部允许，空列表拒绝全部，否则精确匹配
    状态: is_allowed→bool | 持久化: ❌ | 跨模块: ❌
    步骤: 读取 config.allow_from → 空列表（拒绝所有 + WARNING 日志）→ 含 "*"（允许所有）→ 否则 check sender_id in allow_from
 
-**17. 保存 context_token 到 _user_data**
+**16. 保存 context_token 到 _user_data**
    将微信上下文 token 按用户 ID 存储到内存字典
    状态: _user_data[wechat_user_id]["context_token"]→str | 持久化: ❌ (仅标记 need_save) | 跨模块: ❌
    步骤: 检查 context_token 非空 → 确保 _user_data 有该用户条目 → 写入 context_token → 设置 need_save=True
 
-**18. WechatMedia.download_media(media_info, type) — 媒体下载（逐文件）**
+**17. WechatMedia.download_media(media_info, type) — 媒体下载（逐文件）**
    遍历 media 列表，逐个下载并解密媒体文件（详细步骤见链路 3）
    状态: media_paths→list[Path] | 持久化: ✅ (媒体文件写入 media_dir) | 跨模块: ✅ (channel→微信CDN)
    步骤: 遍历 parsed["media"] → 每个 media_item 调用 media.download_media(media_info, media_type) → 成功则追加到 media_paths
 
-**19. 构建 InboundMessage — 发送到 MessageQueue**
+**18. 构建 InboundMessage — 发送到 MessageQueue**
    组装符合 MessageQueue 契约的入站消息
    状态: inbound_msg→InboundMessage | 持久化: ❌ | 跨模块: ✅ (channel→bus)
    步骤: 从 _user_data 读取 last_session_id（or None 规范空字符串）→ 构造 InboundMessage(type=CHAT, channel=WECHAT, content=文本, session_id=会话ID, extra={media, wechat_user_id})
 
-**20. MessageQueue.send(inbound_msg) — Bus 发送并等待 Agent 回复**
+**19. MessageQueue.send(inbound_msg) — Bus 发送并等待 Agent 回复**
    将消息发布到消息总线，限速等待后获得 AgentLoop 处理结果的 OutboundMessage
    状态: outbound_msg→OutboundMessage | 持久化: ✅ (token usage 异步写入) | 跨模块: ✅ (bus→agent loop)
    步骤: _ensure_receive_task 懒启动接收循环 → _wait_for_rate_limit 滑动窗口限速（60 RPM * 0.7）→ publish_inbound 发布 → 等待 future（超时 1000s）→ 收到 OutboundMessage → 异步保存 token usage
 
-**21. 记录 LLM 调用日志（条件执行）**
+**20. 记录 LLM 调用日志（条件执行）**
    非命令消息（不以 "/" 开头）时记录完整的 LLM 调用信息
    状态: 无状态变化 | 持久化: ✅ (LLM 调用日志) | 跨模块: ✅ (channel→llm_call_logger)
    步骤: 检查 content 不以 "/" 开头 → Context.build_system_prompt 构建 system prompt → llm_call_logger.log_call 记录输入输出 → 日志记录失败仅 WARNING 不阻塞主流程
 
-**22. 更新 session_id 到 _user_data**
+**21. 更新 session_id 到 _user_data**
    从 AgentLoop 返回的 OutboundMessage 中提取最新 session_id
    状态: _user_data[wechat_user_id]["last_session_id"]→str | 持久化: ❌ (标记 need_save) | 跨模块: ❌
    步骤: 检查 response.session_id 非空 → 更新 _user_data 中的 last_session_id → 设置 need_save=True
 
-**23. auth.save_state() — 统一持久化用户数据**
+**22. auth.save_state() — 统一持久化用户数据**
    context_token 和 session_id 变更后，一次性将最新的 token + user_data 写入文件
    状态: account.json 文件内容更新 | 持久化: ✅ (account.json) | 跨模块: ✅ (channel→keyring)
    步骤: 构建 state={token, user_data} → save_state → token 写 keyring（失败则 fallback 到文件写整个 state）→ user_data 写文件
 
-**24. WechatChannel.send(response) — 发送回复到微信**
+**23. WechatChannel.send(response) — 发送回复到微信**
    将 Agent 回复文本通过 sendmessage API 发送给微信用户
    状态: sent_success→bool | 持久化: ❌ | 跨模块: ✅ (channel→微信API)
    步骤: 从 response.extra 提取 wechat_user_id → 从 _user_data 获取 context_token → 提取 response.content → 内容为空则跳过 → WechatMessage.build_text_message 构建请求体 → api_post "ilink/bot/sendmessage" 发送
 
-**25. WechatMessage.build_text_message(to_user_id, text, context_token) — 构建回复消息**
+**24. WechatMessage.build_text_message(to_user_id, text, context_token) — 构建回复消息**
    构造符合微信 API 格式的文本消息字典
    状态: 无状态变化 | 持久化: ❌ | 跨模块: ❌
    步骤: 生成 client_id "lifeprism-{uuid.hex[:12]}" → 构建消息结构（from_user_id=""、to_user_id、message_type=2 机器人、message_state=2 完成、item_list=[{type:1, text_item:{text}}]）→ context_token 非空时附带
 
 ### 链路 3：媒体下载与解密
 
-**26. WechatMedia.download_media(media_info, type) — 下载入口**
+**25. WechatMedia.download_media(media_info, type) — 下载入口**
    从微信 CDN 下载加密/非加密媒体文件，解密后保存到本地
    状态: file_path→str（本地文件路径）| 持久化: ✅ (media_dir 下文件写入) | 跨模块: ✅ (channel→微信CDN)
    步骤: 提取 full_url/encrypt_query_param/aes_key → 构建下载 URL（优先 full_url，fallback 到 CDN 拼接 encrypt_query_param）→ HTTP GET 下载原始数据 → 有 aes_key 时 AES-ECB 解密 → 根据 type 确定文件扩展名 → 生成 filename "{type}_{uuid.hex[:12]}.{ext}" → file_path.write_bytes 保存
 
-**27. WechatMedia._decrypt_aes_ecb(data, key_b64) — AES-ECB 解密（静态方法）**
+**26. WechatMedia._decrypt_aes_ecb(data, key_b64) — AES-ECB 解密（静态方法）**
    使用微信提供的 Base64 编码密钥对加密数据进行 AES-ECB 解密
    状态: 无状态变化 | 持久化: ❌ | 跨模块: ❌
    步骤: base64.b64decode 解码密钥 → 创建 AES-ECB Cipher → decryptor.update + decryptor.finalize → 返回解密后字节
 
 ### 链路 4：Channel 停止
 
-**28. WechatChannel.stop() — 停止入口**
+**27. WechatChannel.stop() — 停止入口**
    按顺序执行状态保存、任务取消、客户端关闭
    状态: _running=True→False | 持久化: ✅ (account.json) | 跨模块: ✅ (channel→keyring)
    步骤: 设置 _running=False → 保存最新状态 → 取消 poll_task → 关闭 HTTP 客户端
 
-**29. stop() 内 save_state — 停止时兜底保存**
+**28. stop() 内 save_state — 停止时兜底保存**
    将最新的 token 和 _user_data 持久化
    状态: account.json 文件更新 | 持久化: ✅ | 跨模块: ✅ (channel→keyring)
    步骤: 检查 auth/client/_user_data 均存在 → 构造 state={token, user_data} → auth.save_state(state) → 保存失败仅记录 ERROR 不阻止停止流程
 
-**30. stop() 内取消 poll_task + 关闭客户端**
+**29. stop() 内取消 poll_task + 关闭客户端**
    清理后台轮询任务和 HTTP 连接
    状态: _poll_task→None, client._client→closed | 持久化: ❌ | 跨模块: ❌
    步骤: _poll_task.cancel() → suppress CancelledError 等待任务结束 → client.__aexit__ 关闭 AsyncClient
@@ -389,7 +384,7 @@ stateDiagram-v2
 ## 异常与清理
 
 - **start() 无 token**：记录 INFO 日志 → 设置 _running=False → return（不执行后续初始化，不抛异常）
-- **start() Token 测试失败**：仅记录 ERROR 日志 → 继续启动轮询（不阻止启动，token 可能仅对 getupdates 有效）
+- **start() Token 失效**：2026-08-19 移除启动时 token 预测试段（避免 lifespan 阻塞），token 有效性由 _poll_loop 首次调用 getupdates 暴露 → ERROR 日志 → sleep(5) → 下一次循环重试（详见 [ADR 2026-08-19-startup-optimization-phased-strategy](../adr/2026-08-19-startup-optimization-phased-strategy.md)）
 - **_poll_loop 网络错误**：捕获 httpx.HTTPStatusError / httpx.RequestError → ERROR 日志 → sleep(5) → 下一次循环重试（不退出轮询）
 - **_poll_loop 数据解析错误**：捕获 KeyError / ValueError → ERROR 日志 → sleep(5) → 下一次循环重试（不退出轮询）
 - **_handle_wechat_message 消息解析错误**：捕获 KeyError/ValueError/TypeError → ERROR 日志 → 抛出 WechatMessageError（由 _poll_loop 的通用异常处理兜底）

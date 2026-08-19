@@ -2,9 +2,15 @@
 version: 2.4
 created_at: 2026-04-10
 updated_at: 2026-08-18
-last_updated: 新增 custom-prompt-user-role-injection ADR（chat agent 自定义规则以 user role 前缀区动态注入，同构 Claude Code 机制）
+last_updated: 新增 startup-optimization-phased-strategy ADR（启动慢优化分阶段执行策略：1+3 先做、2 暂不修改只记录）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## startup-optimization-phased-strategy
+- updated_at: 2026-08-19
+- path: `docs/adr/2026-08-19-startup-optimization-phased-strategy.md`
+- 触发规则：当需要理解为什么启动慢优化只执行方案 1（删除微信 token 测试）和方案 3（send_heartbeat 改 fire-and-forget）而暂不执行方案 2（启动同步改 fire-and-forget）、或后续启动同步异步化时读取（含锁内移、shutdown 处理、task 引用持有等 6 条必须满足的约束）
+- 内容摘要：LifePrism 启动慢优化采用分阶段策略。方案 1+3 风险极低先执行，方案 2 涉及锁释放时机变更、违反 ADR 2026-07-25-global-task-state 决策 4 契约、shutdown 冲突、task GC 等多重风险暂不修改只记录。3 个决策前提：1+3 可能已足够、方案 2 风险暂时不可接受、分阶段可降低决策风险。备选触发：1+3 修复后启动仍慢则启动方案 2，按 6 条约束执行（锁内移、task 引用持有、shutdown 处理未完成任务、SSH 隧道保持 await、task 内部异常处理、ADR 2026-07-25 同步更新）
 
 ## custom-prompt-user-role-injection
 - updated_at: 2026-08-18
