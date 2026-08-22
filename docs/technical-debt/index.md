@@ -46,3 +46,10 @@
 - path: `docs/technical-debt/mood-impacts-autoincrement-id.md`
 - 触发规则：修改 mood_impacts 表结构或 MoodImpactProvider 时阅读
 - 内容摘要：mood_impacts 是唯一使用 INTEGER AUTOINCREMENT 主键的表，与项目 TEXT hash ID 风格不一致。经 ADR 2026-07-17 验证无功能影响，建议在下次涉及该表结构变更时统一
+
+## llm-server-service-coupling
+
+- updated_at: 2026-08-19
+- path: `docs/technical-debt/2026-08-19-llm-server-service-coupling.md`
+- 触发规则：修改 `lifeprism/llm/agent/tools/habit_tool.py`、新增 LLM 工具需复用 server.service 业务规则、或重构 HabitService 结构时阅读
+- 内容摘要：`llm/agent/tools/habit_tool.py` 反向依赖 `server/services/habit_service` 与 `server/schemas/habit_schemas`，通过延迟导入掩盖循环依赖，是 `lifeprism/llm/` 下唯一此类离群点。修复方向是将 Service 从 server 中剥离形成独立 application/service 层，同时服务于 LLM 和 HTTP API；分三阶段实施：schema 共享先行 → 抽应用服务层 → 完整领域模块。触发条件为出现第二个需复用 server.service 的 LLM 工具

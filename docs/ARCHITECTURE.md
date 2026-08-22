@@ -1,8 +1,8 @@
 ---
-version: 2.1
+version: 2.2
 created_at: 2026-04-09
-updated_at: 2026-07-07
-last_updated: 新增自定义记录模块（Custom Records）章节，前端架构图和目录结构同步更新
+updated_at: 2026-08-19
+last_updated: 更新已知耦合说明：原 llm provider/summary_context 反向依赖 server 已解除；新增 habit_tool.py 反向依赖 server.services.habit_service 的耦合点说明
 abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后端架构、主干数据流和关键依赖方向。
 ---
 
@@ -18,6 +18,7 @@ abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后�
 | 1.1 | 补充 abstract 字段 |
 | 2.0 | 全面重写：参照 agents-hub 格式重构，新增 LLM Agent/Channel/Repository 等核心模块，补充技术栈表、分层架构图、4 条主干数据流和文档导航 |
 | 2.1 | 新增自定义记录模块（Custom Records）：前端架构图和目录结构同步更新 |
+| 2.2 | 更新已知耦合说明：原 llm provider/summary_context 反向依赖 server 已解除；新增 habit_tool.py 反向依赖 server.services.habit_service 的耦合点说明，关联技术债文档 |
 
 ## 项目概述
 
@@ -201,7 +202,9 @@ utils → config → repository → monitor → processors → server
 ```
 
 **已知耦合**：
-- `llm` 中的部分 provider / summary_context 代码反向依赖了 `server` 的 provider 或 service
+- ~~`llm` 中的部分 provider / summary_context 代码反向依赖了 `server` 的 provider 或 service~~（已解除）
+- 当前耦合点：`lifeprism/llm/agent/tools/habit_tool.py` 反向依赖 `lifeprism/server/services/habit_service` 与 `lifeprism/server/schemas/habit_schemas`，通过函数体内延迟导入（`_get_habit_service()`）规避循环依赖。这是 `lifeprism/llm/` 目录下唯一此类离群点，同目录其他工具均直连 repository 层
+- 修复方向：将 Service 从 `server` 中剥离，形成独立 application/service 层，使 Service 可同时服务于 LLM 和 HTTP Application。详见 [docs/technical-debt/2026-08-19-llm-server-service-coupling.md](technical-debt/2026-08-19-llm-server-service-coupling.md)
 - 主体结构上 `server` 是对外汇总层，但 `llm` 与 `server` 之间尚未完全解耦
 
 ### 各模块职责
@@ -408,7 +411,7 @@ utils → config → repository → monitor → processors → server
 6. **llm** — 依赖 utils + config + repository：Agent 引擎、Session 管理、多渠道接入
 7. **server** — 对外服务层：汇总 repository / processors / llm / config 的能力，对前端暴露 API
 
-> **注意**：`llm` 与 `server` 之间存在现实代码耦合（`llm` 中部分 provider/summary_context 代码反向依赖 `server`），尚未完全解耦。
+> **注意**：`llm` 与 `server` 之间存在现实代码耦合。历史上的 `llm` provider/summary_context 反向依赖 `server` 已解除；当前剩余耦合点为 `lifeprism/llm/agent/tools/habit_tool.py` 反向依赖 `lifeprism/server/services/habit_service`（通过延迟导入规避循环依赖），尚未完全解耦，详见 [docs/technical-debt/2026-08-19-llm-server-service-coupling.md](technical-debt/2026-08-19-llm-server-service-coupling.md)。
 
 ## 文档导航
 
