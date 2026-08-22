@@ -891,6 +891,149 @@ class CustomRecordRepository:
         )
         return True
 
+    # ==================== 更新记录 (P3) ====================
+
+    def update_entry(
+        self,
+        type_id: str,
+        entry_id: str,
+        data: dict[str, Any],
+        event_time: str | None = None,
+    ) -> bool:
+        """
+        P3: 更新单条记录（PATCH 三态语义）
+
+        对齐项目标准 backend-api-rules.md：
+        - 字段未传（key 不在 data 中） → 不修改
+        - 字段传 null（值为 None） → 清空（写入 NULL）
+        - 字段传值 → 校验并更新为新值
+
+        不做"空字符串转 NULL"非标准处理（参考 value_service / commitment_service）。
+        None 值跳过 _coerce_field_value 校验，直接作为 SQL 参数写入 NULL。
+
+        Args:
+            type_id: 类型 ID
+            entry_id: 记录 ID
+            data: 字段值字典，仅出现的 key 进入 SET 子句
+            event_time: 事件时间 UTC ISO 8601；None 表示不更新该列
+
+        Returns:
+            bool: 是否更新成功
+
+        Raises:
+            EntityNotFoundError: 类型不存在 / 记录不存在
+            ValidationError: data 含未知 field_key（INVALID_FIELD_KEY）
+                              或字段值类型不匹配（INVALID_FIELD_VALUE）
+            DataAccessError: 数据库操作失败
+        """
+        _, data_table = self._get_type_and_table(type_id)
+        fields = self._get_fields_by_type_id(type_id)
+        valid_keys = {f["field_key"] for f in fields}
+
+        # 校验 data 的 key 是否都在 valid_keys 中
+        invalid_keys = set(data.keys()) - valid_keys
+        if invalid_keys:
+            valid_fields = [
+                {"field_key": f["field_key"], "field_name": f["field_name"]} for f in fields
+            ]
+            raise ValidationError(
+                message=f"字段不存在: {','.join(sorted(invalid_keys))}",
+                code="INVALID_FIELD_KEY",
+                details={
+                    "invalid_keys": sorted(invalid_keys),
+                    "valid_fields": valid_fields,
+                },
+            )
+
+        # 校验 data 的值类型与 field_type 匹配（None 值跳过校验，表达清空语义）
+        field_type_map = {f["field_key"]: f["field_type"] for f in fields}
+        invalid_value_fields: list[dict] = []
+        for key, value in data.items():
+            if value is None:
+                continue  # None 值跳过校验，直接作为 SQL 参数写 NULL
+            ftype = field_type_map[key]
+            converted = self._coerce_field_value(key, value, ftype)
+            if converted is _INVALID_SENTINEL:
+                invalid_value_fields.append(
+                    {
+                        "field_key": key,
+                        "value": value,
+                        "expected_type": ftype,
+                    }
+                )
+            else:
+                data[key] = converted
+
+        if invalid_value_fields:
+            valid_fields = [
+                {
+                    "field_key": f["field_key"],
+                    "field_name": f["field_name"],
+                    "field_type": f["field_type"],
+                }
+                for f in fields
+            ]
+            raise ValidationError(
+                message=f"字段值类型不匹配: {','.join(iv['field_key'] for iv in invalid_value_fields)}",
+                code="INVALID_FIELD_VALUE",
+                details={
+                    "invalid_fields": invalid_value_fields,
+                    "valid_fields": valid_fields,
+                },
+            )
+
+        # 构造 UPDATE SET 子句（动态）
+        now = datetime.now(timezone.utc).isoformat()
+        set_clauses: list[str] = []
+        params: list[Any] = []
+        if event_time is not None:
+            set_clauses.append("event_time = ?")
+            params.append(event_time)
+        for key, value in data.items():
+            set_clauses.append(f"{key} = ?")
+            params.append(value)  # None 直接作为 SQL 参数，自动写为 NULL
+        set_clauses.append("updated_at = ?")
+        params.append(now)
+        params.append(entry_id)
+        sql = f"UPDATE {data_table} SET {', '.join(set_clauses)} WHERE id = ?"
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                # 1. 先查询记录是否存在（与 delete_entry 一致，避免对不存在的 entry_id 静默成功）
+                cursor.execute(
+                    f"SELECT 1 FROM {data_table} WHERE id = ?",
+                    (entry_id,),
+                )
+                if cursor.fetchone() is None:
+                    raise EntityNotFoundError(entity_type="CustomRecordEntry", entity_id=entry_id)
+                # 2. 执行 UPDATE
+                cursor.execute(sql, tuple(params))
+                conn.commit()
+        except sqlite3.Error as e:
+            logger.error(
+                "更新自定义记录失败: type_id=%s, entry_id=%s, error=%s",
+                type_id,
+                entry_id,
+                e,
+            )
+            raise DataAccessError(
+                message="更新自定义记录失败",
+                details={
+                    "type_id": type_id,
+                    "entry_id": entry_id,
+                    "error": str(e),
+                },
+                cause=e,
+            ) from e
+
+        logger.info(
+            "更新自定义记录成功: type_id=%s, entry_id=%s",
+            type_id,
+            entry_id,
+        )
+        return True
+
     # ==================== 配置更新 (Slice 6) ====================
 
     def update_type_config(

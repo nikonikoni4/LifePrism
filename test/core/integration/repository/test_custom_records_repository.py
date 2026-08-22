@@ -59,10 +59,18 @@ def repository(test_data_path):
                 sort_order INTEGER DEFAULT 0,
                 display_role TEXT NOT NULL DEFAULT 'auto',
                 created_at TEXT DEFAULT (datetime('now','localtime')),
+                updated_at TEXT,
                 UNIQUE (type_id, field_key)
             )
         """
         )
+        # 与生产 schema 对齐（m012 迁移后含 updated_at 列）：
+        # 旧测试库的表由本 fixture 早期版本建出、缺 updated_at 列，
+        # CREATE TABLE IF NOT EXISTS 不会补列，需显式 ALTER（模拟 m012）
+        cursor.execute("PRAGMA table_info(custom_record_fields)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "updated_at" not in columns:
+            cursor.execute("ALTER TABLE custom_record_fields ADD COLUMN updated_at TEXT")
         conn.commit()
 
     yield repo
@@ -1388,3 +1396,664 @@ class TestQueryEntriesFieldFilters:
                 type_id=type_id,
                 filters=[{"field_key": "heart_rate", "op": "in", "value": [120, "abc"]}],
             )
+
+
+# ==================== P3: 更新记录测试 ====================
+
+
+class TestUpdateEntry:
+    """P3: 测试 update_entry() 方法（PATCH 三态语义：未传=不修改，传 null=清空，传值=更新）"""
+
+    def test_update_entry_single_text_field_preserves_other_fields(self, repository):
+        """P3 测试 1: 更新单字段（text）——仅更新该字段，其他字段保持原值"""
+        # Arrange: 创建类型并录入初始记录
+        type_id = repository.create_type(
+            name="体育活动",
+            slug="sport_p3",
+            fields=[
+                {"field_name": "日期", "field_key": "exercise_date", "field_type": "text"},
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"exercise_date": "2026-07-07", "exercise_content": "跑步5公里"},
+        )
+
+        # Act: 只更新 exercise_content 字段
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"exercise_content": "跑步10公里"},
+        )
+
+        # Assert: 返回 True
+        assert result is True
+
+        # Assert: 仅 exercise_content 更新，exercise_date 保持原值
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT exercise_date, exercise_content FROM custom_sport_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "2026-07-07"  # 原值不变（未传字段不修改）
+            assert row[1] == "跑步10公里"  # 已更新为新值
+
+    def test_update_entry_all_fields_updates_all(self, repository):
+        """P3 测试 2: 更新全部字段——所有字段值都更新为新值"""
+        # Arrange
+        type_id = repository.create_type(
+            name="阅读记录",
+            slug="reading_p3",
+            fields=[
+                {"field_name": "书名", "field_key": "book_title", "field_type": "text"},
+                {"field_name": "页数", "field_key": "page_count", "field_type": "integer"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"book_title": "原书名", "page_count": 100},
+        )
+
+        # Act: 更新全部字段
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"book_title": "新书名", "page_count": 200},
+        )
+
+        # Assert
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT book_title, page_count FROM custom_reading_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "新书名"
+            assert row[1] == 200
+
+    def test_update_entry_empty_dict_only_refreshes_updated_at(self, repository):
+        """P3 测试 3: 空字典更新——仅刷 updated_at，字段值全部不变"""
+        # Arrange
+        type_id = repository.create_type(
+            name="空字典测试",
+            slug="empty_p3",
+            fields=[
+                {"field_name": "笔记", "field_key": "note", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"note": "原始笔记"},
+        )
+        # 取原始 updated_at
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT note, updated_at FROM custom_empty_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            orig_row = cursor.fetchone()
+            orig_note = orig_row[0]
+            orig_updated_at = orig_row[1]
+
+        # Act: 空字典更新
+        import time as _time
+        _time.sleep(1.1)  # 确保 updated_at 时间戳不同
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={},
+        )
+
+        # Assert
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT note, updated_at FROM custom_empty_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == orig_note  # 字段值不变
+            assert row[1] != orig_updated_at  # updated_at 已变化
+
+    def test_update_entry_none_value_clears_field(self, repository):
+        """P3 测试 4: 清空字段（None 值，三态语义）——传 null 表达清空，写入 NULL"""
+        # Arrange
+        type_id = repository.create_type(
+            name="清空字段测试",
+            slug="clear_p3",
+            fields=[
+                {"field_name": "笔记", "field_key": "note", "field_type": "text"},
+                {"field_name": "计数", "field_key": "count", "field_type": "integer"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"note": "原始笔记", "count": 42},
+        )
+
+        # Act: 把 note 清空（传 None）
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"note": None},
+        )
+
+        # Assert
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT note, count FROM custom_clear_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] is None  # note 已清空（NULL）
+            assert row[1] == 42  # count 保持原值（未传字段不修改）
+
+    def test_update_entry_unmentioned_field_preserved(self, repository):
+        """P3 测试 5: 未传字段三态语义——未传的字段保持原值（不修改）"""
+        # Arrange
+        type_id = repository.create_type(
+            name="未传字段测试",
+            slug="unmentioned_p3",
+            fields=[
+                {"field_name": "字段A", "field_key": "field_a", "field_type": "text"},
+                {"field_name": "字段B", "field_key": "field_b", "field_type": "text"},
+                {"field_name": "字段C", "field_key": "field_c", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"field_a": "值A", "field_b": "值B", "field_c": "值C"},
+        )
+
+        # Act: 只传 field_b，不传 field_a 和 field_c
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"field_b": "新值B"},
+        )
+
+        # Assert: field_a 和 field_c 保持原值，field_b 更新
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT field_a, field_b, field_c FROM custom_unmentioned_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == "值A"  # 未传，保持原值
+            assert row[1] == "新值B"  # 已传，更新为新值
+            assert row[2] == "值C"  # 未传，保持原值
+
+    def test_update_entry_integer_correct_value_persists(self, repository):
+        """P3 测试 6: 更新 integer 字段正确 int 值——落库成功"""
+        # Arrange
+        type_id = repository.create_type(
+            name="整数测试",
+            slug="int_p3",
+            fields=[
+                {"field_name": "计数", "field_key": "count", "field_type": "integer"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"count": 10},
+        )
+
+        # Act: 更新为新整数
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"count": 42},
+        )
+
+        # Assert
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT count FROM custom_int_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == 42
+
+    def test_update_entry_integer_invalid_value_raises_validation_error(self, repository):
+        """P3 测试 7: 更新 integer 字段错误值——抛 ValidationError(INVALID_FIELD_VALUE) + valid_fields 详情"""
+        # Arrange
+        type_id = repository.create_type(
+            name="整数错误值",
+            slug="int_invalid_p3",
+            fields=[
+                {"field_name": "计数", "field_key": "count", "field_type": "integer"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"count": 10},
+        )
+
+        # Act + Assert: 传非数值字符串
+        with pytest.raises(ValidationError) as exc_info:
+            repository.update_entry(
+                type_id=type_id,
+                entry_id=entry_id,
+                data={"count": "abc"},
+            )
+
+        # Assert: details 含 valid_fields
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+        details = exc_info.value.details
+        assert "invalid_fields" in details
+        assert details["invalid_fields"][0]["field_key"] == "count"
+        assert "valid_fields" in details
+
+    def test_update_entry_float_correct_value_persists(self, repository):
+        """P3 测试 8: 更新 float 字段正确值——落库成功"""
+        # Arrange
+        type_id = repository.create_type(
+            name="浮点测试",
+            slug="float_p3",
+            fields=[
+                {"field_name": "体重", "field_key": "weight", "field_type": "float"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"weight": 60.0},
+        )
+
+        # Act: 更新为新浮点数
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"weight": 65.5},
+        )
+
+        # Assert
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT weight FROM custom_float_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == 65.5
+
+    def test_update_entry_float_invalid_value_raises_validation_error(self, repository):
+        """P3 测试 9: 更新 float 字段错误值——抛 ValidationError(INVALID_FIELD_VALUE)"""
+        # Arrange
+        type_id = repository.create_type(
+            name="浮点错误值",
+            slug="float_invalid_p3",
+            fields=[
+                {"field_name": "体重", "field_key": "weight", "field_type": "float"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"weight": 60.0},
+        )
+
+        # Act + Assert: 传非数值字符串
+        with pytest.raises(ValidationError) as exc_info:
+            repository.update_entry(
+                type_id=type_id,
+                entry_id=entry_id,
+                data={"weight": "xyz"},
+            )
+
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+
+    def test_update_entry_unknown_field_key_raises_validation_error(self, repository):
+        """P3 测试 10: 更新不存在的 field_key——抛 ValidationError(INVALID_FIELD_KEY) 且 details 含 valid_fields"""
+        # Arrange: 创建类型并录入初始记录
+        type_id = repository.create_type(
+            name="未知字段测试",
+            slug="unknown_field_p3",
+            fields=[
+                {"field_name": "内容", "field_key": "content", "field_type": "text"},
+                {"field_name": "心率", "field_key": "heart_rate", "field_type": "integer"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"content": "跑步", "heart_rate": 120},
+        )
+
+        # Act + Assert: 传 data 含未知 field_key
+        with pytest.raises(ValidationError) as exc_info:
+            repository.update_entry(
+                type_id=type_id,
+                entry_id=entry_id,
+                data={"unknown_field": "x"},
+            )
+
+        # Assert: code 为 INVALID_FIELD_KEY
+        assert exc_info.value.code == "INVALID_FIELD_KEY"
+
+        # Assert: details 含 invalid_keys（按字母序）和 valid_fields
+        details = exc_info.value.details
+        assert details["invalid_keys"] == ["unknown_field"]
+        valid_fields = details["valid_fields"]
+        valid_keys = {f["field_key"] for f in valid_fields}
+        assert valid_keys == {"content", "heart_rate"}
+        # valid_fields 每项含 field_key + field_name（供前端展示可用字段清单）
+        for f in valid_fields:
+            assert "field_key" in f
+            assert "field_name" in f
+
+    def test_update_entry_nonexistent_type_id_raises_entity_not_found(self, repository):
+        """P3 测试 11: 更新不存在的 type_id——抛 EntityNotFoundError(entity_type='CustomRecordType')"""
+        # Arrange: 不存在的 type_id（格式合法但库里没有）
+        nonexistent_type_id = "crt-not-exist-p3"
+        # 先随便创建一条 entry_id 来调用（type_id 校验在前，不会到达 entry 存在性校验）
+        fake_entry_id = "cre-fake-p3"
+
+        # Act + Assert
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            repository.update_entry(
+                type_id=nonexistent_type_id,
+                entry_id=fake_entry_id,
+                data={"any_field": "x"},
+            )
+
+        # Assert: code 固定为 ENTITY_NOT_FOUND，details 含 entity_type=CustomRecordType
+        assert exc_info.value.code == "ENTITY_NOT_FOUND"
+        assert exc_info.value.details["entity_type"] == "CustomRecordType"
+        assert exc_info.value.details["entity_id"] == nonexistent_type_id
+
+    def test_update_entry_nonexistent_entry_id_raises_entity_not_found(self, repository):
+        """P3 测试 12: 类型存在但 entry_id 不存在——抛 EntityNotFoundError(entity_type='CustomRecordEntry')"""
+        # Arrange: 创建类型，但不录入任何记录
+        type_id = repository.create_type(
+            name="空类型",
+            slug="empty_type_p3",
+            fields=[
+                {"field_name": "内容", "field_key": "content", "field_type": "text"},
+            ],
+        )
+        nonexistent_entry_id = "cre-not-exist-p3"
+
+        # Act + Assert: type_id 存在但 entry_id 不存在
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            repository.update_entry(
+                type_id=type_id,
+                entry_id=nonexistent_entry_id,
+                data={"content": "x"},
+            )
+
+        # Assert: code 固定为 ENTITY_NOT_FOUND，details 含 entity_type=CustomRecordEntry
+        assert exc_info.value.code == "ENTITY_NOT_FOUND"
+        assert exc_info.value.details["entity_type"] == "CustomRecordEntry"
+        assert exc_info.value.details["entity_id"] == nonexistent_entry_id
+
+    def test_update_entry_event_time_updates_column_without_touching_data(self, repository):
+        """P3 测试 13: 更新 event_time——event_time 列已更新，data 字段保持不变"""
+        # Arrange: 录入记录时显式指定原始 event_time（便于对比）
+        type_id = repository.create_type(
+            name="事件时间更新测试",
+            slug="event_time_update_p3",
+            fields=[
+                {"field_name": "笔记", "field_key": "note", "field_type": "text"},
+            ],
+        )
+        orig_event_time = "2026-07-01T08:00:00+00:00"
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"note": "原始笔记"},
+            event_time=orig_event_time,
+        )
+        # 捕获原始 note 值（确保 data 字段未被 update_entry 触及）
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT note, event_time FROM custom_event_time_update_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            orig_row = cursor.fetchone()
+            orig_note = orig_row[0]
+            assert orig_row[1] == orig_event_time  # 落库即原始 event_time
+
+        # Act: 仅传 event_time，data 为空字典（不修改任何字段值）
+        new_event_time = "2026-08-01T00:00:00+00:00"
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={},
+            event_time=new_event_time,
+        )
+
+        # Assert: 返回 True，event_time 已更新，note 保持原值
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT note, event_time FROM custom_event_time_update_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == orig_note  # data 字段不变（空字典）
+            assert row[1] == new_event_time  # event_time 已更新为新值
+
+    def test_update_entry_event_time_none_keeps_original_event_time(self, repository):
+        """P3 测试 14: event_time=None 不更新该列——event_time 列保持原值"""
+        # Arrange: 录入记录时显式指定原始 event_time
+        type_id = repository.create_type(
+            name="事件时间不变测试",
+            slug="event_time_none_p3",
+            fields=[
+                {"field_name": "笔记", "field_key": "note", "field_type": "text"},
+            ],
+        )
+        orig_event_time = "2026-07-15T10:30:00+00:00"
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"note": "原始笔记"},
+            event_time=orig_event_time,
+        )
+
+        # Act: 传 event_time=None（显式不更新该列），同时更新 note 字段
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"note": "更新后的笔记"},
+            event_time=None,
+        )
+
+        # Assert: 返回 True，event_time 保持原值，note 已更新
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT note, event_time FROM custom_event_time_none_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == "更新后的笔记"  # note 已更新
+            assert row[1] == orig_event_time  # event_time 保持原值（None 不更新）
+
+    def test_update_entry_refreshes_updated_at_automatically(self, repository):
+        """P3 测试 15: updated_at 自动刷新——updated_at > created_at 且 updated_at > 原始 updated_at"""
+        # Arrange: 录入记录
+        type_id = repository.create_type(
+            name="updated_at刷新测试",
+            slug="updated_at_refresh_p3",
+            fields=[
+                {"field_name": "笔记", "field_key": "note", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"note": "原始笔记"},
+        )
+        # 捕获原始 created_at 和 updated_at
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT created_at, updated_at FROM custom_updated_at_refresh_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            orig_row = cursor.fetchone()
+            orig_created_at = orig_row[0]
+            orig_updated_at = orig_row[1]
+
+        # Act: 等待 1.1 秒后调 update_entry（确保时间戳不同）
+        import time as _time
+        _time.sleep(1.1)
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"note": "更新后的笔记"},
+        )
+
+        # Assert: 返回 True，created_at 不变，updated_at 已刷新
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT created_at, updated_at FROM custom_updated_at_refresh_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            new_created_at = row[0]
+            new_updated_at = row[1]
+
+        # created_at 不可变
+        assert new_created_at == orig_created_at
+        # updated_at 已刷新（与原始不同，且严格大于原始——字符串 ISO 时间戳字典序与时间序一致）
+        assert new_updated_at != orig_updated_at
+        assert new_updated_at > orig_updated_at
+        # updated_at 应 ≥ created_at（更新发生在创建之后）
+        assert new_updated_at >= new_created_at
+
+    def test_update_entry_id_and_created_at_immutable(self, repository):
+        """P3 测试 16: id 与 created_at 不可变——更新后 id 和 created_at 与原值一致"""
+        # Arrange
+        type_id = repository.create_type(
+            name="不可变列测试",
+            slug="immutable_p3",
+            fields=[
+                {"field_name": "笔记", "field_key": "note", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"note": "原始笔记"},
+        )
+        # 捕获原始 id 和 created_at
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, created_at FROM custom_immutable_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            orig_row = cursor.fetchone()
+            orig_id = orig_row[0]
+            orig_created_at = orig_row[1]
+
+        # Act: 更新 note 字段
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"note": "更新后的笔记"},
+        )
+
+        # Assert: 返回 True，id 和 created_at 与原值一致
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, created_at, note FROM custom_immutable_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == orig_id  # id 不可变
+            assert row[0] == entry_id  # id 仍为原 entry_id
+            assert row[1] == orig_created_at  # created_at 不可变
+            assert row[2] == "更新后的笔记"  # note 已更新
+
+    def test_update_entry_none_value_skips_field_type_coercion(self, repository):
+        """P3 测试 17: None 值跳过 _coerce_field_value 校验——传 None 给 integer 字段不抛 ValidationError，写入 NULL
+
+        通过行为验证（非 mock）：若 Repository 对 None 调用 _coerce_field_value，
+        会因 None 无法转 int 而返回 _INVALID_SENTINEL 并抛 ValidationError(INVALID_FIELD_VALUE)。
+        本测试断言传 None 不抛错且写入 NULL，即证明 None 跳过了类型校验。
+        """
+        # Arrange: integer 字段
+        type_id = repository.create_type(
+            name="None跳过校验测试",
+            slug="none_skip_coerce_p3",
+            fields=[
+                {"field_name": "心率", "field_key": "heart_rate", "field_type": "integer"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"heart_rate": 120},
+        )
+
+        # Act: 传 None 给 integer 字段（清空语义，应跳过类型校验）
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"heart_rate": None},
+        )
+
+        # Assert: 不抛 ValidationError，返回 True，heart_rate 写入 NULL
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT heart_rate FROM custom_none_skip_coerce_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] is None  # 已清空（NULL）
+
+    def test_update_entry_text_field_regression_full_flow(self, repository):
+        """P3 测试 18: text 字段保持原行为（回归）——创建+录入+更新 text 字段全流程成功（与 P1 行为一致）"""
+        # Arrange: 多个 text 字段，含短文本和长文本
+        type_id = repository.create_type(
+            name="文本回归测试",
+            slug="text_regression_p3",
+            fields=[
+                {"field_name": "标题", "field_key": "title", "field_type": "text"},
+                {"field_name": "内容", "field_key": "content", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"title": "原始标题", "content": "原始内容"},
+        )
+
+        # Act: 更新 content 字段，title 保持原值
+        result = repository.update_entry(
+            type_id=type_id,
+            entry_id=entry_id,
+            data={"content": "更新后的内容"},
+        )
+
+        # Assert: 全流程成功，符合 PATCH 三态语义
+        assert result is True
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT title, content FROM custom_text_regression_p3 WHERE id = ?",
+                (entry_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == "原始标题"  # 未传字段保持原值（P1 行为）
+            assert row[1] == "更新后的内容"  # 已更新字段为新值

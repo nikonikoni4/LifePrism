@@ -15,10 +15,12 @@ from lifeprism.server.schemas.custom_records_schemas import (
     CustomRecordTypeItem,
     CustomRecordTypeListResponse,
     FieldDefinition,
+    UpdateCustomRecordEntryRequest,
     UpdateFieldRoleRequest,
     UpdateTypeConfigRequest,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ValidationError
 
 logger = get_logger(__name__)
 
@@ -147,6 +149,76 @@ def create_entry(type_id: str, request: CreateCustomRecordEntryRequest) -> Custo
     entry_dict = custom_record_repository.get_entry(type_id=type_id, entry_id=entry_id)
     logger.info("录入自定义记录成功: type_id=%s, entry_id=%s", type_id, entry_id)
     return _convert_to_entry_item(entry_dict)
+
+
+def update_entry(
+    type_id: str, entry_id: str, request: UpdateCustomRecordEntryRequest
+) -> CustomRecordEntryItem:
+    """更新记录（PATCH 三态语义，薄包装）
+
+    顶层字段三态由 model_dump(exclude_unset=True) 区分；
+    dict 内 key 三态由前端 diff 保证（Repository 层只看到出现的 key）。
+
+    Args:
+        type_id: 类型 ID
+        entry_id: 记录 ID
+        request: 更新请求
+
+    Returns:
+        CustomRecordEntryItem: 更新后的完整记录
+
+    Raises:
+        ValidationError: data 传 null（不支持整体清空，code=INVALID_PATCH_BODY）
+                         / event_time 传 null（不允许清空，code=INVALID_PATCH_BODY）
+                         / data 含未知 field_key（code=INVALID_FIELD_KEY，来自 Repository）
+                         / 字段值类型不匹配（code=INVALID_FIELD_VALUE，来自 Repository）
+        EntityNotFoundError: 类型不存在 / 记录不存在
+    """
+    # 标准 model_dump(exclude_unset=True) 模式（参考 value_service.update_value / commitment_service.update_commitment）
+    update_data = request.model_dump(exclude_unset=True)
+
+    # data 字段三态：
+    #   未传 data → 不修改任何字段值（用空 dict 表达）
+    #   传 data=null → 报错（不支持整体清空，避免误操作）
+    #   传 data={} → 仅刷 updated_at
+    #   传 data={key: null/val} → 按 dict 内 key 三态处理
+    data_dict = update_data.get("data")
+    if data_dict is None:
+        if "data" in update_data:
+            # 显式传 null，不支持（ValidationError → 422，符合字段校验语义）
+            raise ValidationError(
+                message="data 不支持传 null 整体清空，请传 {} 或省略",
+                code="INVALID_PATCH_BODY",
+                details={"field": "data", "reason": "not_nullable"},
+            )
+        # 未传 data 字段，视为空 dict
+        data_dict = {}
+
+    # event_time 字段三态：
+    #   未传 event_time → 不修改 event_time
+    #   传 event_time=null → 报错（event_time 不允许清空，必填字段）
+    #   传 event_time="value" → 更新 event_time
+    event_time = None
+    if "event_time" in update_data:
+        if update_data["event_time"] is None:
+            raise ValidationError(
+                message="event_time 不允许清空",
+                code="INVALID_PATCH_BODY",
+                details={"field": "event_time", "reason": "not_nullable"},
+            )
+        event_time = update_data["event_time"]
+
+    custom_record_repository.update_entry(
+        type_id=type_id,
+        entry_id=entry_id,
+        data=data_dict,
+        event_time=event_time,
+    )
+
+    # 返回更新后的完整记录（与 create_entry 模式一致）
+    entry_dict = custom_record_repository.get_entry(type_id=type_id, entry_id=entry_id)
+    logger.info("更新自定义记录成功: type_id=%s, entry_id=%s", type_id, entry_id)
+    return _convert_to_entry_item(entry_dict) if entry_dict else None
 
 
 def delete_entry(type_id: str, entry_id: str) -> bool:

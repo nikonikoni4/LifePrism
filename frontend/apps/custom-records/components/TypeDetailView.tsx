@@ -3,12 +3,13 @@
  * 卡片按日期分组，支持模板切换和字段角色配置
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Database, FileText, Clock, Trash2, AlertTriangle, ChevronLeft, ChevronRight, LayoutGrid, Table, Columns3, Settings2, LineChart as LineChartIcon } from 'lucide-react';
+import { ArrowLeft, Database, FileText, Clock, Trash2, AlertTriangle, ChevronLeft, ChevronRight, LayoutGrid, Table, Columns3, Settings2, LineChart as LineChartIcon, Plus, Pencil } from 'lucide-react';
 import { CustomRecordsAPI } from '../api';
 import { EntryCard } from './EntryCard';
 import { EntryChart } from './EntryChart';
 import { TemplatePicker } from './TemplatePicker';
 import { FieldRoleModal } from './FieldRoleModal';
+import { EntryForm } from './EntryForm';
 import { TEMPLATE_PRESETS, getTemplatePreset } from '../utils/templatePresets';
 import { toISOStringUTC, parseISOString, toLocalDateString, toLocalDateTimeString } from '../../../core/utils/dateUtils';
 import type { CustomRecordTypeItem, CustomRecordEntryItem, FieldDefinition } from '../types';
@@ -55,6 +56,29 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
   const [currentTemplate, setCurrentTemplate] = useState('clean');
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [localFields, setLocalFields] = useState<FieldDefinition[]>([]);
+
+  // 添加/编辑记录 Modal state
+  // Slice 1：仅使用 showEntryForm（create 模式）
+  // Slice 2：扩展 editingEntry（edit 模式）
+  const [showEntryForm, setShowEntryForm] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<CustomRecordEntryItem | null>(null);
+
+  const handleAddEntry = () => {
+    setEditingEntry(null); // Slice 2 修复：清理 editingEntry，确保走 create 模式
+    setShowEntryForm(true);
+  };
+
+  // Slice 2: 编辑记录入口（卡片视图 onEdit + 表格视图编辑按钮均走此 handler）
+  const handleEditEntry = (entry: CustomRecordEntryItem) => {
+    setEditingEntry(entry);
+    setShowEntryForm(true);
+  };
+
+  const handleEntryFormSuccess = () => {
+    setShowEntryForm(false);
+    setEditingEntry(null); // Slice 2 修复：成功后清理 editingEntry
+    loadData();
+  };
 
   // 筛选与分页
   // 默认时间范围：进入详情页时自动填充最近一周（今天 ~ 7 天前）
@@ -276,7 +300,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
         </button>
       </div>
 
-      {/* Tab 栏 + 模板选择器 + 筛选栏 */}
+      {/* Tab 栏 + 模板选择器 + 筛选栏 + 添加记录按钮 */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
           <button
@@ -315,53 +339,63 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
           </button>
         </div>
 
-        {activeTab !== 'compare' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* 模板选择器（卡片视图时显示） */}
-            {activeTab === 'card' && (
-              <div className="flex items-center gap-2">
-                {saveStatus !== 'idle' && (
-                  <span className="text-[10px] text-slate-400">
-                    {saveStatus === 'saving' ? '保存中...' : '已保存'}
-                  </span>
-                )}
-                <TemplatePicker
-                  currentTemplate={currentTemplate}
-                  onTemplateChange={handleTemplateChange}
-                />
-              </div>
-            )}
-
-            {/* 日期筛选 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 模板选择器（卡片视图时显示） */}
+          {activeTab === 'card' && (
             <div className="flex items-center gap-2">
-              <Clock size={14} className="text-slate-400" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-              />
-              <span className="text-slate-400 text-sm">~</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+              {saveStatus !== 'idle' && (
+                <span className="text-[10px] text-slate-400">
+                  {saveStatus === 'saving' ? '保存中...' : '已保存'}
+                </span>
+              )}
+              <TemplatePicker
+                currentTemplate={currentTemplate}
+                onTemplateChange={handleTemplateChange}
               />
             </div>
-            <button onClick={handleFilter} className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800">
-              筛选
-            </button>
-            {(startDate || endDate) && (
-              <button
-                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
-                className="text-xs text-slate-400 hover:text-slate-600"
-              >
-                清除
+          )}
+
+          {/* 日期筛选（非 compare Tab 时显示） */}
+          {activeTab !== 'compare' && (
+            <>
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-slate-400" />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                />
+                <span className="text-slate-400 text-sm">~</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                />
+              </div>
+              <button onClick={handleFilter} className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800">
+                筛选
               </button>
-            )}
-          </div>
-        )}
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  清除
+                </button>
+              )}
+            </>
+          )}
+
+          {/* 添加记录按钮 — 所有 Tab 都显示 */}
+          <button
+            onClick={handleAddEntry}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 shadow-sm"
+          >
+            <Plus size={14} />添加记录
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -449,6 +483,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
                     entry={entry}
                     templateId={currentTemplate}
                     onDelete={handleDeleteEntry}
+                    onEdit={handleEditEntry}
                   />
                 ))}
               </div>
@@ -488,12 +523,22 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
                       {entry.event_time ? toLocalDateTimeString(parseISOString(entry.event_time)).replace('T', ' ').slice(0, 16) : '—'}
                     </td>
                     <td className="px-5 py-3.5">
-                      <button
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => handleEditEntry(entry)}
+                          className="p-1.5 rounded-lg text-slate-300 hover:text-cyan-500 hover:bg-cyan-50 transition-colors"
+                          title="编辑"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          title="删除"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -532,6 +577,19 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
           fields={localFields}
           onClose={() => setShowFieldModal(false)}
           onFieldRoleChange={handleFieldRoleChange}
+        />
+      )}
+
+      {/* 添加/编辑记录弹窗
+          Slice 1: 仅 create 模式（editingEntry 始终为 null）
+          Slice 2: 扩展 edit 模式（handleEditEntry 设置 editingEntry） */}
+      {showEntryForm && type && (
+        <EntryForm
+          mode={editingEntry ? 'edit' : 'create'}
+          type={type}
+          entry={editingEntry || undefined}
+          onClose={() => { setShowEntryForm(false); setEditingEntry(null); }}
+          onSuccess={handleEntryFormSuccess}
         />
       )}
     </div>

@@ -10,6 +10,7 @@ import type {
   CustomRecordEntryItem,
   CustomRecordEntryListResponse,
   CreateCustomRecordEntryRequest,
+  UpdateCustomRecordEntryRequest,
   GetEntriesParams,
   UpdateTypeConfigRequest,
   UpdateFieldRoleRequest,
@@ -87,6 +88,20 @@ export const CustomRecordsAPI = {
       body: JSON.stringify(req),
     });
     if (!res.ok) await parseError(res, '创建记录失败');
+    return res.json();
+  },
+
+  async updateEntry(
+    typeId: string,
+    entryId: string,
+    req: UpdateCustomRecordEntryRequest,
+  ): Promise<CustomRecordEntryItem> {
+    const res = await fetch(`${getApiBase()}/${typeId}/entries/${entryId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) await parseError(res, '更新记录失败');
     return res.json();
   },
 

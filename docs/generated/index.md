@@ -153,3 +153,10 @@
 - path: `docs/generated/026/2026-08-18-code-review-custom-records-field-filter.md`
 - 触发规则：审查自定义记录模块 query_custom_record_entries 工具新增字段级过滤（filters）功能时查看
 - 内容摘要：自定义记录模块字段级过滤功能的 8 维度代码审查报告。审查 3 个核心代码文件（aggregator 新增 _build_field_filters 私有方法 + tool 新增 filters 参数与 ValidationError 结构化处理）+ 2 个测试文件（17 集成测试 + 7 单元测试）+ spec v1.2 同步更新。未发现置信度 ≥ 80 的问题（No issues found）。正向：SQL 全参数化 + field_key 白名单校验 + LIKE 通配符 ESCAPE 转义构成完整注入防护；错误分层合规（Repository 抛 ValidationError，Tool 层捕获转结构化 JSON 引导 AI 重试）；测试覆盖全面（含 LIKE 通配符转义、空数组、混合无效值等边界）；复用 _coerce_field_value 保持类型转换一致；spec 与代码同步。
+
+## 2026-08-19-code-review-custom-records-p3
+
+- updated_at: 2026-08-19
+- path: `docs/generated/027/2026-08-19-code-review-custom-records-p3.md`
+- 触发规则：审查自定义记录模块 P3（前端记录 CRUD — 新增/编辑记录）PRD 对应实现时查看
+- 内容摘要：P3 前端"C"+"U"实现的 8 维度代码审查报告。审查 10 个变更文件（后端 4：aggregator update_entry/API PATCH 端点/Schema UpdateCustomRecordEntryRequest/Service 薄包装 + 前端 5：EntryForm/entryFormPayload/EntryCard/TypeDetailView/api.ts/types.ts + 测试 18 用例）。验证：pytest 84 全过（含 18 P3）、前端 custom-records 0 TS 错误、三态语义链路正确、动态列名注入防护完备。发现 3 个问题（置信度 ≥ 80）：1 个代码质量（update_entry 复制 create_entry 校验逻辑约 45 行未真正"复用"，PRD 系统行为 27 未落实，80）、1 个代码质量（update_entry 在 with 块内抛 EntityNotFoundError 与 delete_entry 既有模式不一致，80）、1 个 PRD 符合性（添加/编辑成功后未 setPage(1)，多页场景新记录不可见，80）。正向：三态语义落地正确、错误分层合规、API 无 try/except、无新增 LLM tool、P1/P2 无回归。

@@ -89,6 +89,33 @@ class CreateCustomRecordEntryRequest(BaseModel):
     )
 
 
+class UpdateCustomRecordEntryRequest(BaseModel):
+    """更新自定义记录（PATCH 三态语义）
+
+    顶层字段三态语义（model_dump(exclude_unset=True) 区分）：
+      - data 未传 → 不修改任何字段值
+      - data 传 null → 报错（不支持整体清空）
+      - data 传 dict → 按 dict 内 key 三态处理
+      - event_time 未传 → 不修改 event_time
+      - event_time 传 null → 报错（不允许清空）
+      - event_time 传 str → 更新
+
+    dict 内 key 三态语义（前端 diff 实现）：
+      - key 不在 data 中 → 不修改该字段
+      - key 在 data 中，值为 null → 清空该字段（写入 NULL）
+      - key 在 data 中，值为具体值 → 更新该字段为新值
+    """
+
+    data: dict[str, str | int | float | None] | None = Field(
+        default=None,
+        description="待更新字段值字典。未传=不修改任何字段；传 null=报错；传 dict=按 dict 内 key 三态处理",
+    )
+    event_time: str | None = Field(
+        default=None,
+        description="事件时间 UTC ISO 8601。未传=不修改；传 null=报错（不允许清空）；传 str=更新",
+    )
+
+
 # ==================== 配置更新 ====================
 
 

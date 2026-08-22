@@ -15,6 +15,7 @@ from lifeprism.server.schemas.custom_records_schemas import (
     CustomRecordEntryListResponse,
     CustomRecordTypeItem,
     CustomRecordTypeListResponse,
+    UpdateCustomRecordEntryRequest,
     UpdateFieldRoleRequest,
     UpdateTypeConfigRequest,
 )
@@ -131,6 +132,28 @@ async def create_custom_record_entry(
     - 类型不存在返回 404
     """
     return custom_records_service.create_entry(type_id=type_id, request=request)
+
+
+@router.patch(
+    "/{type_id}/entries/{entry_id}",
+    response_model=CustomRecordEntryItem,
+    summary="更新自定义记录",
+)
+async def update_custom_record_entry(
+    request: UpdateCustomRecordEntryRequest,
+    type_id: str = Path(..., description="类型 ID"),
+    entry_id: str = Path(..., description="记录 ID"),
+):
+    """更新记录（PATCH 三态语义）
+
+    - data 未传=不修改任何字段；传 null=报错；传 dict=按 dict 内 key 三态处理
+    - dict 内 key：未传=不修改，传 null=清空（NULL），传值=更新
+    - event_time 未传=不修改；传 null=报错（不允许清空）；传 str=更新
+    - field_key 错误返回 422，details 含 valid_fields
+    - 字段值类型不匹配返回 422
+    - 类型/记录不存在返回 404
+    """
+    return custom_records_service.update_entry(type_id=type_id, entry_id=entry_id, request=request)
 
 
 @router.delete(

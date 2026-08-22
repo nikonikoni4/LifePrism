@@ -5,7 +5,7 @@
  * 左侧 accent 竖条 + 头部时间戳 + 主体 + chips 标签区
  */
 import React from 'react';
-import { Trash2, Clock } from 'lucide-react';
+import { Trash2, Clock, Pencil } from 'lucide-react';
 import { analyzeCardLayout } from '../utils/cardLayoutEngine';
 import type { Overrides } from '../utils/cardLayoutEngine';
 import { getFieldColor } from '../utils/fieldColors';
@@ -19,6 +19,8 @@ interface EntryCardProps {
   entry: CustomRecordEntryItem;
   templateId?: string;
   onDelete?: (entryId: string) => void;
+  /** Slice 2: 编辑按钮回调。不传则不显示编辑按钮（向后兼容） */
+  onEdit?: (entry: CustomRecordEntryItem) => void;
 }
 
 const LAYOUT_LABELS: Record<string, string> = {
@@ -37,6 +39,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
   entry,
   templateId = 'clean',
   onDelete,
+  onEdit,
 }) => {
   const data: Record<string, string> = {};
   for (const f of fields) {
@@ -73,13 +76,27 @@ export const EntryCard: React.FC<EntryCardProps> = ({
               {layoutLabel}
             </span>
           </div>
-          {onDelete && (
-            <button
-              onClick={() => onDelete(entry.id)}
-              className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-            >
-              <Trash2 size={13} />
-            </button>
+          {(onEdit || onDelete) && (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(entry)}
+                  className="p-1 rounded-lg text-slate-300 hover:text-cyan-500 hover:bg-cyan-50 transition-colors"
+                  title="编辑"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(entry.id)}
+                  className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="删除"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
