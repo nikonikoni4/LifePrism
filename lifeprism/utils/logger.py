@@ -55,6 +55,12 @@ logging.basicConfig(
 for _h in logging.getLogger().handlers:
     _h.setFormatter(TruncatingFormatter(_LOG_FORMAT))
 
+# asyncssh 以 INFO 记录每个 SSH channel 的开关（Opening direct TCP connection /
+# Received channel close / Closing channel / Channel closed），端口转发模式下每个 HTTP 请求
+# 都会产生一组，噪音大。只对 asyncssh 子树设 WARNING：正常 open/close 日志在源头丢弃，
+# SSH 异常（WARNING/ERROR）仍输出；排查时临时把这行改为 INFO 即可。
+logging.getLogger("asyncssh").setLevel(logging.WARNING)
+
 _file_handler_added = False
 _file_handler: logging.FileHandler | None = None
 _uvicorn_file_logging_added = False
