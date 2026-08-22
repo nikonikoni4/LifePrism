@@ -1,7 +1,7 @@
 {
   "total_files": 241,
-  "total_definitions": 2264,
-  "total_calls": 6970,
+  "total_definitions": 2267,
+  "total_calls": 6989,
   "definitions": {
     "config.cloud_config_generator.CloudConfigGenerator": {
       "line": 44,
@@ -949,12 +949,12 @@
       "name": "_start_sync_on_startup"
     },
     "server.main.is_port_available": {
-      "line": 805,
+      "line": 815,
       "module": "server.main",
       "name": "is_port_available"
     },
     "server.main.find_available_port": {
-      "line": 818,
+      "line": 828,
       "module": "server.main",
       "name": "find_available_port"
     },
@@ -2543,13 +2543,18 @@
       "module": "server.schemas.custom_records_schemas",
       "name": "CreateCustomRecordEntryRequest"
     },
+    "server.schemas.custom_records_schemas.UpdateCustomRecordEntryRequest": {
+      "line": 92,
+      "module": "server.schemas.custom_records_schemas",
+      "name": "UpdateCustomRecordEntryRequest"
+    },
     "server.schemas.custom_records_schemas.UpdateTypeConfigRequest": {
-      "line": 95,
+      "line": 122,
       "module": "server.schemas.custom_records_schemas",
       "name": "UpdateTypeConfigRequest"
     },
     "server.schemas.custom_records_schemas.UpdateFieldRoleRequest": {
-      "line": 105,
+      "line": 132,
       "module": "server.schemas.custom_records_schemas",
       "name": "UpdateFieldRoleRequest"
     },
@@ -3949,62 +3954,67 @@
       "name": "delete_commitment"
     },
     "server.services.custom_records_service._convert_to_field_definition": {
-      "line": 29,
+      "line": 31,
       "module": "server.services.custom_records_service",
       "name": "_convert_to_field_definition"
     },
     "server.services.custom_records_service._convert_to_type_item": {
-      "line": 40,
+      "line": 42,
       "module": "server.services.custom_records_service",
       "name": "_convert_to_type_item"
     },
     "server.services.custom_records_service._convert_to_entry_item": {
-      "line": 56,
+      "line": 58,
       "module": "server.services.custom_records_service",
       "name": "_convert_to_entry_item"
     },
     "server.services.custom_records_service.get_types": {
-      "line": 64,
+      "line": 66,
       "module": "server.services.custom_records_service",
       "name": "get_types"
     },
     "server.services.custom_records_service.get_type": {
-      "line": 71,
+      "line": 73,
       "module": "server.services.custom_records_service",
       "name": "get_type"
     },
     "server.services.custom_records_service.create_type": {
-      "line": 83,
+      "line": 85,
       "module": "server.services.custom_records_service",
       "name": "create_type"
     },
     "server.services.custom_records_service.delete_type": {
-      "line": 101,
+      "line": 103,
       "module": "server.services.custom_records_service",
       "name": "delete_type"
     },
     "server.services.custom_records_service.get_entries": {
-      "line": 113,
+      "line": 115,
       "module": "server.services.custom_records_service",
       "name": "get_entries"
     },
     "server.services.custom_records_service.create_entry": {
-      "line": 139,
+      "line": 141,
       "module": "server.services.custom_records_service",
       "name": "create_entry"
     },
+    "server.services.custom_records_service.update_entry": {
+      "line": 154,
+      "module": "server.services.custom_records_service",
+      "name": "update_entry"
+    },
     "server.services.custom_records_service.delete_entry": {
-      "line": 152,
+      "line": 224,
       "module": "server.services.custom_records_service",
       "name": "delete_entry"
     },
     "server.services.custom_records_service.update_type_config": {
-      "line": 164,
+      "line": 236,
       "module": "server.services.custom_records_service",
       "name": "update_type_config"
     },
     "server.services.custom_records_service.update_field_role": {
-      "line": 181,
+      "line": 253,
       "module": "server.services.custom_records_service",
       "name": "update_field_role"
     },
@@ -5733,13 +5743,18 @@
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.delete_entry"
     },
-    "repository.aggregators.custom_record_aggregator.CustomRecordRepository.update_type_config": {
+    "repository.aggregators.custom_record_aggregator.CustomRecordRepository.update_entry": {
       "line": 893,
+      "module": "repository.aggregators.custom_record_aggregator",
+      "name": "CustomRecordRepository.update_entry"
+    },
+    "repository.aggregators.custom_record_aggregator.CustomRecordRepository.update_type_config": {
+      "line": 1038,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.update_type_config"
     },
     "repository.aggregators.custom_record_aggregator.CustomRecordRepository.update_field_role": {
-      "line": 958,
+      "line": 1103,
       "module": "repository.aggregators.custom_record_aggregator",
       "name": "CustomRecordRepository.update_field_role"
     },
@@ -10259,22 +10274,22 @@
       "name": "WechatChannel.start"
     },
     "llm.channel.wechat.channel.WechatChannel.stop": {
-      "line": 305,
+      "line": 296,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel.stop"
     },
     "llm.channel.wechat.channel.WechatChannel.send": {
-      "line": 329,
+      "line": 320,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel.send"
     },
     "llm.channel.wechat.channel.WechatChannel._poll_loop": {
-      "line": 370,
+      "line": 361,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel._poll_loop"
     },
     "llm.channel.wechat.channel.WechatChannel._handle_wechat_message": {
-      "line": 414,
+      "line": 405,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel._handle_wechat_message"
     },
@@ -13908,7 +13923,11 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 513
+        "line": 402
+      },
+      {
+        "from": "server.main.lifespan",
+        "line": 517
       },
       {
         "from": "server.main_agent_only._run_agent_and_api",
@@ -13972,7 +13991,7 @@
       },
       {
         "from": "llm.channel.wechat.channel.start",
-        "line": 303
+        "line": 294
       }
     ],
     "time.perf_counter": [
@@ -14098,11 +14117,7 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 407
-      },
-      {
-        "from": "server.main.lifespan",
-        "line": 416
+        "line": 411
       },
       {
         "from": "server.main.lifespan",
@@ -14118,27 +14133,31 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 466
+        "line": 432
+      },
+      {
+        "from": "server.main.lifespan",
+        "line": 470
       },
       {
         "from": "server.main.<module>",
-        "line": 596
+        "line": 606
       },
       {
         "from": "server.main.<module>",
-        "line": 630
+        "line": 640
       },
       {
         "from": "server.main.<module>",
-        "line": 672
+        "line": 682
       },
       {
         "from": "server.main.<module>",
-        "line": 733
+        "line": 743
       },
       {
         "from": "server.main.<module>",
-        "line": 762
+        "line": 772
       },
       {
         "from": "server.api.sync_cloud_api.sync_pull",
@@ -14260,63 +14279,59 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 467
+        "line": 471
       },
       {
         "from": "server.main.lifespan",
-        "line": 468
+        "line": 472
       },
       {
         "from": "server.main.lifespan",
-        "line": 469
+        "line": 473
       },
       {
         "from": "server.main.<module>",
-        "line": 595
+        "line": 605
       },
       {
         "from": "server.main.<module>",
-        "line": 671
+        "line": 681
       },
       {
         "from": "server.main.<module>",
-        "line": 732
+        "line": 742
       },
       {
         "from": "server.main.<module>",
-        "line": 763
+        "line": 773
       },
       {
         "from": "server.main.<module>",
-        "line": 764
+        "line": 774
       },
       {
         "from": "server.main.<module>",
-        "line": 765
+        "line": 775
       },
       {
         "from": "server.main.<module>",
-        "line": 766
+        "line": 776
       },
       {
         "from": "server.main.find_available_port",
-        "line": 837
+        "line": 847
       },
       {
         "from": "server.main.find_available_port",
-        "line": 842
+        "line": 852
       },
       {
         "from": "server.main.find_available_port",
-        "line": 853
+        "line": 863
       },
       {
         "from": "server.main.<module>",
-        "line": 868
-      },
-      {
-        "from": "server.main.<module>",
-        "line": 869
+        "line": 878
       },
       {
         "from": "server.main.<module>",
@@ -14324,11 +14339,15 @@
       },
       {
         "from": "server.main.<module>",
-        "line": 885
+        "line": 889
       },
       {
         "from": "server.main.<module>",
-        "line": 887
+        "line": 895
+      },
+      {
+        "from": "server.main.<module>",
+        "line": 897
       }
     ],
     "server.main._log_startup_time": [
@@ -14462,11 +14481,7 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 409
-      },
-      {
-        "from": "server.main.lifespan",
-        "line": 418
+        "line": 413
       },
       {
         "from": "server.main.lifespan",
@@ -14481,20 +14496,24 @@
         "line": 430
       },
       {
-        "from": "server.main.<module>",
-        "line": 627
+        "from": "server.main.lifespan",
+        "line": 434
       },
       {
         "from": "server.main.<module>",
-        "line": 647
+        "line": 637
       },
       {
         "from": "server.main.<module>",
-        "line": 729
+        "line": 657
       },
       {
         "from": "server.main.<module>",
-        "line": 759
+        "line": 739
+      },
+      {
+        "from": "server.main.<module>",
+        "line": 769
       }
     ],
     "sys.exit": [
@@ -14508,7 +14527,7 @@
       },
       {
         "from": "server.main.<module>",
-        "line": 870
+        "line": 880
       },
       {
         "from": "monitor.windows_monitor.main.handle_signal",
@@ -14523,6 +14542,10 @@
       {
         "from": "server.main.<module>",
         "line": 122
+      },
+      {
+        "from": "server.main.lifespan",
+        "line": 595
       }
     ],
     "server.main.get_logger": [
@@ -14588,11 +14611,15 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 566
+        "line": 570
+      },
+      {
+        "from": "server.main.lifespan",
+        "line": 592
       },
       {
         "from": "server.main.<module>",
-        "line": 873
+        "line": 883
       }
     ],
     "asyncio.to_thread": [
@@ -14606,11 +14633,11 @@
       },
       {
         "from": "server.main.lifespan",
-        "line": 529
+        "line": 533
       },
       {
         "from": "server.main.lifespan",
-        "line": 571
+        "line": 575
       },
       {
         "from": "sync.ssh_tunnel.test_connection",
@@ -14652,85 +14679,85 @@
     "server.main.send_heartbeat": [
       {
         "from": "server.main.lifespan",
-        "line": 398
+        "line": 402
       },
       {
         "from": "server.main.lifespan",
-        "line": 589
+        "line": 599
       }
     ],
     "server.main.enable_uvicorn_file_logging": [
       {
         "from": "server.main.lifespan",
-        "line": 402
+        "line": 406
       }
     ],
     "server.main.initialize_resources": [
       {
         "from": "server.main.lifespan",
-        "line": 408
+        "line": 412
       }
     ],
     "server.main.init_database": [
       {
         "from": "server.main.lifespan",
-        "line": 417
+        "line": 421
       }
     ],
     "server.main.run_migrations": [
       {
         "from": "server.main.lifespan",
-        "line": 421
+        "line": 425
       }
     ],
     "server.main.str": [
       {
         "from": "server.main.lifespan",
-        "line": 421
+        "line": 425
       },
       {
         "from": "server.main.global_exception_handler",
-        "line": 715
+        "line": 725
       },
       {
         "from": "server.main.<module>",
-        "line": 878
+        "line": 888
       }
     ],
     "server.main.initialize_default_data": [
       {
         "from": "server.main.lifespan",
-        "line": 425
+        "line": 429
       }
     ],
     "server.main.initialize_category_colors": [
       {
         "from": "server.main.lifespan",
-        "line": 429
+        "line": 433
       }
     ],
     "server.main.start_monitor_process": [
       {
         "from": "server.main.lifespan",
-        "line": 446
+        "line": 450
       }
     ],
     "server.main.SyncRepository": [
       {
         "from": "server.main.lifespan",
-        "line": 494
+        "line": 498
       }
     ],
     "server.main.SyncClient": [
       {
         "from": "server.main.lifespan",
-        "line": 495
+        "line": 499
       }
     ],
     "asyncio.get_running_loop": [
       {
         "from": "server.main.lifespan",
-        "line": 498
+        "line": 502
       },
       {
         "from": "server.main_agent_only._run_agent_and_api",
@@ -14744,85 +14771,85 @@
     "server.main._start_sync_on_startup": [
       {
         "from": "server.main.lifespan",
-        "line": 517
+        "line": 521
       }
     ],
     "server.main.hasattr": [
       {
         "from": "server.main.lifespan",
-        "line": 523
+        "line": 527
       },
       {
         "from": "server.main.lifespan",
-        "line": 569
+        "line": 573
       },
       {
         "from": "server.main.lifespan",
-        "line": 578
+        "line": 582
       }
     ],
     "server.main.FastAPI": [
       {
         "from": "server.main.<module>",
-        "line": 598
+        "line": 608
       }
     ],
     "server.main.JSONResponse": [
       {
         "from": "server.main.restrict_shutdown_endpoints",
-        "line": 663
+        "line": 673
       },
       {
         "from": "server.main.lw_base_error_handler",
-        "line": 703
+        "line": 713
       },
       {
         "from": "server.main.global_exception_handler",
-        "line": 719
+        "line": 729
       }
     ],
     "server.main.call_next": [
       {
         "from": "server.main.restrict_shutdown_endpoints",
-        "line": 667
+        "line": 677
       }
     ],
     "server.main.to_http_exception": [
       {
         "from": "server.main.lw_base_error_handler",
-        "line": 689
+        "line": 699
       }
     ],
     "server.main.type": [
       {
         "from": "server.main.lw_base_error_handler",
-        "line": 692
+        "line": 702
       },
       {
         "from": "server.main.lw_base_error_handler",
-        "line": 697
+        "line": 707
       },
       {
         "from": "server.main.global_exception_handler",
-        "line": 714
+        "line": 724
       }
     ],
     "server.main.open": [
       {
         "from": "server.main.find_available_port",
-        "line": 827
+        "line": 837
       }
     ],
     "server.main.is_port_available": [
       {
         "from": "server.main.find_available_port",
-        "line": 846
+        "line": 856
       }
     ],
     "server.main.find_available_port": [
       {
         "from": "server.main.<module>",
-        "line": 880
+        "line": 890
       }
     ],
     "server.main_agent_only.get_logger": [
@@ -15130,7 +15157,7 @@
       },
       {
         "from": "llm.channel.wechat.channel.stop",
-        "line": 323
+        "line": 314
       }
     ],
     "server.main_agent_only.stop_agent_and_channel": [
@@ -15894,11 +15921,11 @@
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 409
+        "line": 400
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 412
+        "line": 403
       }
     ],
     "sync.ssh_tunnel.min": [
@@ -18272,52 +18299,56 @@
     "server.api.custom_records_api.APIRouter": [
       {
         "from": "server.api.custom_records_api.<module>",
-        "line": 23
+        "line": 24
       }
     ],
     "server.api.custom_records_api.Path": [
       {
         "from": "server.api.custom_records_api.get_custom_record_type",
-        "line": 51
+        "line": 52
       },
       {
         "from": "server.api.custom_records_api.delete_custom_record_type",
-        "line": 59
+        "line": 60
       },
       {
         "from": "server.api.custom_records_api.update_custom_record_type_config",
-        "line": 69
-      },
-      {
-        "from": "server.api.custom_records_api.update_custom_record_field_role",
-        "line": 82
+        "line": 70
       },
       {
         "from": "server.api.custom_records_api.update_custom_record_field_role",
         "line": 83
       },
       {
-        "from": "server.api.custom_records_api.get_custom_record_entries",
-        "line": 100
+        "from": "server.api.custom_records_api.update_custom_record_field_role",
+        "line": 84
       },
-      {
-        "from": "server.api.custom_records_api.create_custom_record_entry",
-        "line": 124
-      },
-      {
-        "from": "server.api.custom_records_api.delete_custom_record_entry",
-        "line": 141
-      },
-      {
-        "from": "server.api.custom_records_api.delete_custom_record_entry",
-        "line": 142
-      }
-    ],
-    "server.api.custom_records_api.Query": [
       {
         "from": "server.api.custom_records_api.get_custom_record_entries",
         "line": 101
       },
+      {
+        "from": "server.api.custom_records_api.create_custom_record_entry",
+        "line": 125
+      },
+      {
+        "from": "server.api.custom_records_api.update_custom_record_entry",
+        "line": 144
+      },
+      {
+        "from": "server.api.custom_records_api.update_custom_record_entry",
+        "line": 145
+      },
+      {
+        "from": "server.api.custom_records_api.delete_custom_record_entry",
+        "line": 166
+      },
+      {
+        "from": "server.api.custom_records_api.delete_custom_record_entry",
+        "line": 167
+      }
+    ],
+    "server.api.custom_records_api.Query": [
       {
         "from": "server.api.custom_records_api.get_custom_record_entries",
         "line": 102
@@ -18329,6 +18360,10 @@
       {
         "from": "server.api.custom_records_api.get_custom_record_entries",
         "line": 104
+      },
+      {
+        "from": "server.api.custom_records_api.get_custom_record_entries",
+        "line": 105
       }
     ],
     "server.api.diary_api.APIRouter": [
@@ -22210,19 +22245,27 @@
       },
       {
         "from": "server.schemas.custom_records_schemas.<module>",
-        "line": 98
+        "line": 109
       },
       {
         "from": "server.schemas.custom_records_schemas.<module>",
-        "line": 101
+        "line": 113
       },
       {
         "from": "server.schemas.custom_records_schemas.<module>",
-        "line": 102
+        "line": 125
       },
       {
         "from": "server.schemas.custom_records_schemas.<module>",
-        "line": 108
+        "line": 128
+      },
+      {
+        "from": "server.schemas.custom_records_schemas.<module>",
+        "line": 129
+      },
+      {
+        "from": "server.schemas.custom_records_schemas.<module>",
+        "line": 135
       }
     ],
     "server.schemas.diary_schemas.Field": [
@@ -26342,81 +26385,95 @@
     "server.services.custom_records_service.get_logger": [
       {
         "from": "server.services.custom_records_service.<module>",
-        "line": 23
+        "line": 25
       }
     ],
     "server.services.custom_records_service.FieldDefinition": [
       {
         "from": "server.services.custom_records_service._convert_to_field_definition",
-        "line": 31
+        "line": 33
       }
     ],
     "server.services.custom_records_service.CustomRecordTypeItem": [
       {
         "from": "server.services.custom_records_service._convert_to_type_item",
-        "line": 42
+        "line": 44
       }
     ],
     "server.services.custom_records_service._convert_to_field_definition": [
       {
         "from": "server.services.custom_records_service._convert_to_type_item",
-        "line": 47
+        "line": 49
       }
     ],
     "server.services.custom_records_service.CustomRecordEntryItem": [
       {
         "from": "server.services.custom_records_service._convert_to_entry_item",
-        "line": 58
+        "line": 60
       }
     ],
     "server.services.custom_records_service._convert_to_type_item": [
       {
         "from": "server.services.custom_records_service.get_types",
-        "line": 67
+        "line": 69
       },
       {
         "from": "server.services.custom_records_service.get_type",
-        "line": 80
+        "line": 82
       },
       {
         "from": "server.services.custom_records_service.create_type",
-        "line": 98
+        "line": 100
       },
       {
         "from": "server.services.custom_records_service.update_type_config",
-        "line": 178
+        "line": 250
       },
       {
         "from": "server.services.custom_records_service.update_field_role",
-        "line": 196
+        "line": 268
       }
     ],
     "server.services.custom_records_service.CustomRecordTypeListResponse": [
       {
         "from": "server.services.custom_records_service.get_types",
-        "line": 68
+        "line": 70
       }
     ],
     "server.services.custom_records_service.EntityNotFoundError": [
       {
         "from": "server.services.custom_records_service.get_type",
-        "line": 79
+        "line": 81
       }
     ],
     "server.services.custom_records_service._convert_to_entry_item": [
       {
         "from": "server.services.custom_records_service.get_entries",
-        "line": 135
+        "line": 137
       },
       {
         "from": "server.services.custom_records_service.create_entry",
-        "line": 149
+        "line": 151
+      },
+      {
+        "from": "server.services.custom_records_service.update_entry",
+        "line": 221
       }
     ],
     "server.services.custom_records_service.CustomRecordEntryListResponse": [
       {
         "from": "server.services.custom_records_service.get_entries",
-        "line": 136
+        "line": 138
+      }
+    ],
+    "server.services.custom_records_service.ValidationError": [
+      {
+        "from": "server.services.custom_records_service.update_entry",
+        "line": 189
+      },
+      {
+        "from": "server.services.custom_records_service.update_entry",
+        "line": 204
       }
     ],
     "server.services.data_processing_service.get_logger": [
@@ -31431,6 +31488,14 @@
       {
         "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
         "line": 706
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 936
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 973
       }
     ],
     "repository.aggregators.custom_record_aggregator.list": [
@@ -31451,6 +31516,10 @@
       {
         "from": "repository.aggregators.custom_record_aggregator.create_entry",
         "line": 507
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 931
       }
     ],
     "repository.aggregators.custom_record_aggregator.DuplicateEntityError": [
@@ -31503,12 +31572,16 @@
         "line": 875
       },
       {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 1019
+      },
+      {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 947
+        "line": 1092
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_field_role",
-        "line": 992
+        "line": 1137
       }
     ],
     "repository.aggregators.custom_record_aggregator.str": [
@@ -31553,12 +31626,16 @@
         "line": 877
       },
       {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 1024
+      },
+      {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 949
+        "line": 1094
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_field_role",
-        "line": 994
+        "line": 1139
       }
     ],
     "repository.aggregators.custom_record_aggregator.dict": [
@@ -31603,12 +31680,16 @@
         "line": 883
       },
       {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 1006
+      },
+      {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 954
+        "line": 1099
       },
       {
         "from": "repository.aggregators.custom_record_aggregator.update_field_role",
-        "line": 999
+        "line": 1144
       }
     ],
     "repository.aggregators.custom_record_aggregator.CustomRecordFieldProvider": [
@@ -31681,6 +31762,14 @@
       {
         "from": "repository.aggregators.custom_record_aggregator._build_field_filters",
         "line": 650
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 937
+      },
+      {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 940
       }
     ],
     "repository.aggregators.custom_record_aggregator.tuple": [
@@ -31697,8 +31786,12 @@
         "line": 781
       },
       {
+        "from": "repository.aggregators.custom_record_aggregator.update_entry",
+        "line": 1010
+      },
+      {
         "from": "repository.aggregators.custom_record_aggregator.update_type_config",
-        "line": 943
+        "line": 1088
       }
     ],
     "repository.aggregators.custom_record_aggregator.len": [
@@ -41552,27 +41645,27 @@
       },
       {
         "from": "llm.channel.wechat.channel.stop",
-        "line": 317
+        "line": 308
       },
       {
         "from": "llm.channel.wechat.channel.send",
-        "line": 363
+        "line": 354
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 398
+        "line": 389
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 402
+        "line": 393
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 457
+        "line": 448
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 458
+        "line": 449
       }
     ],
     "llm.channel.wechat.channel.WechatClient": [
@@ -41590,67 +41683,67 @@
     "llm.channel.wechat.channel.WechatMedia": [
       {
         "from": "llm.channel.wechat.channel.start",
-        "line": 300
+        "line": 291
       }
     ],
     "llm.channel.wechat.channel.hasattr": [
       {
         "from": "llm.channel.wechat.channel.send",
-        "line": 351
+        "line": 342
       }
     ],
     "llm.channel.wechat.channel.WechatAPIError": [
       {
         "from": "llm.channel.wechat.channel.send",
-        "line": 368
+        "line": 359
       }
     ],
     "llm.channel.wechat.channel.enumerate": [
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 403
+        "line": 394
       }
     ],
     "llm.channel.wechat.channel.str": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 439
+        "line": 430
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 447
+        "line": 438
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 564
+        "line": 555
       }
     ],
     "llm.channel.wechat.channel.InboundMessage": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 504
+        "line": 495
       }
     ],
     "llm.channel.wechat.channel.OutboundMessage": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 562
+        "line": 553
       }
     ],
     "llm.channel.wechat.channel.LLMResponse": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 564
+        "line": 555
       }
     ],
     "llm.channel.wechat.channel.WechatMessageError": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 576
+        "line": 567
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 579
+        "line": 570
       }
     ],
     "llm.channel.wechat.client.get_logger": [
@@ -46052,23 +46145,23 @@
       },
       {
         "to": "time.perf_counter",
-        "line": 596
+        "line": 606
       },
       {
         "to": "time.perf_counter",
-        "line": 630
+        "line": 640
       },
       {
         "to": "time.perf_counter",
-        "line": 672
+        "line": 682
       },
       {
         "to": "time.perf_counter",
-        "line": 733
+        "line": 743
       },
       {
         "to": "time.perf_counter",
-        "line": 762
+        "line": 772
       },
       {
         "to": "server.main.print",
@@ -46104,39 +46197,35 @@
       },
       {
         "to": "server.main.print",
-        "line": 595
+        "line": 605
       },
       {
         "to": "server.main.print",
-        "line": 671
+        "line": 681
       },
       {
         "to": "server.main.print",
-        "line": 732
+        "line": 742
       },
       {
         "to": "server.main.print",
-        "line": 763
+        "line": 773
       },
       {
         "to": "server.main.print",
-        "line": 764
+        "line": 774
       },
       {
         "to": "server.main.print",
-        "line": 765
+        "line": 775
       },
       {
         "to": "server.main.print",
-        "line": 766
+        "line": 776
       },
       {
         "to": "server.main.print",
-        "line": 868
-      },
-      {
-        "to": "server.main.print",
-        "line": 869
+        "line": 878
       },
       {
         "to": "server.main.print",
@@ -46144,11 +46233,15 @@
       },
       {
         "to": "server.main.print",
-        "line": 885
+        "line": 889
       },
       {
         "to": "server.main.print",
-        "line": 887
+        "line": 895
+      },
+      {
+        "to": "server.main.print",
+        "line": 897
       },
       {
         "to": "server.main._log_startup_time",
@@ -46280,19 +46373,19 @@
       },
       {
         "to": "server.main._log_startup_time",
-        "line": 627
+        "line": 637
       },
       {
         "to": "server.main._log_startup_time",
-        "line": 647
+        "line": 657
       },
       {
         "to": "server.main._log_startup_time",
-        "line": 729
+        "line": 739
       },
       {
         "to": "server.main._log_startup_time",
-        "line": 759
+        "line": 769
       },
       {
         "to": "sys.exit",
@@ -46304,7 +46397,7 @@
       },
       {
         "to": "sys.exit",
-        "line": 870
+        "line": 880
       },
       {
         "to": "server.main.suppress",
@@ -46316,19 +46409,19 @@
       },
       {
         "to": "server.main.getattr",
-        "line": 873
+        "line": 883
       },
       {
         "to": "server.main.str",
-        "line": 878
+        "line": 888
       },
       {
         "to": "server.main.FastAPI",
-        "line": 598
+        "line": 608
       },
       {
         "to": "server.main.find_available_port",
-        "line": 880
+        "line": 890
       }
     ],
     "utils.logger.<module>": [
@@ -47760,15 +47853,15 @@
     "server.main.lifespan": [
       {
         "to": "asyncio.create_task",
-        "line": 513
+        "line": 402
+      },
+      {
+        "to": "asyncio.create_task",
+        "line": 517
       },
       {
         "to": "time.perf_counter",
-        "line": 407
-      },
-      {
-        "to": "time.perf_counter",
-        "line": 416
+        "line": 411
       },
       {
         "to": "time.perf_counter",
@@ -47784,7 +47877,11 @@
       },
       {
         "to": "time.perf_counter",
-        "line": 466
+        "line": 432
+      },
+      {
+        "to": "time.perf_counter",
+        "line": 470
       },
       {
         "to": "server.main.print",
@@ -47800,23 +47897,19 @@
       },
       {
         "to": "server.main.print",
-        "line": 467
+        "line": 471
       },
       {
         "to": "server.main.print",
-        "line": 468
+        "line": 472
       },
       {
         "to": "server.main.print",
-        "line": 469
+        "line": 473
       },
       {
         "to": "server.main._log_startup_time",
-        "line": 409
-      },
-      {
-        "to": "server.main._log_startup_time",
-        "line": 418
+        "line": 413
       },
       {
         "to": "server.main._log_startup_time",
@@ -47831,84 +47924,96 @@
         "line": 430
       },
       {
+        "to": "server.main._log_startup_time",
+        "line": 434
+      },
+      {
+        "to": "server.main.suppress",
+        "line": 595
+      },
+      {
         "to": "server.main.getattr",
-        "line": 566
+        "line": 570
+      },
+      {
+        "to": "server.main.getattr",
+        "line": 592
       },
       {
         "to": "asyncio.to_thread",
-        "line": 529
+        "line": 533
       },
       {
         "to": "asyncio.to_thread",
-        "line": 571
+        "line": 575
       },
       {
         "to": "server.main.send_heartbeat",
-        "line": 398
-      },
-      {
-        "to": "server.main.send_heartbeat",
-        "line": 589
-      },
-      {
-        "to": "server.main.enable_uvicorn_file_logging",
         "line": 402
       },
       {
+        "to": "server.main.send_heartbeat",
+        "line": 599
+      },
+      {
+        "to": "server.main.enable_uvicorn_file_logging",
+        "line": 406
+      },
+      {
         "to": "server.main.initialize_resources",
-        "line": 408
+        "line": 412
       },
       {
         "to": "server.main.init_database",
-        "line": 417
+        "line": 421
       },
       {
         "to": "server.main.run_migrations",
-        "line": 421
-      },
-      {
-        "to": "server.main.str",
-        "line": 421
-      },
-      {
-        "to": "server.main.initialize_default_data",
         "line": 425
       },
       {
-        "to": "server.main.initialize_category_colors",
+        "to": "server.main.str",
+        "line": 425
+      },
+      {
+        "to": "server.main.initialize_default_data",
         "line": 429
       },
       {
+        "to": "server.main.initialize_category_colors",
+        "line": 433
+      },
+      {
         "to": "server.main.start_monitor_process",
-        "line": 446
+        "line": 450
       },
       {
         "to": "server.main.SyncRepository",
-        "line": 494
-      },
-      {
-        "to": "server.main.SyncClient",
-        "line": 495
-      },
-      {
-        "to": "asyncio.get_running_loop",
         "line": 498
       },
       {
+        "to": "server.main.SyncClient",
+        "line": 499
+      },
+      {
+        "to": "asyncio.get_running_loop",
+        "line": 502
+      },
+      {
         "to": "server.main._start_sync_on_startup",
-        "line": 517
+        "line": 521
       },
       {
         "to": "server.main.hasattr",
-        "line": 523
+        "line": 527
       },
       {
         "to": "server.main.hasattr",
-        "line": 569
+        "line": 573
       },
       {
         "to": "server.main.hasattr",
-        "line": 578
+        "line": 582
       }
     ],
     "server.main_agent_only._run_agent_and_api": [
@@ -48222,7 +48327,7 @@
     "llm.channel.wechat.channel.start": [
       {
         "to": "asyncio.create_task",
-        "line": 303
+        "line": 294
       },
       {
         "to": "llm.channel.wechat.channel.len",
@@ -48238,7 +48343,7 @@
       },
       {
         "to": "llm.channel.wechat.channel.WechatMedia",
-        "line": 300
+        "line": 291
       }
     ],
     "server.main._log_startup_time": [
@@ -48536,23 +48641,23 @@
     "server.main.find_available_port": [
       {
         "to": "server.main.print",
-        "line": 837
+        "line": 847
       },
       {
         "to": "server.main.print",
-        "line": 842
+        "line": 852
       },
       {
         "to": "server.main.print",
-        "line": 853
+        "line": 863
       },
       {
         "to": "server.main.open",
-        "line": 827
+        "line": 837
       },
       {
         "to": "server.main.is_port_available",
-        "line": 846
+        "line": 856
       }
     ],
     "monitor.windows_monitor.main.handle_signal": [
@@ -48870,43 +48975,43 @@
     "server.main.global_exception_handler": [
       {
         "to": "server.main.str",
-        "line": 715
+        "line": 725
       },
       {
         "to": "server.main.JSONResponse",
-        "line": 719
+        "line": 729
       },
       {
         "to": "server.main.type",
-        "line": 714
+        "line": 724
       }
     ],
     "server.main.restrict_shutdown_endpoints": [
       {
         "to": "server.main.JSONResponse",
-        "line": 663
+        "line": 673
       },
       {
         "to": "server.main.call_next",
-        "line": 667
+        "line": 677
       }
     ],
     "server.main.lw_base_error_handler": [
       {
         "to": "server.main.JSONResponse",
-        "line": 703
+        "line": 713
       },
       {
         "to": "server.main.to_http_exception",
-        "line": 689
+        "line": 699
       },
       {
         "to": "server.main.type",
-        "line": 692
+        "line": 702
       },
       {
         "to": "server.main.type",
-        "line": 697
+        "line": 707
       }
     ],
     "server.main_agent_only.<module>": [
@@ -49200,11 +49305,11 @@
     "llm.channel.wechat.channel.stop": [
       {
         "to": "contextlib.suppress",
-        "line": 323
+        "line": 314
       },
       {
         "to": "llm.channel.wechat.channel.len",
-        "line": 317
+        "line": 308
       }
     ],
     "server.main_agent_only._run_agent_loop": [
@@ -50136,23 +50241,23 @@
     "llm.channel.wechat.channel._poll_loop": [
       {
         "to": "asyncio.sleep",
-        "line": 409
+        "line": 400
       },
       {
         "to": "asyncio.sleep",
-        "line": 412
+        "line": 403
       },
       {
         "to": "llm.channel.wechat.channel.len",
-        "line": 398
+        "line": 389
       },
       {
         "to": "llm.channel.wechat.channel.len",
-        "line": 402
+        "line": 393
       },
       {
         "to": "llm.channel.wechat.channel.enumerate",
-        "line": 403
+        "line": 394
       }
     ],
     "sync.sync_client.<module>": [
@@ -52980,44 +53085,40 @@
     "server.api.custom_records_api.<module>": [
       {
         "to": "server.api.custom_records_api.APIRouter",
-        "line": 23
+        "line": 24
       }
     ],
     "server.api.custom_records_api.get_custom_record_type": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 51
+        "line": 52
       }
     ],
     "server.api.custom_records_api.delete_custom_record_type": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 59
+        "line": 60
       }
     ],
     "server.api.custom_records_api.update_custom_record_type_config": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 69
+        "line": 70
       }
     ],
     "server.api.custom_records_api.update_custom_record_field_role": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 82
+        "line": 83
       },
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 83
+        "line": 84
       }
     ],
     "server.api.custom_records_api.get_custom_record_entries": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 100
-      },
-      {
-        "to": "server.api.custom_records_api.Query",
         "line": 101
       },
       {
@@ -53031,22 +53132,36 @@
       {
         "to": "server.api.custom_records_api.Query",
         "line": 104
+      },
+      {
+        "to": "server.api.custom_records_api.Query",
+        "line": 105
       }
     ],
     "server.api.custom_records_api.create_custom_record_entry": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 124
+        "line": 125
+      }
+    ],
+    "server.api.custom_records_api.update_custom_record_entry": [
+      {
+        "to": "server.api.custom_records_api.Path",
+        "line": 144
+      },
+      {
+        "to": "server.api.custom_records_api.Path",
+        "line": 145
       }
     ],
     "server.api.custom_records_api.delete_custom_record_entry": [
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 141
+        "line": 166
       },
       {
         "to": "server.api.custom_records_api.Path",
-        "line": 142
+        "line": 167
       }
     ],
     "server.api.diary_api.<module>": [
@@ -56912,19 +57027,27 @@
       },
       {
         "to": "server.schemas.custom_records_schemas.Field",
-        "line": 98
+        "line": 109
       },
       {
         "to": "server.schemas.custom_records_schemas.Field",
-        "line": 101
+        "line": 113
       },
       {
         "to": "server.schemas.custom_records_schemas.Field",
-        "line": 102
+        "line": 125
       },
       {
         "to": "server.schemas.custom_records_schemas.Field",
-        "line": 108
+        "line": 128
+      },
+      {
+        "to": "server.schemas.custom_records_schemas.Field",
+        "line": 129
+      },
+      {
+        "to": "server.schemas.custom_records_schemas.Field",
+        "line": 135
       }
     ],
     "server.schemas.diary_schemas.<module>": [
@@ -61852,83 +61975,97 @@
     "server.services.custom_records_service.<module>": [
       {
         "to": "server.services.custom_records_service.get_logger",
-        "line": 23
+        "line": 25
       }
     ],
     "server.services.custom_records_service._convert_to_field_definition": [
       {
         "to": "server.services.custom_records_service.FieldDefinition",
-        "line": 31
+        "line": 33
       }
     ],
     "server.services.custom_records_service._convert_to_type_item": [
       {
         "to": "server.services.custom_records_service.CustomRecordTypeItem",
-        "line": 42
+        "line": 44
       },
       {
         "to": "server.services.custom_records_service._convert_to_field_definition",
-        "line": 47
+        "line": 49
       }
     ],
     "server.services.custom_records_service._convert_to_entry_item": [
       {
         "to": "server.services.custom_records_service.CustomRecordEntryItem",
-        "line": 58
+        "line": 60
       }
     ],
     "server.services.custom_records_service.get_types": [
       {
         "to": "server.services.custom_records_service._convert_to_type_item",
-        "line": 67
+        "line": 69
       },
       {
         "to": "server.services.custom_records_service.CustomRecordTypeListResponse",
-        "line": 68
+        "line": 70
       }
     ],
     "server.services.custom_records_service.get_type": [
       {
         "to": "server.services.custom_records_service._convert_to_type_item",
-        "line": 80
+        "line": 82
       },
       {
         "to": "server.services.custom_records_service.EntityNotFoundError",
-        "line": 79
+        "line": 81
       }
     ],
     "server.services.custom_records_service.create_type": [
       {
         "to": "server.services.custom_records_service._convert_to_type_item",
-        "line": 98
+        "line": 100
       }
     ],
     "server.services.custom_records_service.update_type_config": [
       {
         "to": "server.services.custom_records_service._convert_to_type_item",
-        "line": 178
+        "line": 250
       }
     ],
     "server.services.custom_records_service.update_field_role": [
       {
         "to": "server.services.custom_records_service._convert_to_type_item",
-        "line": 196
+        "line": 268
       }
     ],
     "server.services.custom_records_service.get_entries": [
       {
         "to": "server.services.custom_records_service._convert_to_entry_item",
-        "line": 135
+        "line": 137
       },
       {
         "to": "server.services.custom_records_service.CustomRecordEntryListResponse",
-        "line": 136
+        "line": 138
       }
     ],
     "server.services.custom_records_service.create_entry": [
       {
         "to": "server.services.custom_records_service._convert_to_entry_item",
-        "line": 149
+        "line": 151
+      }
+    ],
+    "server.services.custom_records_service.update_entry": [
+      {
+        "to": "server.services.custom_records_service._convert_to_entry_item",
+        "line": 221
+      },
+      {
+        "to": "server.services.custom_records_service.ValidationError",
+        "line": 189
+      },
+      {
+        "to": "server.services.custom_records_service.ValidationError",
+        "line": 204
       }
     ],
     "server.services.data_processing_service.<module>": [
@@ -65551,6 +65688,44 @@
         "line": 680
       }
     ],
+    "repository.aggregators.custom_record_aggregator.update_entry": [
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 936
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.ValidationError",
+        "line": 973
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.set",
+        "line": 931
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
+        "line": 1019
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.str",
+        "line": 1024
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
+        "line": 1006
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.sorted",
+        "line": 937
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.sorted",
+        "line": 940
+      },
+      {
+        "to": "repository.aggregators.custom_record_aggregator.tuple",
+        "line": 1010
+      }
+    ],
     "repository.aggregators.custom_record_aggregator.query_entries": [
       {
         "to": "repository.aggregators.custom_record_aggregator.list",
@@ -65650,33 +65825,33 @@
     "repository.aggregators.custom_record_aggregator.update_type_config": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 947
+        "line": 1092
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 949
+        "line": 1094
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 954
+        "line": 1099
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.tuple",
-        "line": 943
+        "line": 1088
       }
     ],
     "repository.aggregators.custom_record_aggregator.update_field_role": [
       {
         "to": "repository.aggregators.custom_record_aggregator.DataAccessError",
-        "line": 992
+        "line": 1137
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.str",
-        "line": 994
+        "line": 1139
       },
       {
         "to": "repository.aggregators.custom_record_aggregator.EntityNotFoundError",
-        "line": 999
+        "line": 1144
       }
     ],
     "repository.aggregators.custom_record_aggregator._coerce_field_value": [
@@ -73492,57 +73667,57 @@
     "llm.channel.wechat.channel.send": [
       {
         "to": "llm.channel.wechat.channel.len",
-        "line": 363
+        "line": 354
       },
       {
         "to": "llm.channel.wechat.channel.hasattr",
-        "line": 351
+        "line": 342
       },
       {
         "to": "llm.channel.wechat.channel.WechatAPIError",
-        "line": 368
+        "line": 359
       }
     ],
     "llm.channel.wechat.channel._handle_wechat_message": [
       {
         "to": "llm.channel.wechat.channel.len",
-        "line": 457
+        "line": 448
       },
       {
         "to": "llm.channel.wechat.channel.len",
-        "line": 458
+        "line": 449
       },
       {
         "to": "llm.channel.wechat.channel.str",
-        "line": 439
+        "line": 430
       },
       {
         "to": "llm.channel.wechat.channel.str",
-        "line": 447
+        "line": 438
       },
       {
         "to": "llm.channel.wechat.channel.str",
-        "line": 564
+        "line": 555
       },
       {
         "to": "llm.channel.wechat.channel.InboundMessage",
-        "line": 504
+        "line": 495
       },
       {
         "to": "llm.channel.wechat.channel.OutboundMessage",
-        "line": 562
+        "line": 553
       },
       {
         "to": "llm.channel.wechat.channel.LLMResponse",
-        "line": 564
+        "line": 555
       },
       {
         "to": "llm.channel.wechat.channel.WechatMessageError",
-        "line": 576
+        "line": 567
       },
       {
         "to": "llm.channel.wechat.channel.WechatMessageError",
-        "line": 579
+        "line": 570
       }
     ],
     "llm.channel.wechat.client.<module>": [

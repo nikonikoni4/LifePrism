@@ -87,10 +87,10 @@ class WechatMessageTrace:
 - lifeprism/llm/channel/wechat/channel.py
   - channel.WechatChannel.__init__:53
   - channel.WechatChannel.start:242
-  - channel.WechatChannel.stop:305
-  - channel.WechatChannel.send:329
-  - channel.WechatChannel._poll_loop:370
-  - channel.WechatChannel._handle_wechat_message:414
+  - channel.WechatChannel.stop:296
+  - channel.WechatChannel.send:320
+  - channel.WechatChannel._poll_loop:361
+  - channel.WechatChannel._handle_wechat_message:405
 - lifeprism/llm/channel/wechat/auth.py
   - auth.WechatAuth.load_state:135
   - auth.WechatAuth.save_state:224
