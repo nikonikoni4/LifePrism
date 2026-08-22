@@ -66,10 +66,18 @@ def repository(test_data_path):
                 sort_order INTEGER DEFAULT 0,
                 display_role TEXT NOT NULL DEFAULT 'auto',
                 created_at TEXT DEFAULT (datetime('now','localtime')),
+                updated_at TEXT,
                 UNIQUE (type_id, field_key)
             )
         """
         )
+        # 与生产 schema 对齐（m012 迁移后含 updated_at 列）：
+        # 旧测试库的表由本 fixture 早期版本建出、缺 updated_at 列，
+        # CREATE TABLE IF NOT EXISTS 不会补列，需显式 ALTER（模拟 m012）
+        cursor.execute("PRAGMA table_info(custom_record_fields)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "updated_at" not in columns:
+            cursor.execute("ALTER TABLE custom_record_fields ADD COLUMN updated_at TEXT")
         conn.commit()
 
     yield repo
@@ -173,6 +181,46 @@ class TestCreateTypeUtcTimestamps:
             assert UTC_ISO_PATTERN.match(created_at), (
                 f"field created_at 应为 UTC ISO 8601 格式，实际: {created_at}"
             )
+
+    def test_field_updated_at_is_utc_iso8601(self, repository):
+        """custom_record_fields.updated_at 应为非 NULL 且 UTC ISO 8601 格式
+
+        Bug 复现（2026-08-21）：create_type 写字段定义行漏写 updated_at，
+        NULL 行无法被增量同步（WHERE updated_at > ? 恒为假），导致云端
+        create_custom_record_entry 报 INVALID_FIELD_KEY。
+        """
+        type_id = repository.create_type(
+            name="体育活动",
+            slug="sport",
+            fields=[
+                {
+                    "field_name": "日期",
+                    "field_key": "exercise_date",
+                    "field_type": "text",
+                },
+                {
+                    "field_name": "锻炼内容",
+                    "field_key": "exercise_content",
+                    "field_type": "text",
+                },
+            ],
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT field_key, updated_at FROM custom_record_fields WHERE type_id = ?",
+                (type_id,),
+            )
+            rows = cursor.fetchall()
+            assert len(rows) == 2, f"应有 2 条字段定义行，实际: {len(rows)}"
+            for field_key, updated_at in rows:
+                assert updated_at is not None, (
+                    f"field updated_at 不应为 None（NULL 行无法被增量同步）: {field_key}"
+                )
+                assert UTC_ISO_PATTERN.match(updated_at), (
+                    f"field updated_at 应为 UTC ISO 8601 格式，实际: {updated_at}"
+                )
 
 
 # ==================== create_entry 测试 ====================

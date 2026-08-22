@@ -1,3 +1,10 @@
+## 2026-08-21-custom-record-fields-null-updated-at-not-synced
+
+- updated_at: 2026-08-21
+- path: `docs/history-bugs/2026-08-21-custom-record-fields-null-updated-at-not-synced.md`
+- 触发规则：在排查"云端查不到自定义记录字段 / create_custom_record_entry 报 INVALID_FIELD_KEY 且 valid_fields 为空"、"本地存在但云端永远缺失且无同步错误日志"（updated_at 为 NULL 的幽灵行）、为 SYNC_TABLES 表编写手写 SQL 的 INSERT（绕过基类时间注入）、编写 ALTER TABLE ADD COLUMN updated_at 类迁移、排查 tokens_usage_log 大量 NULL updated_at、讨论 updated_at 改 NOT NULL 的 schema 治理方案时阅读
+- 内容摘要：**静默数据丢失 bug（P1，已定位 2026-08-21）** — `CustomRecordRepository.create_type` 写 `custom_record_fields` 时 INSERT 漏写 `updated_at`，该列由 m012 迁移 ALTER 补出、无 DEFAULT，行存入 NULL；增量同步 `WHERE updated_at > ?` 中 `NULL > ?` 恒假，字段行永远不推送，云端只到类型行和数据行，出现"类型在、数据表在、数据在、唯独字段定义缺"的分裂。全项目共 3 处同类漏写：create_type、`save_tokens_usage`（每次 LLM 调用产生 437 行 NULL）、`raw_behavior_analysis_provider._insert_analysis`（持续产生）。修复分三层：① 代码补列（3 处，注意 batch_insert_tokens_usage 是死代码不能止血）；② 存量回填（回填值必须大于 last_sync_time，实际用 `2026-08-21T02:00:00.000000+00:00`，范围覆盖全部 SYNC_TABLES 普查而非仅事故表）；③ 根本方案：所有同步表 updated_at 改 NOT NULL 且去掉 DDL DEFAULT（防 datetime('now') 空格格式分裂），**前置改造 data_initializer 6 处种子 INSERT**（硬依赖 DEFAULT 否则新库启动崩溃），存量表走表重建迁移（SQLite ALTER 限制），配契约测试。教训：updated_at IS NULL 是增量同步的幽灵行，全链路无感知；直写路径漏注入是漏写源头，修复定位前先查调用链确认活跃路径。
+
 ## 2026-08-18-habit-checkin-replace-on-duplicate
 
 - updated_at: 2026-08-18

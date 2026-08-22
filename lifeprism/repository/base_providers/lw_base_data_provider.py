@@ -862,13 +862,17 @@ class LWBaseDataProvider:
                 if "search_count" not in data:
                     data["search_count"] = 0
 
-            # 注入 ISO 8601 + UTC 时间戳（tokens_usage_log 配置了 timestamps=True，无 update_at）
+            # 注入 ISO 8601 + UTC 时间戳（tokens_usage_log 配置了 timestamps=True 和 update_at=True，
+            # updated_at 必须显式注入：该列在旧库由 m013 迁移 ALTER 补出、无 DEFAULT，
+            # 省略会存入 NULL，导致增量同步（WHERE updated_at > ?）永远查不到）
             from lifeprism.utils.time_utils import get_utc_now_iso
 
             now_iso = get_utc_now_iso()
             for data in tokens_usage_data:
                 if "created_at" not in data:
                     data["created_at"] = now_iso
+                if "updated_at" not in data:
+                    data["updated_at"] = now_iso
 
             # 使用 insert_many 插入数据
             affected = self.db.insert_many("tokens_usage_log", tokens_usage_data)

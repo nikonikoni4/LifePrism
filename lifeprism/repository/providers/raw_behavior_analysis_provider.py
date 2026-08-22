@@ -186,13 +186,14 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                 try:
                     cursor.execute(
                         f"""INSERT INTO {self._TABLE_NAME}
-                           (start_time, end_time, behavior, screen_count, created_at)
-                           VALUES (?, ?, ?, ?, ?)""",
+                           (start_time, end_time, behavior, screen_count, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
                         (
                             data["start_time"],
                             data["end_time"],
                             data["behavior"],
                             data["screen_count"],
+                            now_iso,
                             now_iso,
                         ),
                     )

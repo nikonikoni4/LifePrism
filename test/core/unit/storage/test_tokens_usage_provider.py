@@ -4,12 +4,16 @@ TokensUsageProvider 单元测试
 测试 TokensUsageProvider 的所有 CRUD 方法
 """
 
+import re
 from datetime import datetime
 
 import pytest
 
 from lifeprism.repository.providers import tokens_usage_provider
 from lifeprism.repository.providers.common_query_options import QueryOptions
+
+# UTC ISO 8601 格式：2026-07-11T16:29:54.123456+00:00
+UTC_ISO_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$")
 
 # ==================== Fixtures ====================
 
@@ -86,6 +90,47 @@ class TestInsertTokensUsage:
         data = {"session_id": "test-session-003", "invalid_field": "value"}
         result = tokens_usage_provider.insert_tokens_usage(data)
         assert result is False
+
+
+# ==================== save_tokens_usage 测试 ====================
+
+
+class TestSaveTokensUsageTimestamps:
+    """测试 save_tokens_usage（LWBaseDataProvider 继承方法）写入的时间戳"""
+
+    def test_save_tokens_usage_injects_updated_at(self, cleanup_test_data):
+        """save_tokens_usage 应注入 updated_at（非 NULL 且 UTC ISO 8601）
+
+        Bug 复现（2026-08-21）：save_tokens_usage 只注入 created_at，
+        updated_at 为 NULL 的行无法被增量同步（WHERE updated_at > ? 恒为假）。
+        生产调用链：llm_usage_db_provider.batch_save_usage（每次 LLM 调用）。
+        """
+        data = {
+            "session_id": "test-session-001",
+            "input_tokens": 10,
+            "output_tokens": 20,
+            "total_tokens": 30,
+        }
+        affected = tokens_usage_provider.save_tokens_usage([data])
+        assert affected == 1
+
+        with tokens_usage_provider.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT created_at, updated_at FROM tokens_usage_log WHERE session_id = ?",
+                ("test-session-001",),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        created_at, updated_at = row
+        assert created_at is not None, "created_at 不应为 None"
+        assert UTC_ISO_PATTERN.match(created_at), (
+            f"created_at 应为 UTC ISO 8601 格式，实际: {created_at}"
+        )
+        assert updated_at is not None, "updated_at 不应为 None（NULL 行无法被增量同步）"
+        assert UTC_ISO_PATTERN.match(updated_at), (
+            f"updated_at 应为 UTC ISO 8601 格式，实际: {updated_at}"
+        )
 
 
 # ==================== 查询测试 ====================

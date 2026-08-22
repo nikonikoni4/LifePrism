@@ -203,12 +203,14 @@ class CustomRecordRepository:
                 )
 
                 # 2. 写入 custom_record_fields
+                # updated_at 必须显式写入：该列由 m012 迁移 ALTER 补出、无 DEFAULT，
+                # 省略会存入 NULL，导致增量同步（WHERE updated_at > ?）永远查不到
                 for idx, f in enumerate(fields):
                     field_id = f"{self._FIELD_ID_PREFIX}{uuid.uuid4().hex[:8]}"
                     cursor.execute(
                         "INSERT INTO custom_record_fields "
-                        "(id, type_id, field_name, field_key, field_type, sort_order, created_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "(id, type_id, field_name, field_key, field_type, sort_order, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             field_id,
                             type_id,
@@ -216,6 +218,7 @@ class CustomRecordRepository:
                             f["field_key"],
                             f.get("field_type", "text"),
                             f.get("sort_order", idx),
+                            now,
                             now,
                         ),
                     )
