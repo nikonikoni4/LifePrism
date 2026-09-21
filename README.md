@@ -4,7 +4,7 @@
 
 LifePrism：你的一站式生活记录工具。记录你的外在行为与内在感受，通过目标管理、深度自我剖析（行为模式、矛盾与关系分析），将数据转化为清晰的自我认知与持续的行动指南。
 
-注：AI模块在之后将会使用https://github.com/nikonikoni4/my-agent的替代
+注：AI模块在之后将会使用https://github.com/nikonikoni4/my-agent 的Agent框架替代当前的Agent框架
 
 ## 功能
 
