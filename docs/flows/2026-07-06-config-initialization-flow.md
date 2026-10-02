@@ -90,7 +90,7 @@ class ConfigInitState:
 - lifeprism/config/migrations/config_migrator.py
   - config_migrator.run_config_migrations:22
 - lifeprism/utils/logger.py
-  - logger.setup_file_logging:95
+  - logger.setup_file_logging:101
 </key_function>
 
 ## 流程概览
