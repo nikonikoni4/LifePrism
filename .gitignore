@@ -58,3 +58,4 @@ cloud_init.yaml
 storage.yaml
 MagicMock
 scripts\code_search\ast_scan_result.json
+mcp
