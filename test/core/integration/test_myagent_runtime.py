@@ -17,6 +17,7 @@ pytestmark = pytest.mark.core
 
 class EchoTool(Tool):
     """最简 Tool 测试替身，回显文本，并对哨兵输入返回失败。"""
+
     name = "echo"
     description = "Echo the supplied text"
     parameters = {
@@ -33,6 +34,7 @@ class EchoTool(Tool):
 
 class FakeClient:
     """确定性的流式 provider 测试替身，提供脚本化轮次与多种失败模式。"""
+
     model = "fake"
     params = ChatParams()
 
@@ -90,6 +92,7 @@ def make_runtime(tmp_path, client, usage=None):
     Returns:
         AgentRuntime: 用于确定性离线运行的 runtime 实例。
     """
+
     async def write_usage(sid, values, mode):
         """测试需要采集时，把一次 usage 写入记录到共享列表。"""
         if usage is not None:
@@ -111,6 +114,7 @@ def make_runtime(tmp_path, client, usage=None):
 
 def test_tool_turn_waits_for_final_message_and_accounts_all_steps(tmp_path):
     """守护一次工具轮次产出分块、工具事件、最终回答以及一次 usage 写入。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动工具轮次的 runtime 场景。"""
         usage = []
@@ -139,6 +143,7 @@ def test_tool_turn_waits_for_final_message_and_accounts_all_steps(tmp_path):
 
 def test_session_serializes_runs_and_refreshes_prompt_files(tmp_path):
     """守护同一 session 上的并发运行被串行化，且每轮重新加载 prompt 文件。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动同 session 并发场景。"""
         prompt_file = tmp_path / "agent/chat/soul.md"
@@ -170,6 +175,7 @@ def test_session_serializes_runs_and_refreshes_prompt_files(tmp_path):
 
 def test_provider_failure_emits_error_without_success(tmp_path):
     """守护 provider 失败时只透出 error 事件，绝不产生 done 事件。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动 provider 失败场景。"""
         runtime = make_runtime(tmp_path, FakeClient(fail=True))
@@ -189,6 +195,7 @@ def test_provider_failure_emits_error_without_success(tmp_path):
 
 def test_abandoned_stream_cancels_turn_and_persists_terminal(tmp_path):
     """守护关闭流会取消当前轮次，并落盘一条 interrupted 终止记录。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动流被中途放弃的场景。"""
         client = FakeClient(block=True)
@@ -210,6 +217,7 @@ def test_abandoned_stream_cancels_turn_and_persists_terminal(tmp_path):
 
 def test_background_bus_returns_result_and_releases_context(tmp_path):
     """守护后台 bus 任务返回结果并释放 session 槽位。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动后台任务成功的场景。"""
         runtime = make_runtime(tmp_path, FakeClient())
@@ -233,6 +241,7 @@ def test_background_bus_returns_result_and_releases_context(tmp_path):
 
 def test_background_failure_rejects_waiter_immediately(tmp_path):
     """守护后台任务失败会立即拒绝等待方，而不是一直挂起。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动后台任务失败场景。"""
         runtime = make_runtime(tmp_path, FakeClient(fail=True))
@@ -255,6 +264,7 @@ def test_background_failure_rejects_waiter_immediately(tmp_path):
 
 def test_old_session_is_not_loaded(tmp_path):
     """守护早于迁移切点的 session id 会被拒绝，而不是被恢复。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动过期 session 场景。"""
         runtime = make_runtime(tmp_path, FakeClient())
@@ -269,6 +279,7 @@ def test_old_session_is_not_loaded(tmp_path):
 
 def test_tool_failure_uses_native_result_and_default_breaker():
     """守护工具失败保持 native 结果形态与默认熔断设置。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动工具熔断默认值场景。"""
         tool = EchoTool()
@@ -283,6 +294,7 @@ def test_tool_failure_uses_native_result_and_default_breaker():
 
 def test_runtime_shutdown_cancels_live_subscriber_without_deadlock(tmp_path):
     """守护 runtime 关闭会取消存活的订阅者且不发生死锁。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动 runtime 关闭场景。"""
         client = FakeClient(block=True)
@@ -308,6 +320,7 @@ def test_runtime_shutdown_cancels_live_subscriber_without_deadlock(tmp_path):
 
 def test_bus_caller_cancellation_stops_background_model(tmp_path):
     """守护取消 bus 调用方会一并取消后台模型轮次。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动调用方取消场景。"""
         client = FakeClient(block=True)
@@ -341,6 +354,7 @@ def test_bus_caller_cancellation_stops_background_model(tmp_path):
 
 def test_worker_can_restart_after_shutdown(tmp_path):
     """守护 worker 循环在生命周期被取消后仍能重新启动。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动 worker 重启场景。"""
         runtime = make_runtime(tmp_path, FakeClient())
@@ -363,6 +377,7 @@ def test_worker_can_restart_after_shutdown(tmp_path):
 
 def test_setup_failure_releases_new_context(tmp_path):
     """守护工具构建失败时会释放刚创建的 session 槽位。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动工具构建失败场景。"""
         runtime = make_runtime(tmp_path, FakeClient())
@@ -384,6 +399,7 @@ def test_setup_failure_releases_new_context(tmp_path):
 
 def test_chat_logging_uses_native_prompt_and_does_not_duplicate_background(tmp_path, monkeypatch):
     """守护 chat 轮次用 native prompt 只记录一次日志，而后台任务不记录。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动 chat 日志场景。"""
         from lifeprism.llm.utils.llm_call_logger import llm_call_logger
@@ -401,6 +417,130 @@ def test_chat_logging_uses_native_prompt_and_does_not_duplicate_background(tmp_p
             assert logged[0]["model"] == "fake"
             await runtime.execute(InboundMessage(type=MessageType.GENERAL_TASK, content="job"))
             assert len(logged) == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("always_fail", [False, True])
+def test_request_error_policy_drives_native_loop_retries(tmp_path, always_fail, monkeypatch):
+    from lifeprism.llm.providers.errors import LLMProviderError
+
+    class TransientClient(FakeClient):
+        attempts = 0
+
+        async def stream_chat(self, messages, tools=None):
+            self.attempts += 1
+            if always_fail or self.attempts == 1:
+                raise LLMProviderError(
+                    "network failed",
+                    kind="connection",
+                    reason="connection",
+                    provider="fake",
+                    model="fake",
+                )
+            yield LLMResponse(content="recovered", usage=Usage())
+
+    async def scenario():
+        client = TransientClient()
+        runtime = make_runtime(tmp_path, client)
+        # Remove wall-clock waits while keeping the actual native policy/loop path.
+        from lifeprism.config.agent_config import AgentSettings
+        from lifeprism.config.settings_manager import SettingsManager
+
+        config = AgentSettings.model_validate({"policies": {"llm_retry": {"base_delay": 0.0}}})
+        monkeypatch.setattr(SettingsManager, "agent", property(lambda self: config))
+        try:
+            events = [
+                event
+                async for event in runtime.stream(
+                    InboundMessage(type=MessageType.CHAT, content="hi")
+                )
+            ]
+            assert client.attempts == (4 if always_fail else 2)
+            assert events[-1].type == ("error" if always_fail else "done")
+            slot = next(iter(runtime._slots.values()))
+            assert slot.context.session.llm_retry_count(slot.context.session.turn) == (
+                3 if always_fail else 1
+            )
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("retry_enabled", [False, True])
+def test_context_loads_agent_settings_and_guard(tmp_path, monkeypatch, retry_enabled):
+    from lifeprism.config.agent_config import AgentSettings
+    from lifeprism.config.settings_manager import SettingsManager
+    from lifeprism.llm.providers.errors import LLMProviderError
+
+    config = AgentSettings.model_validate(
+        {
+            "step_limit": 8,
+            "max_retry_count": 1,
+            "policies": {
+                "llm_retry": {"enabled": retry_enabled, "base_delay": 0.0},
+                "tool_guard": {"enabled": False, "allow_paths": ["user"]},
+            },
+        }
+    )
+    monkeypatch.setattr(SettingsManager, "agent", property(lambda self: config))
+
+    class Client(FakeClient):
+        attempts = 0
+
+        async def stream_chat(self, messages, tools=None):
+            self.attempts += 1
+            raise LLMProviderError(
+                "failure", kind="connection", reason="connection", provider="fake", model="fake"
+            )
+            yield
+
+    async def scenario():
+        client = Client()
+        runtime = make_runtime(tmp_path, client)
+        try:
+            events = [
+                event
+                async for event in runtime.stream(
+                    InboundMessage(type=MessageType.CHAT, content="hi")
+                )
+            ]
+            slot = next(iter(runtime._slots.values()))
+            assert slot.context.agent_loop.agent_config.step_limit == 8
+            assert slot.context.agent_loop.agent_config.max_retry_count == 1
+            from myagent.agent.guard.tool_use_guard import ToolUseGuard
+
+            from lifeprism.llm.providers.llm_retry import LLMRetry
+
+            guards = [obj for obj in slot.context.policy_objects if isinstance(obj, ToolUseGuard)]
+            assert len(guards) == 1
+            assert guards[0].allow_path == [(tmp_path / "user").resolve()]
+            from types import SimpleNamespace
+
+            from myagent.infra.events.eventspec import TOOL_CALL
+
+            vetoes = await slot.context.event_service.waterfall(
+                TOOL_CALL.name,
+                SimpleNamespace(
+                    tool_call_requests=[
+                        SimpleNamespace(
+                            id="outside",
+                            name="read_file",
+                            arguments={"file_path": str(tmp_path / "outside.txt")},
+                        )
+                    ]
+                ),
+            )
+            assert vetoes["outside"]["decision"] == "deny"
+            assert (
+                any(isinstance(obj, LLMRetry) for obj in slot.context.policy_objects)
+                == retry_enabled
+            )
+            assert client.attempts == (2 if retry_enabled else 1)
+            assert events[-1].type == "error"
         finally:
             await runtime.close()
 

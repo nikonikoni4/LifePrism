@@ -2,7 +2,7 @@
 
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _ConfigModel(BaseModel):
@@ -25,8 +25,15 @@ class LLMRetrySettings(_ConfigModel):
 class ToolGuardSettings(_ConfigModel):
     """Allow-list paths; relative entries use the LifePrism data directory."""
 
-    enabled: bool = False
     allow_paths: list[str] = Field(default_factory=lambda: ["user", "diary", "agent"])
+
+    @model_validator(mode="before")
+    @classmethod
+    def discard_legacy_switch(cls, value):
+        """Ignore the retired enabled switch; guard registration is mandatory."""
+        if isinstance(value, dict):
+            return {key: item for key, item in value.items() if key != "enabled"}
+        return value
 
     @field_validator("allow_paths")
     @classmethod

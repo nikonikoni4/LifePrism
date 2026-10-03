@@ -12,7 +12,7 @@ def test_defaults_and_partial_config(tmp_path):
     config = AgentSettings.model_validate({"policies": {"llm_retry": {"enabled": False}}})
     assert config.step_limit == 20 and config.max_retry_count == 3
     assert not config.policies.llm_retry.enabled
-    assert not config.policies.tool_guard.enabled
+    assert "enabled" not in config.policies.tool_guard.model_dump()
     assert config.policies.tool_guard.resolve_paths(tmp_path) == [
         str((tmp_path / name).resolve()) for name in ["user", "diary", "agent"]
     ]
@@ -47,12 +47,12 @@ def test_settings_roundtrip_without_real_config(tmp_path):
     manager._config_path = tmp_path / "config.yaml"
     manager.set(
         "agent",
-        {"step_limit": 7, "policies": {"tool_guard": {"enabled": True, "allow_paths": ["user"]}}},
+        {"step_limit": 7, "policies": {"tool_guard": {"allow_paths": ["user"]}}},
     )
     assert manager.agent.step_limit == 7
     saved = yaml.safe_load(manager._config_path.read_text(encoding="utf-8"))
     manager._config = saved
-    assert manager.agent.policies.tool_guard.enabled
+    assert manager.agent.policies.tool_guard.allow_paths == ["user"]
     assert manager.agent.max_retry_count == 3
     before = manager._config_path.read_bytes()
     with pytest.raises(ValidationError):
@@ -74,3 +74,10 @@ def test_empty_guard_list_remains_empty(tmp_path):
     from lifeprism.config.agent_config import ToolGuardSettings
 
     assert ToolGuardSettings(allow_paths=[]).resolve_paths(tmp_path) == []
+
+
+def test_legacy_guard_switch_cannot_disable_guard():
+    from lifeprism.config.agent_config import AgentSettings
+
+    config = AgentSettings.model_validate({"policies": {"tool_guard": {"enabled": False}}})
+    assert "enabled" not in config.policies.tool_guard.model_dump()

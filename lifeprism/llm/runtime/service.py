@@ -7,15 +7,17 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from myagent.agent.agent_context import AgentContext
+from myagent.agent.agent_context import AgentContext, AgentPolicySpec
 from myagent.agent.core.agent.types import AgentConfig
 from myagent.agent.core.provider import Message
 from myagent.agent.core.session import SessionStore
-from myagent.infra.events.eventspec import SESSION_EVENT
+from myagent.agent.guard.tool_use_guard import ToolUseGuard
+from myagent.infra.events.eventspec import REQUEST_ERROR, SESSION_EVENT, TOOL_CALL
 
 from lifeprism.config import settings
 from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage
 from lifeprism.llm.providers import LLMResponse, create_llm_client
+from lifeprism.llm.providers.llm_retry import LLMRetry
 from lifeprism.llm.runtime.limiter import ModelCallLimiter
 from lifeprism.llm.runtime.prompts import register_prompts
 from lifeprism.llm.runtime.provider import ProviderAdapter
@@ -224,6 +226,9 @@ class AgentRuntime:
         if is_new:
             preview = "".join(block.get("text", "") for block in message.content)[:20]
             session = store.create(preview or message.type, self.data_path)
+        agent_settings = settings.agent
+        guard_settings = agent_settings.policies.tool_guard
+        guard_paths = guard_settings.resolve_paths(self.data_path)
         client = (
             self._client_factory()
             if self._client_factory
@@ -232,9 +237,20 @@ class AgentRuntime:
         context = AgentContext(
             agent_name=f"lifeprism-{uuid4().hex[:8]}",
             session=session,
-            agent_config=AgentConfig(step_limit=20, max_retry_count=0),
+            agent_config=AgentConfig(
+                step_limit=agent_settings.step_limit, max_retry_count=agent_settings.max_retry_count
+            ),
             llm_client=client,
             prompt_render_parame=None,
+        )
+        if agent_settings.policies.llm_retry.enabled:
+            llm_retry = LLMRetry(agent_settings.policies.llm_retry.backoff_policy())
+            context.register_policy(
+                AgentPolicySpec(REQUEST_ERROR, [llm_retry.request_error_event], llm_retry)
+            )
+        tool_guard = ToolUseGuard({"allow_path": guard_paths})
+        context.register_policy(
+            AgentPolicySpec(TOOL_CALL, [tool_guard.file_sys_path_guard], tool_guard)
         )
         slot = _AgentSlot(context, client)
         self._slots[session.meta_data.session_id] = slot

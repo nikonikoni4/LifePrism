@@ -285,7 +285,7 @@ class LLMProvider(ABC):
         reasoning_effort: object = _SENTINEL,
         tool_choice: str | dict[str, Any] | None = None,
     ) -> LLMResponse:
-        """Compatibility entry point: one call, with generation defaults and no recovery policy.
+        """Compatibility entry point: one call with generation defaults; loop owns retries.
 
         Parameters default to ``self.generation`` when not explicitly passed,
         so callers no longer need to thread temperature / max_tokens /

@@ -111,8 +111,8 @@ class CustomProvider(LLMProvider):
     ) -> AsyncIterator[Any]:
         """Stream a chat completion, yielding raw SDK chunks without parsing.
 
-        Exceptions propagate unchanged; no retry is attempted. The underlying
-        stream is always closed, including on cancellation.
+        Each call performs one SDK request. Retry decisions belong to the
+        agent request/error policy. The stream is closed on cancellation.
 
         Yields:
             Raw chunk objects from the OpenAI-compatible streaming API.

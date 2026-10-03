@@ -359,8 +359,8 @@ class LiteLLMProvider(LLMProvider):
     ) -> AsyncIterator[Any]:
         """Stream a chat completion via LiteLLM, yielding raw chunks without parsing.
 
-        Exceptions propagate unchanged; no retry is attempted. The underlying
-        stream is always closed, including on cancellation.
+        Each call performs one SDK request. Retry decisions belong to the
+        agent request/error policy. The stream is closed on cancellation.
 
         Yields:
             Raw chunk objects from the streaming completion API.
