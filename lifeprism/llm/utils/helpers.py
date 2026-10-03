@@ -4,7 +4,7 @@ import base64
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import tiktoken
@@ -40,7 +40,7 @@ def build_image_content_blocks(
 
 def timestamp() -> str:
     """Current UTC ISO timestamp."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def current_time_str() -> str:
@@ -48,7 +48,7 @@ def current_time_str() -> str:
 
     时间基于 UTC 源转换为本地时区显示（参考 docs/guides/utc-migration-hidden-dependencies.md 2.9 节）。
     """
-    now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M (%A)")
+    now = datetime.now(UTC).astimezone().strftime("%Y-%m-%d %H:%M (%A)")
     tz = time.strftime("%Z") or "UTC"
     return f"{now} ({tz})"
 

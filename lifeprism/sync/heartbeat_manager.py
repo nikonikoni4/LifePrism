@@ -8,7 +8,7 @@
 不使用数据库，所有状态保存在内存中。
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Lock
 
 from lifeprism.utils import get_logger
@@ -41,7 +41,7 @@ class HeartbeatManager:
         设置 15 分钟初始窗口，本地在此期间发送同步/心跳即确认为在线，
         超时无响应则自动接管。
         """
-        self._last_heartbeat: datetime | None = datetime.now(timezone.utc)
+        self._last_heartbeat: datetime | None = datetime.now(UTC)
         self._last_event: str | None = None  # 'online' | 'offline' | None
         self._lock = Lock()
 
@@ -54,7 +54,7 @@ class HeartbeatManager:
         with self._lock:
             was_offline = self._last_event == "offline"
             self._last_event = None
-            self._last_heartbeat = datetime.now(timezone.utc)
+            self._last_heartbeat = datetime.now(UTC)
             if was_offline:
                 logger.info("心跳恢复: 检测到本地同步请求，清除 offline → 云端不再接管微信消息")
             else:
@@ -72,7 +72,7 @@ class HeartbeatManager:
         """
         with self._lock:
             self._last_event = event
-            self._last_heartbeat = datetime.now(timezone.utc)
+            self._last_heartbeat = datetime.now(UTC)
             if event == "offline":
                 logger.info("收到 offline 事件 → 云端接管微信消息处理")
             elif event == "online":
@@ -98,7 +98,7 @@ class HeartbeatManager:
                 return False  # 显式 offline，优先判断
             if self._last_heartbeat is None:
                 return False  # 从未连接
-            elapsed = (datetime.now(timezone.utc) - self._last_heartbeat).total_seconds()
+            elapsed = (datetime.now(UTC) - self._last_heartbeat).total_seconds()
             return elapsed < HEARTBEAT_TIMEOUT_SECONDS
 
 

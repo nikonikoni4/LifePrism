@@ -6,7 +6,7 @@ Activity Stats Builder - 纯函数模块
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytz
@@ -63,7 +63,7 @@ def _utc_timestamp_to_local_date(timestamp: str) -> str:
     if not normalized:
         return ""
     try:
-        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         local_tz = pytz.timezone(get_user_timezone())
         local_dt = utc_dt.astimezone(local_tz)
         return local_dt.strftime("%Y-%m-%d")

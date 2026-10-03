@@ -4,7 +4,7 @@
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from lifeprism.repository import (
     category_repository,
@@ -169,15 +169,15 @@ class CategoryService:
         # 验证时间参数（在 try 之外，让验证错误直接抛出）
         # 统一转换为 UTC aware datetime，兼容旧格式 naive 输入
         if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
+            start_time = start_time.replace(tzinfo=UTC)
         else:
-            start_time = start_time.astimezone(timezone.utc)
+            start_time = start_time.astimezone(UTC)
         if end_time.tzinfo is None:
-            end_time = end_time.replace(tzinfo=timezone.utc)
+            end_time = end_time.replace(tzinfo=UTC)
         else:
-            end_time = end_time.astimezone(timezone.utc)
+            end_time = end_time.astimezone(UTC)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if start_time >= end_time:
             raise ValueError(f"start_time ({start_time}) 必须小于 end_time ({end_time})")
         if end_time > now:
@@ -1476,14 +1476,14 @@ class CategoryService:
 category_service = LazySingleton(CategoryService)
 
 if __name__ == "__main__":
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from lifeprism.server.schemas.category_schemas import CategoryStatsIncludeOptions
 
     test_service = CategoryService()
 
     # 测试 get_category_stats
-    end_time = datetime.now(timezone.utc)
+    end_time = datetime.now(UTC)
     start_time = end_time - timedelta(days=1)
 
     include_options = CategoryStatsIncludeOptions.from_include_string("duration,app,title")

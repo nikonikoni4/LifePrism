@@ -5,6 +5,7 @@ Map Cache Providers
 """
 
 import sqlite3
+from datetime import UTC
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -307,10 +308,10 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # 手动实现批量更新
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             if "updated_at" not in data:
-                data["updated_at"] = datetime.now(timezone.utc).isoformat()
+                data["updated_at"] = datetime.now(UTC).isoformat()
 
             set_clause = ", ".join([f"{key} = ?" for key in data])
             placeholders = ",".join("?" * len(cache_ids))
@@ -665,10 +666,10 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # 手动实现批量更新
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             if "updated_at" not in data:
-                data["updated_at"] = datetime.now(timezone.utc).isoformat()
+                data["updated_at"] = datetime.now(UTC).isoformat()
 
             set_clause = ", ".join([f"{key} = ?" for key in data])
             placeholders = ",".join("?" * len(cache_ids))

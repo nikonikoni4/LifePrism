@@ -5,7 +5,7 @@
 - 日期字段（date、start_date、end_date 等 YYYY-MM-DD 格式）保持用户本地时区日期
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytz
 
@@ -34,7 +34,7 @@ def get_utc_now_iso() -> str:
     Returns:
         str: UTC ISO 8601 格式时间戳，如 "2026-07-11T16:29:54.123456+00:00"
     """
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def parse_iso_to_aware(iso_string: str) -> datetime:
@@ -57,7 +57,7 @@ def parse_iso_to_aware(iso_string: str) -> datetime:
     """
     dt = datetime.fromisoformat(iso_string)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -84,7 +84,7 @@ def local_to_utc_iso(local_str: str, format: str = "%Y-%m-%d %H:%M:%S") -> str:
     except pytz.exceptions.AmbiguousTimeError:
         # DST 冬令时回退重叠（如 fall-back 时 01:30 出现两次），使用标准时间
         dt = tz.localize(dt, is_dst=False)
-    return dt.astimezone(timezone.utc).isoformat()
+    return dt.astimezone(UTC).isoformat()
 
 
 def build_local_datetime(date_str: str, time_str: str = "00:00:00") -> str:

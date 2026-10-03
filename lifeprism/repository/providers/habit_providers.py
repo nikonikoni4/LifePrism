@@ -9,7 +9,7 @@ Habit 模块数据提供者
 
 import sqlite3
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -403,8 +403,8 @@ class HabitChallengeProvider(LWBaseDataProvider):
         Returns:
             是否更新成功（True 表示更新了 1 行）
         """
-        now = datetime.now(timezone.utc).isoformat()
-        updated_at = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
+        updated_at = datetime.now(UTC).isoformat()
 
         with self.db.get_connection() as conn:
             cursor = conn.execute(
@@ -576,7 +576,7 @@ class HabitCheckinProvider(LWBaseDataProvider):
             新 checkin_id，或 None（重复打卡）
         """
         checkin_id = generate_id("checkin")
-        now_str = datetime.now(timezone.utc).isoformat()
+        now_str = datetime.now(UTC).isoformat()
 
         insert_data = {
             "id": checkin_id,

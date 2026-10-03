@@ -11,7 +11,7 @@ Meta 表驱动：custom_record_types + custom_record_fields 定义动态数据�
 import re
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from lifeprism.repository.exceptions import DuplicateEntityError, EntityNotFoundError
@@ -190,7 +190,7 @@ class CustomRecordRepository:
         data_table = f"{self._DATA_TABLE_PREFIX}{slug}"
 
         # 事务：meta 写入 + DDL
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -558,7 +558,7 @@ class CustomRecordRepository:
 
         # 生成 entry_id
         entry_id = f"{self._ENTRY_ID_PREFIX}{uuid.uuid4().hex[:8]}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         # event_time 已由调用方转为 UTC ISO，未提供则默认当前时间
         event_time_val = event_time if event_time else now
@@ -983,7 +983,7 @@ class CustomRecordRepository:
             )
 
         # 构造 UPDATE SET 子句（动态）
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         set_clauses: list[str] = []
         params: list[Any] = []
         if event_time is not None:
@@ -1077,7 +1077,7 @@ class CustomRecordRepository:
 
         # 始终更新 updated_at
         set_clauses.append("updated_at = ?")
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         params.append(now)
 
         params.append(type_id)

@@ -4,7 +4,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytz
@@ -265,7 +265,7 @@ class DataProcessingService:
         if latest_end_time:
             # 增量同步：从数据库最新的 end_time 开始获取到现在
             start_time = self._parse_latest_end_time(latest_end_time)
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             time_diff = end_time - start_time
             hours_diff = time_diff.total_seconds() / 3600
             logger.info("开始增量同步 ActivityWatch 数据")
@@ -274,8 +274,8 @@ class DataProcessingService:
             logger.info("  时间跨度: %.2f 小时", hours_diff)
         else:
             # 数据库为空，首次同步：获取最近24小时
-            start_time = datetime.now(timezone.utc) - timedelta(hours=24)
-            end_time = datetime.now(timezone.utc)
+            start_time = datetime.now(UTC) - timedelta(hours=24)
+            end_time = datetime.now(UTC)
             logger.info("数据库为空，执行首次同步（24小时）")
 
         return start_time, end_time
@@ -303,7 +303,7 @@ class DataProcessingService:
                 # 旧格式（无时区信息），假设为本地时间，转换为 UTC
                 local_tz = pytz.timezone(get_user_timezone())
                 dt = local_tz.localize(dt)
-                dt = dt.astimezone(timezone.utc)
+                dt = dt.astimezone(UTC)
             return dt
         except ValueError:
             # 尝试解析为旧格式 "%Y-%m-%d %H:%M:%S"
@@ -311,12 +311,12 @@ class DataProcessingService:
                 dt = datetime.strptime(latest_end_time, "%Y-%m-%d %H:%M:%S")
                 local_tz = pytz.timezone(get_user_timezone())
                 dt = local_tz.localize(dt)
-                dt = dt.astimezone(timezone.utc)
+                dt = dt.astimezone(UTC)
                 return dt
             except ValueError as e:
                 logger.warning("无法解析 end_time: %s, 错误: %s", latest_end_time, e)
                 # 解析失败，回退到24小时前
-                return datetime.now(timezone.utc) - timedelta(hours=24)
+                return datetime.now(UTC) - timedelta(hours=24)
 
     async def _classify_apps(
         self, classify_state: classifyState, filtered_events: int
@@ -870,8 +870,8 @@ if __name__ == "__main__":
 
     async def _main():
         data_processing_service = DataProcessingService()
-        datetime.now(timezone.utc) - timedelta(minutes=5)
-        datetime.now(timezone.utc)
+        datetime.now(UTC) - timedelta(minutes=5)
+        datetime.now(UTC)
         await data_processing_service.process_activitywatch_data(auto_classify=True)
 
     asyncio.run(_main())

@@ -10,7 +10,7 @@ Report 服务层
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pandas as pd
@@ -91,7 +91,7 @@ def _utc_timestamp_to_local_date(timestamp: str) -> str:
     if not normalized:
         return ""
     try:
-        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         local_tz = pytz.timezone(get_user_timezone())
         local_dt = utc_dt.astimezone(local_tz)
         return local_dt.strftime("%Y-%m-%d")
@@ -149,8 +149,8 @@ def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, s
         + timedelta(days=1)
         - timedelta(seconds=1)
     )
-    utc_start = local_start.astimezone(timezone.utc)
-    utc_end = local_end.astimezone(timezone.utc)
+    utc_start = local_start.astimezone(UTC)
+    utc_end = local_end.astimezone(UTC)
     return utc_start.isoformat(), utc_end.isoformat()
 
 

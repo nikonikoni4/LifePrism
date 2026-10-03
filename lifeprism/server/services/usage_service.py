@@ -4,7 +4,7 @@ Usage 服务层 - Token 使用统计
 提供 Token 使用统计的纯函数接口
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytz
 
@@ -67,8 +67,8 @@ def _to_time_range(
         local_tz = pytz.timezone(get_user_timezone())
         local_start = local_tz.localize(datetime.strptime(date, "%Y-%m-%d"))
         local_end = local_start + timedelta(days=1) - timedelta(seconds=1)
-        utc_start = local_start.astimezone(timezone.utc)
-        utc_end = local_end.astimezone(timezone.utc)
+        utc_start = local_start.astimezone(UTC)
+        utc_end = local_end.astimezone(UTC)
         return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
     return start_time, end_time
 
@@ -139,7 +139,7 @@ def _utc_created_at_to_local_date(created_at: str) -> str:
     if not normalized:
         return ""
     try:
-        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         local_tz = pytz.timezone(get_user_timezone())
         local_dt = utc_dt.astimezone(local_tz)
         return local_dt.strftime("%Y-%m-%d")

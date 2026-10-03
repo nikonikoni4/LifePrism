@@ -6,7 +6,7 @@ ActivityWatch 基础数据提供者
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytz
 
@@ -42,7 +42,7 @@ class AWBaseDataProvider:
             self.db = db_manager
 
         self.local_tz = pytz.timezone(get_user_timezone())
-        self.utc_tz = timezone.utc
+        self.utc_tz = UTC
 
         # 验证数据库路径存在
         self._validate_database()
@@ -146,7 +146,7 @@ class AWBaseDataProvider:
         """
         # 处理时间参数
         if hours:
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             start_time = end_time - timedelta(hours=hours)
         elif not start_time or not end_time:
             raise ValueError("必须提供 start_time 和 end_time，或 hours 参数")

@@ -3,7 +3,7 @@
 负责将 ActivityWatch 原始事件转换为标准化的 ProcessedEvent
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.processors.models.processed_event import ProcessedEvent
@@ -157,7 +157,7 @@ class EventTransformer:
 
             # 如果是 naive datetime，补充 UTC 时区
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
 
             return dt.isoformat()
         except Exception as e:

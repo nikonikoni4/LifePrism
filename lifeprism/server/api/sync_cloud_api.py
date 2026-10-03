@@ -21,7 +21,7 @@ import gzip
 import os
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -272,7 +272,7 @@ def sync_pull(request: SyncPullRequest, _: None = Depends(verify_sync_api_key)):
 
     return {
         "changes": changes,
-        "sync_time": datetime.now(timezone.utc).isoformat(),
+        "sync_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -307,7 +307,7 @@ def sync_push(request: SyncPushRequest, _: None = Depends(verify_sync_api_key)):
 
     return {
         "status": "ok",
-        "sync_time": datetime.now(timezone.utc).isoformat(),
+        "sync_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -504,7 +504,7 @@ def sync_rebuild_dynamic_tables(
 
     return {
         "rebuilt": rebuilt,
-        "sync_time": datetime.now(timezone.utc).isoformat(),
+        "sync_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -546,7 +546,7 @@ async def sync_heartbeat(
 
     return {
         "status": "ok",
-        "server_time": datetime.now(timezone.utc).isoformat(),
+        "server_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -584,7 +584,7 @@ def _encode_file(file_path: Path, data_path: Path) -> dict[str, str]:
     compressed = gzip.compress(content_bytes)
     encoded = base64.b64encode(compressed).decode("ascii")
     rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
-    mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+    mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
     return {
         "path": rel_path,
         "content": encoded,
@@ -662,7 +662,7 @@ def sync_pull_files(
 
         if dir_path.is_file():
             # 单文件处理（如 channel/wechat/account.json）
-            file_mtime_dt = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=timezone.utc)
+            file_mtime_dt = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=UTC)
             if last_sync_dt and file_mtime_dt <= last_sync_dt:
                 continue
             files.append(_encode_file(dir_path, data_path))
@@ -672,7 +672,7 @@ def sync_pull_files(
                 if not file_path.is_file():
                     continue
 
-                file_mtime_dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+                file_mtime_dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
                 if last_sync_dt and file_mtime_dt <= last_sync_dt:
                     continue
                 files.append(_encode_file(file_path, data_path))
@@ -696,7 +696,7 @@ def sync_pull_files(
 
     return {
         "files": files,
-        "sync_time": datetime.now(timezone.utc).isoformat(),
+        "sync_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -761,7 +761,7 @@ def sync_pull_files_check(
             rel_path = str(dir_path.relative_to(data_path)).replace("\\", "/")
             all_paths.append(rel_path)
             # mtime 过滤，仅变更文件才计算 hash
-            file_mtime_dt = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=timezone.utc)
+            file_mtime_dt = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=UTC)
             if last_sync_dt and file_mtime_dt <= last_sync_dt:
                 continue
             files.append(_build_file_hash_state(dir_path, data_path))
@@ -779,7 +779,7 @@ def sync_pull_files_check(
                 rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
                 all_paths.append(rel_path)
                 # mtime 过滤，仅变更文件才计算 hash
-                file_mtime_dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+                file_mtime_dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
                 if last_sync_dt and file_mtime_dt <= last_sync_dt:
                     continue
                 files.append(_build_file_hash_state(file_path, data_path))
@@ -812,7 +812,7 @@ def sync_pull_files_check(
     return {
         "files": files,
         "all_paths": all_paths,
-        "sync_time": datetime.now(timezone.utc).isoformat(),
+        "sync_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1074,7 +1074,7 @@ def sync_push_files(
 
     return {
         "results": results,
-        "sync_time": datetime.now(timezone.utc).isoformat(),
+        "sync_time": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1095,7 +1095,7 @@ def sync_get_initialization_status(_: None = Depends(verify_sync_api_key)):
     marker_path = settings.config_base_path / "config" / "cloud_initialized"
     return {
         "initialized": marker_path.exists(),
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1186,7 +1186,7 @@ def sync_full_clear(_: None = Depends(verify_sync_api_key)):
         "status": "ok",
         "cleared_tables": cleared_tables,
         "cleared_files": cleared_files,
-        "cleared_at": datetime.now(timezone.utc).isoformat(),
+        "cleared_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1207,11 +1207,11 @@ def sync_mark_initialized(_: None = Depends(verify_sync_api_key)):
     config_dir = settings.config_base_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     marker_path = config_dir / "cloud_initialized"
-    marker_path.write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
+    marker_path.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
 
     logger.info("云端已标记为已初始化: %s", marker_path)
 
     return {
         "status": "ok",
-        "marked_at": datetime.now(timezone.utc).isoformat(),
+        "marked_at": datetime.now(UTC).isoformat(),
     }

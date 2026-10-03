@@ -94,7 +94,7 @@ class ClassifyGraph:
                     logger.debug("获取 %s 描述成功: %s", app, result[:50])
                     return
                 logger.warning("获取 %s 描述为空（第 %s/%s 次）", app, attempt, MAX_RETRIES)
-            except (asyncio.TimeoutError, LLMError, ConnectionError, OSError) as e:
+            except (TimeoutError, LLMError, ConnectionError, OSError) as e:
                 logger.warning("获取 %s 描述异常（第 %s/%s 次）: %s", app, attempt, MAX_RETRIES, e)
             if attempt < MAX_RETRIES:
                 await asyncio.sleep(0.5)

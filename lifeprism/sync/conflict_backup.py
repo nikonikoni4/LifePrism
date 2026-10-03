@@ -25,7 +25,7 @@
 """
 
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lifeprism.utils import get_logger
@@ -96,10 +96,10 @@ def cleanup_expired_conflict_backups(
         被删除的目录数量
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     # 防御性：确保 now 是 aware datetime（遵循 time-handling-rules §3.3）
     if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
+        now = now.replace(tzinfo=UTC)
 
     sync_conflict_root = data_path / "sync_conflict"
     if not sync_conflict_root.exists():
@@ -152,7 +152,7 @@ def _parse_conflict_timestamp(dir_name: str) -> datetime | None:
     try:
         # strptime 返回 naive datetime，目录名约定为 UTC 时间
         # （由 datetime.now(timezone.utc).strftime 生成）
-        return datetime.strptime(dir_name, _CONFLICT_TIMESTAMP_FORMAT).replace(tzinfo=timezone.utc)
+        return datetime.strptime(dir_name, _CONFLICT_TIMESTAMP_FORMAT).replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -196,7 +196,7 @@ def backup_conflict_versions(
     """
     # 生成时间戳目录名（UTC aware，遵循 time-handling-rules §3.1）
     if timestamp_str is None:
-        timestamp_str = datetime.now(timezone.utc).strftime(_CONFLICT_TIMESTAMP_FORMAT)
+        timestamp_str = datetime.now(UTC).strftime(_CONFLICT_TIMESTAMP_FORMAT)
 
     # 构建冲突备份目录：sync_conflict/{ts}/
     conflict_dir = (data_path / "sync_conflict" / timestamp_str).resolve()

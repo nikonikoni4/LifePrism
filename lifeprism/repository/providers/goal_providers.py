@@ -8,7 +8,7 @@ Goal Providers - 目标相关数据提供者
 
 import sqlite3
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -492,7 +492,7 @@ class GoalProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             data = {"time_invested": time_invested, "time_invested_updated_at": now}
             success = self._generic_update(goal_id, data)
             if success:

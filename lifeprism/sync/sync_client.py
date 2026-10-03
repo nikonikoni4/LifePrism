@@ -14,7 +14,7 @@ import gzip
 import os
 import tempfile
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -236,10 +236,10 @@ class SyncClient:
 
                 try:
                     logger.info("定时同步开始")
-                    start_time = datetime.now(timezone.utc)
+                    start_time = datetime.now(UTC)
                     # 使用 asyncio.to_thread 在独立线程中运行同步方法，避免阻塞事件循环
                     await asyncio.to_thread(self.sync_once)
-                    duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+                    duration = (datetime.now(UTC) - start_time).total_seconds()
                     logger.info("定时同步完成，耗时 %ss", duration)
                 finally:
                     global_task_state.release()
@@ -367,7 +367,7 @@ class SyncClient:
         if self._ssh_tunnel_keep_alive_task is not None:
             try:
                 await asyncio.wait_for(self._ssh_tunnel_keep_alive_task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # 超时则强制取消（保底，正常不应发生）
                 self._ssh_tunnel_keep_alive_task.cancel()
                 logger.warning("keep-alive 任务未在 5s 内退出，已强制取消")
@@ -438,7 +438,7 @@ class SyncClient:
         # - 代价：下次 sync 会重复 Push 已 Push 过的数据（updated_at > T_start），
         #   但云端 LWW 幂等处理（updated_at 相同跳过覆盖），无副作用
         # 参考 ADR docs/adr/2026-07-25-global-task-state.md
-        sync_cutoff_time = datetime.now(timezone.utc).isoformat()
+        sync_cutoff_time = datetime.now(UTC).isoformat()
 
         # SSH 隧道模式 + 隧道未就绪 → 跳过本次同步（不抛异常）
         # _read_remote_url() 已记录 WARNING，此处不重复记录
@@ -756,7 +756,7 @@ class SyncClient:
         # 这样即使 mark-initialized 失败，下次 sync_once 会重新检测（未初始化）并重试
         # 如果 mark-initialized 成功，last_sync_time 已设置，下次走增量同步
         logger.info("步骤 4/4: 更新 last_sync_time 并标记云端已初始化...")
-        current_time = datetime.now(timezone.utc).isoformat()
+        current_time = datetime.now(UTC).isoformat()
         set_setting("sync.last_sync_time", current_time)
 
         resp = httpx.post(
@@ -2247,7 +2247,7 @@ class SyncClient:
         resolved_paths = []
         for file_path in conflict_paths:
             try:
-                start_time = datetime.now(timezone.utc)
+                start_time = datetime.now(UTC)
 
                 # 1. 读取本地文件内容 (ours)
                 local_file = (data_path / file_path).resolve()
@@ -2362,7 +2362,7 @@ class SyncClient:
                 # 修复旧实现仅备份 local_content 的 bug（PRD 决策 19，
                 # ADR-2026-07-17-conflict-failure-policy.md）。
                 # backup_conflict_versions 内部会顺带触发 30 天清理（PRD 决策 9）。
-                timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                timestamp_str = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
                 backup_conflict_versions(
                     data_path=data_path,
                     file_path=file_path,
@@ -2383,7 +2383,7 @@ class SyncClient:
                     current_hash=new_hash,
                 )
 
-                duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+                duration = (datetime.now(UTC) - start_time).total_seconds()
                 logger.debug(
                     "_resolve_conflicts: 文件 %s 冲突解决完成，耗时 %ss，new_hash=%s",
                     file_path,

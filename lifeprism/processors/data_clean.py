@@ -6,7 +6,7 @@
 - clean_activitywatch_data_v2: 重构版本（组件化架构）
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
@@ -66,7 +66,7 @@ def _normalize_utc_timestamp(utc_timestamp_str: str) -> str:
         clean_timestamp = utc_timestamp_str.replace("Z", "+00:00")
         dt = datetime.fromisoformat(clean_timestamp)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt.isoformat()
     except Exception as e:
         logger.warning("时间戳转换失败: %s -> %s", utc_timestamp_str, str(e))
