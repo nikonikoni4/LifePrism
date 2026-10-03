@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class CaptureReason(str, Enum):
+class CaptureReason(StrEnum):
     SCHEDULED = "scheduled"
     ACTIVE = "active"
     ENTER = "enter"

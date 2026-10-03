@@ -5,7 +5,7 @@
 模板纯文件管理，不经过数据库。
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -78,7 +78,7 @@ class DiaryAISummaryResponse(BaseModel):
 # ==================== AI 总结范围更新 ====================
 
 
-class ExistingSummaryMode(str, Enum):
+class ExistingSummaryMode(StrEnum):
     """现有总结更新模式"""
 
     REGENERATE_ALL = "regenerate_all"

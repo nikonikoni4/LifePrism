@@ -5,7 +5,7 @@ Goal 服务层 - Goal 目标业务逻辑
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from lifeprism.repository import goal_repository
@@ -212,10 +212,8 @@ class GoalService:
             last_update = datetime.fromisoformat(normalized)
             if last_update.tzinfo is None:
                 # 旧数据为 naive 本地时间，过渡期按 UTC 处理（24h 阈值容差可接受）
-                last_update = last_update.replace(tzinfo=timezone.utc)
-            threshold = datetime.now(timezone.utc) - timedelta(
-                hours=TIME_INVESTED_UPDATE_THRESHOLD_HOURS
-            )
+                last_update = last_update.replace(tzinfo=UTC)
+            threshold = datetime.now(UTC) - timedelta(hours=TIME_INVESTED_UPDATE_THRESHOLD_HOURS)
             return last_update < threshold
         except Exception:
             return True

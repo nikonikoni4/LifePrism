@@ -6,7 +6,7 @@ import json
 import os
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,12 +21,10 @@ allow_role = ["user", "assistant", "tool", "system"]
 @dataclass
 class Session:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    name: str = field(
-        default_factory=lambda: f"session_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}"
-    )
+    name: str = field(default_factory=lambda: f"session_{datetime.now(UTC).strftime('%Y%m%d%H%M')}")
     messages: list[dict[str, Any]] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     # metadata : dict = field(default_factory=dict) # 扩展位，预留，暂时无任何作用
     last_compacted_loc: int = 0  # 上一次compact的位置
     auto_compact: bool = True  # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
@@ -53,11 +51,11 @@ class Session:
             {
                 "role": role,
                 "content": content,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 **kw,
             }
         )
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def get_history_message(self) -> list[dict[str, Any]]:
         """加载未压缩的message"""
@@ -341,7 +339,7 @@ class ChatHistoryManager:
             self.path = settings.lifeprism_data_path / "user/daily_data/chat_history.json"
         self.path.parent.parent.mkdir(parents=True, exist_ok=True)
         self.histories: list[dict] = []  # timestamp,content,is_processed
-        self.last_processed_time = datetime.now(timezone.utc)
+        self.last_processed_time = datetime.now(UTC)
         self.load_histories()
 
     def load_histories(self) -> list[dict]:
@@ -370,10 +368,10 @@ class ChatHistoryManager:
                             parsed_lpt = datetime.fromisoformat(raw_lpt)
                             # 向后兼容：旧文件中的 naive 时间戳视为 UTC
                             if parsed_lpt.tzinfo is None:
-                                parsed_lpt = parsed_lpt.replace(tzinfo=timezone.utc)
+                                parsed_lpt = parsed_lpt.replace(tzinfo=UTC)
                             self.last_processed_time = parsed_lpt
                         else:
-                            self.last_processed_time = datetime.now(timezone.utc)
+                            self.last_processed_time = datetime.now(UTC)
                     else:
                         self.histories.append(data)
         if self.histories:
@@ -389,7 +387,7 @@ class ChatHistoryManager:
                 dt = datetime.fromisoformat(history["timestamp"])
                 # 向后兼容：旧记录中的 naive 时间戳视为 UTC
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 if dt > self.last_processed_time:
                     result.append(history)
         return result
@@ -410,7 +408,7 @@ class ChatHistoryManager:
         self.path.parent.parent.mkdir(parents=True, exist_ok=True)
 
         # 构建历史记录项
-        history_item = {"timestamp": datetime.now(timezone.utc).isoformat(), "content": content}
+        history_item = {"timestamp": datetime.now(UTC).isoformat(), "content": content}
 
         # 只有当 session_id 不为 None 时才添加该字段
         if session_id is not None:

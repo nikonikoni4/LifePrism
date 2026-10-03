@@ -7,7 +7,7 @@ Chatbot 模块的 schemas 定义
 - 对话功能：流式输出、Token 估计
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -86,7 +86,7 @@ class ChatStreamStartResponse(BaseModel):
     is_new_session: bool = Field(default=False, description="是否为新创建的会话")
 
 
-class SSEEventType(str, Enum):
+class SSEEventType(StrEnum):
     """SSE 事件类型"""
 
     SESSION = "session"  # 会话信息
@@ -96,7 +96,7 @@ class SSEEventType(str, Enum):
     ERROR = "error"  # 错误信息
 
 
-class ChatNodeType(str, Enum):
+class ChatNodeType(StrEnum):
     """聊天节点类型（用于 status 事件）"""
 
     INTENT_ROUTER = "intent_router"  # 意图识别
@@ -152,7 +152,7 @@ class ChatCompletionResponse(BaseModel):
 # ============================================================================
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """消息角色"""
 
     USER = "user"

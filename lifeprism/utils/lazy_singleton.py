@@ -6,12 +6,10 @@
 """
 
 import threading
-from typing import Any, Generic, TypeVar
-
-T = TypeVar("T")
+from typing import Any
 
 
-class LazySingleton(Generic[T]):
+class LazySingleton[T]:
     """
     懒加载单例代理类
 
