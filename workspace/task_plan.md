@@ -154,3 +154,18 @@ P0/P1/P2 代码迁移与限定验证完成。Windows 冻结构建成功，在线
 - Claude CLI 完成两个生产 provider 的机械接线；Codex 完成分类器、共享边界与生命周期修正。
 - 禁用 SDK 自动重试与旧 chat_with_retry 的恢复行为，严格保留无效工具参数原文。
 - P3 恢复策略仍未实现。具体契约、验证和兼容风险见 workspace/provider-errors-implementation.md。
+
+## 重试 IoC（2026-10-03）
+
+- 按用户指定参考实现接入 context.register_policy / request/error waterfall。
+- LLMRetry 只裁决，myagent loop 管理每轮 3 次重试、退避和记录；撤回 provider 内重试。
+- 相关测试 63 项通过，覆盖真实 loop 恢复/耗尽及 llm/retry 记录；限定文件 Ruff 通过。
+- 详情及边界见 workspace/llm-retry-implementation.md。
+
+## Agent 配置（2026-10-03）
+
+- 新增 AgentSettings 并挂到 settings.agent；config.yaml 存 agent 嵌套节点，保存前验证。
+- context 初始化从配置加载步数、重试预算、LLMRetry 和 myagent ToolUseGuard。
+- 相对护栏路径基于数据目录解析；支持本平台绝对路径并拒绝外平台路径。
+- 当前本地 config.yaml 补入默认 agent 节点，保持 LLMRetry 开启、ToolGuard 关闭。
+- 76 项相关测试通过，限定 Ruff 通过。示例与边界见 workspace/agent-config-example.yaml 和 workspace/agent-config-implementation.md。
