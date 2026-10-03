@@ -14,8 +14,8 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from lifeprism.llm.agent.tools.base import ERROR
-from lifeprism.llm.agent.tools.session_query import QuerySessionHistoryTool, QuerySessionListTool
+from lifeprism.llm.deprecated_agent.tools.base import ERROR
+from lifeprism.llm.deprecated_agent.tools.session_query import QuerySessionHistoryTool, QuerySessionListTool
 
 
 @pytest.mark.core

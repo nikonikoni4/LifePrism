@@ -5,8 +5,8 @@ from collections import defaultdict
 from typing import Any
 
 from lifeprism.config import settings
-from lifeprism.llm.agent.context import Context
-from lifeprism.llm.agent.tools import (
+from lifeprism.llm.deprecated_agent.context import Context
+from lifeprism.llm.deprecated_agent.tools import (
     ERROR,
     BackfillCheckinTool,
     CancelCheckinHabitTool,

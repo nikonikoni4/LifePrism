@@ -5,6 +5,7 @@ Chatbot API - 聊天机器人接口
 采用方式B设计：发送消息时自动创建会话
 """
 
+import contextlib
 import json
 
 from fastapi import APIRouter, HTTPException, Path, Query
@@ -107,8 +108,7 @@ async def get_session_tokens(session_id: str = Path(..., description="会话 ID"
     - turn_usage: 本轮对话使用量
     - session_usage: 会话累计使用量
     """
-    usage = chatbot_service.get_last_token_usage(session_id)
-    return usage
+    return await chatbot_service.get_tokens_usage(session_id)
 
 
 # ============================================================================
@@ -177,9 +177,11 @@ async def chat_stream(request: ChatMessageRequest):
     async def generate():
         try:
             # 使用重构后的 send_message，它统一处理了 session 创建和事件生成
-            async for event in chatbot_service.send_message(request.content, request.session_id):
-                # event 为 ChatStreamEvent 对象，需要转换为字典并序列化
-                yield f"data: {event.model_dump_json(exclude_none=True)}\n\n"
+            async with contextlib.aclosing(
+                chatbot_service.send_message(request.content, request.session_id)
+            ) as events:
+                async for event in events:
+                    yield f"data: {event.model_dump_json(exclude_none=True)}\n\n"
 
         except Exception as e:
             # LEGITIMATE: SSE 流边界兜底 — 将未预期异常格式化为流错误事件

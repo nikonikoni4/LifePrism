@@ -1,98 +1,36 @@
-from lifeprism.llm.agent.context import Context
-from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage, bus
-from lifeprism.llm.providers.llm_providers.base import LLMResponse
-from lifeprism.llm.session.manager import Session, session_manager
-from lifeprism.llm.utils.llm_call_logger import llm_call_logger
-from lifeprism.utils import get_logger
+"""Chat entry point using myagent events; session business APIs are deferred to P4."""
 
-logger = get_logger(__name__)
+from collections.abc import AsyncIterator
+
+from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
+from lifeprism.llm.providers import LLMResponse
+from lifeprism.llm.runtime import agent_runtime
+from lifeprism.llm.runtime.service import RuntimeEvent
 
 
 class ChatBot:
-    def __init__(self):
-        # 现在的 Channel 自动管理接收循环和单例状态，ChatBot 变为无状态包装器
-        self._bus = bus
-        self._session_manager = session_manager
-
-    async def chat(self, content: str, session_id: str = None, **extra) -> LLMResponse:
-        """使用 channel 发送聊天消息并返回响应。会话持久化由 AgentLoop 负责。"""
-        try:
-            # 1. 确保会话存在
-            session = self._session_manager.get_or_create_session(session_id)
-
-            # 2. 发送消息
-            # 注意：不再此处手动添加消息，因为 AgentLoop 会处理消息的接收、存储和回复存储
-            logger.info(
-                "ChatBot.chat 开始: session_id=%s, content_len=%s", session_id, len(content)
+    def stream(
+        self, content: str, session_id: str | None = None, channel: str = ChannelType.LOCAL, **extra
+    ) -> AsyncIterator[RuntimeEvent]:
+        """Submit directly to Runtime and subscribe to the run's events."""
+        return agent_runtime.stream(
+            InboundMessage(
+                type=MessageType.CHAT,
+                content=content,
+                session_id=session_id,
+                channel=channel,
+                extra=extra,
             )
-            msg = InboundMessage(
-                content=content, session_id=session.id, type=MessageType.CHAT, extra=extra
+        )
+
+    async def chat(self, content: str, session_id: str | None = None, **extra) -> LLMResponse:
+        """Collect the complete response without using the background message bus."""
+        result = await agent_runtime.execute(
+            InboundMessage(
+                type=MessageType.CHAT,
+                content=content,
+                session_id=session_id,
+                extra=extra,
             )
-            response_data = await self._bus.send(msg)
-
-            # 记录 LLM 调用
-            try:
-                system_prompt = Context.build_system_prompt(msg)
-                llm_call_logger.log_call(
-                    inbound_msg=msg,
-                    outbound_msg=response_data
-                    if isinstance(response_data, OutboundMessage)
-                    else None,
-                    prompt_module="chat",
-                    prompt_name="chat",
-                    system_prompt=system_prompt,
-                )
-            except Exception as log_e:
-                logger.warning("记录 LLM 调用日志失败: %s", log_e)
-
-            # 3. 包装响应
-            result = None
-            if isinstance(response_data, OutboundMessage):
-                result = response_data.response
-            elif isinstance(response_data, LLMResponse):
-                result = response_data
-            elif isinstance(response_data, str):
-                result = LLMResponse(content=response_data)
-            else:
-                result = response_data
-            logger.info("ChatBot.chat 完成: session_id=%s", session_id)
-            return result
-        except Exception as e:
-            logger.error("[ChatBot] Chat error: %s", e, exc_info=True)
-            raise
-
-    # ========== 会话管理 API ==========
-
-    def get_or_create_session(self, session_id: str = None) -> Session:
-        """获取或创建会话"""
-        return self._session_manager.get_or_create_session(session_id)
-
-    def save_session(self, session: Session):
-        """保存会话"""
-        self._session_manager.save_session(session)
-
-    def delete_session(self, session_id: str):
-        """删除会话"""
-        self._session_manager.delete_session(session_id)
-
-    def list_sessions(self) -> list[str]:
-        """获取所有会话 ID 列表"""
-        return self._session_manager.show_session_list()
-
-    def get_session(self, session_id: str) -> Session | None:
-        """获取现有会话，不存在则返回 None"""
-        try:
-            return self._session_manager.get_or_create_session(session_id)
-        except Exception:
-            return None
-
-    def update_session_name(self, session_id: str, name: str):
-        """更新会话名称"""
-        session = self.get_session(session_id)
-        if session:
-            session.name = name
-            self.save_session(session)
-
-    def stop(self):
-        """停止 ChatBot（现在是空操作，Channel 自行管理生命周期）。"""
-        pass
+        )
+        return result.response

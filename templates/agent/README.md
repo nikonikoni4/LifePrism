@@ -9,7 +9,6 @@
 ```
 agent/
 ├── chat/                      # Chat Agent
-│   ├── bootstrap.md           # 系统级启动说明
 │   ├── agent.md               # System Prompt（角色定义）
 │   ├── memory.md              # 长期蒸馏记忆
 │   └── session_log/           # 跨会话短期记忆
@@ -51,12 +50,6 @@ Chat Agent 负责与用户直接对话，提供系统解释、行为查询、日
 3. memory.md                         → 加载长期稳定语义记忆
 4. session_log/今天.md + 昨天.md     → 仅在需要连续性时按需加载近期对话上下文
 ```
-
-### chat/bootstrap.md
-- **存放内容**：Chat Agent 初始化时的启动流程和基本约束
-- **单一职责**：定义 Chat Agent 每次会话的加载顺序和初始化规则
-- **写入权限**：仅人工维护，Agent 不写入
-- **读取时机**：每次 Chat Agent 会话初始化时首先读取
 
 ### chat/agent.md
 - **存放内容**：Chat Agent 的 System Prompt，定义角色、能力边界、行为准则

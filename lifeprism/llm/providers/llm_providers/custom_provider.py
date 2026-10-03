@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import AsyncIterator
 from typing import Any
 
 import json_repair
@@ -38,7 +39,7 @@ class CustomProvider(LLMProvider):
             default_headers=default_headers,
         )
 
-    async def chat(
+    def _build_chat_kwargs(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
@@ -47,7 +48,24 @@ class CustomProvider(LLMProvider):
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
         tool_choice: str | dict[str, Any] | None = None,
-    ) -> LLMResponse:
+    ) -> dict[str, Any]:
+        """Build the request kwargs shared by chat() and stream_chat().
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'.
+            tools: Optional list of tool definitions in OpenAI format.
+            model: Model identifier; falls back to the default model.
+            max_tokens: Maximum tokens in response.
+            temperature: Sampling temperature.
+            reasoning_effort: Optional reasoning effort hint.
+            tool_choice: Tool selection strategy ("auto", "required", or specific tool dict).
+
+        Returns:
+            dict: Keyword arguments for the chat completions request.
+
+        Raises:
+            ValueError: When the last user message content is a string.
+        """
         self._validate_last_user_content_is_multimodal(messages)
         kwargs: dict[str, Any] = {
             "model": model or self.default_model,
@@ -59,6 +77,21 @@ class CustomProvider(LLMProvider):
             kwargs["reasoning_effort"] = reasoning_effort
         if tools:
             kwargs.update(tools=tools, tool_choice=tool_choice or "auto")
+        return kwargs
+
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        reasoning_effort: str | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        kwargs = self._build_chat_kwargs(
+            messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
+        )
         try:
             return self._parse(await self._client.chat.completions.create(**kwargs))
         except Exception as e:
@@ -69,6 +102,38 @@ class CustomProvider(LLMProvider):
             if body and body.strip():
                 return LLMResponse(content=f"Error: {body.strip()[:500]}", finish_reason="error")
             return LLMResponse(content=f"Error: {e}", finish_reason="error")
+
+    async def stream_chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        reasoning_effort: str | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+    ) -> AsyncIterator[Any]:
+        """Stream a chat completion, yielding raw SDK chunks without parsing.
+
+        Exceptions propagate unchanged; no retry is attempted. The underlying
+        stream is always closed, including on cancellation.
+
+        Yields:
+            Raw chunk objects from the OpenAI-compatible streaming API.
+        """
+        kwargs = self._build_chat_kwargs(
+            messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
+        )
+        kwargs["stream"] = True
+        kwargs["stream_options"] = {"include_usage": True}
+        stream = await self._client.chat.completions.create(**kwargs)
+        try:
+            async for chunk in stream:
+                yield chunk
+        finally:
+            aclose = getattr(stream, "aclose", None) or getattr(stream, "close", None)
+            if aclose is not None:
+                await aclose()
 
     @staticmethod
     def _parse_xml_tool_calls(content: str) -> list[ToolCallRequest]:

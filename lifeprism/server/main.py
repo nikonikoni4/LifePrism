@@ -506,16 +506,16 @@ async def lifespan(app: FastAPI):
         logger.warning("创建 SyncClient 失败: error=%s", e)
         app.state.sync_client = None
 
-    # 先启动 AgentLoop，再执行启动同步
+    # 先启动 AgentBusWorker，再执行启动同步
     # 原因：sync_once 在遇到 CONFLICT 时会通过 bus.send 发送 AI 合并请求，
-    # 若 AgentLoop 未启动，请求会在队列中积压直到 timeout 超时降级。
-    # 必须先启动 AgentLoop 作为消费者，sync_once 的冲突合并请求才能被及时处理。
+    # 若 AgentBusWorker 未启动，请求会在队列中积压直到 timeout 超时降级。
+    # 必须先启动 AgentBusWorker 作为消费者，sync_once 的冲突合并请求才能被及时处理。
     import asyncio
 
-    from lifeprism.llm.agent.loop import agent_loop
+    from lifeprism.llm.runtime.worker import agent_loop
 
     loop_task = asyncio.create_task(agent_loop.loop())
-    logger.info("[STARTUP] AgentLoop started")
+    logger.info("[STARTUP] AgentBusWorker started")
 
     # 启动时立即同步一次 + 定时同步（仅在 run_mode == "full" 时启用）
     await _start_sync_on_startup(app)
@@ -540,12 +540,12 @@ async def lifespan(app: FastAPI):
     if wechat_channel._running:
         await wechat_channel.stop()
 
-    # 关闭时：取消 AgentLoop 任务
+    # 关闭时：取消 AgentBusWorker 任务
     loop_task.cancel()
     try:
         await loop_task
     except asyncio.CancelledError:
-        logger.info("[SHUTDOWN] AgentLoop stopped")
+        logger.info("[SHUTDOWN] AgentBusWorker stopped")
 
     # 关闭时：停止定时任务调度器
     try:

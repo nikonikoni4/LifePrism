@@ -124,6 +124,12 @@ class ChatStreamEvent(BaseModel):
     session_name: str | None = Field(default=None, description="会话名称（session 事件）")
     is_new_session: bool | None = Field(default=None, description="是否新会话（session 事件）")
     error: str | None = Field(default=None, description="错误信息（error 事件）")
+    run_id: str | None = Field(default=None, description="运行关联 ID")
+    turn: int | None = Field(default=None, description="myagent 轮次")
+    step: int | None = Field(default=None, description="myagent 步骤")
+    seq: int | None = Field(default=None, description="会话事件序号")
+    data: dict | None = Field(default=None, description="工具过程事件数据")
+    usage: dict | None = Field(default=None, description="本轮所有模型调用的 token 用量")
 
 
 class TokenUsageEstimate(BaseModel):

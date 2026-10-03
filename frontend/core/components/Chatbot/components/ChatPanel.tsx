@@ -138,9 +138,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
         }
     };
 
-    // 初始化加载
+    // 初始化加载（会话历史暂不可用，不加载会话列表）
     useEffect(() => {
-        loadSessions();
         loadModelConfig();
     }, []);
 
@@ -181,13 +180,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                 (event: SSEEvent) => {
                     switch (event.type) {
                         case 'session':
-                            // 更新会话信息
+                            // 更新会话信息（会话历史暂不可用，不刷新历史列表）
                             newSessionId = event.sessionId || null;
                             setCurrentSessionId(newSessionId);
-                            if (event.isNewSession) {
-                                // 刷新会话列表
-                                loadSessions();
-                            }
                             break;
                         case 'status':
                             // 显示节点状态
@@ -203,9 +198,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                                 )
                             );
                             break;
-                        case 'done':
-                            // 完成，从事件中获取 token 使用情况
+                        case 'done': {
+                            // 完成：使用最终内容覆盖本轮 AI 消息，
+                            // 防止工具步骤的中间内容被拼进最终答案
                             setCurrentStatus(null);
+                            const finalText = event.message;
+                            if (finalText !== undefined) {
+                                setMessages(prev =>
+                                    prev.map(msg =>
+                                        msg.id === aiMsgId ? { ...msg, text: finalText, isLoading: false } : msg
+                                    )
+                                );
+                            }
                             if (event.usage) {
                                 setLastTokenUsage(event.usage);
                                 // 将 token 信息附加到最后一条 AI 消息
@@ -216,6 +220,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                                 );
                             }
                             break;
+                        }
                         case 'error':
                             console.error('SSE Error:', event.error);
                             setCurrentStatus(null);
@@ -475,11 +480,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                         >
                             <Plus size={18} />
                         </button>
-                        {/* History Button */}
+                        {/* History Button（会话历史暂不可用，禁用） */}
                         <button
-                            onClick={() => setShowHistory(!showHistory)}
-                            className={`p-2 hover:bg-white/80 rounded-lg transition-colors ${showHistory ? 'text-indigo-600 bg-white/80' : 'text-gray-500 hover:text-indigo-600'}`}
-                            title="历史对话"
+                            disabled
+                            className="p-2 rounded-lg text-gray-300 cursor-not-allowed"
+                            title="会话历史暂不可用"
                         >
                             <History size={18} />
                         </button>

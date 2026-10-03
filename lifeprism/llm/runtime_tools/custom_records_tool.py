@@ -2,14 +2,21 @@
 自定义记录模块 LLM Tools
 
 直接调用 custom_record_repository，不经过 service（遵循现有架构，避免循环引用）。
-遵循 lifeprism/llm/agent/tools/CLAUDE.md：所有 execute() 返回 str。
+遵循 lifeprism/llm/runtime_tools/base.py 契约：execute 返回 str（成功）或
+ToolResult.error（失败），由 normalize_tool_result 在返回值边界完成转换。
 """
 
 import json
 import re
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
+from lifeprism.llm.runtime_tools.base import (
+    ERROR,
+    SUCCESS,
+    Tool,
+    ToolResult,
+    normalize_tool_result,
+)
 from lifeprism.repository import custom_record_repository
 from lifeprism.utils.exceptions import ValidationError
 from lifeprism.utils.time_utils import build_utc_time_range, local_to_utc_iso, utc_to_local_display
@@ -19,7 +26,7 @@ class ListCustomRecordTypesTool(Tool):
     """列出自定义记录类型工具"""
 
     def __init__(self):
-        pass
+        super().__init__()
 
     @property
     def name(self) -> str:
@@ -40,7 +47,8 @@ class ListCustomRecordTypesTool(Tool):
             "required": [],
         }
 
-    async def execute(self, **kwargs: Any) -> str:
+    @normalize_tool_result
+    async def execute(self, **kwargs: Any) -> ToolResult | str:
         try:
             types = custom_record_repository.list_types()
             for t in types:
@@ -57,7 +65,7 @@ class CreateCustomRecordTypeTool(Tool):
     """创建自定义记录类型工具"""
 
     def __init__(self):
-        pass
+        super().__init__()
 
     @property
     def name(self) -> str:
@@ -125,7 +133,8 @@ class CreateCustomRecordTypeTool(Tool):
             "required": ["name", "slug", "fields"],
         }
 
-    async def execute(self, **kwargs: Any) -> str:
+    @normalize_tool_result
+    async def execute(self, **kwargs: Any) -> ToolResult | str:
         try:
             name = kwargs.get("name", "")
             slug = kwargs.get("slug", "")
@@ -151,7 +160,7 @@ class CreateCustomRecordEntryTool(Tool):
     """录入自定义记录工具"""
 
     def __init__(self):
-        pass
+        super().__init__()
 
     @property
     def name(self) -> str:
@@ -200,7 +209,8 @@ class CreateCustomRecordEntryTool(Tool):
             "required": ["type_id", "data"],
         }
 
-    async def execute(self, **kwargs: Any) -> str:
+    @normalize_tool_result
+    async def execute(self, **kwargs: Any) -> ToolResult | str:
         type_id = kwargs.get("type_id", "")
         data = kwargs.get("data", {})
         event_time_raw = kwargs.get("event_time")
@@ -248,7 +258,7 @@ class QueryCustomRecordEntriesTool(Tool):
     """查询自定义记录工具"""
 
     def __init__(self):
-        pass
+        super().__init__()
 
     @property
     def name(self) -> str:
@@ -332,7 +342,8 @@ class QueryCustomRecordEntriesTool(Tool):
             "required": ["type_id"],
         }
 
-    async def execute(self, **kwargs: Any) -> str:
+    @normalize_tool_result
+    async def execute(self, **kwargs: Any) -> ToolResult | str:
         type_id = kwargs.get("type_id", "")
         date_range_raw = kwargs.get("date_range")
         limit = kwargs.get("limit", 50)

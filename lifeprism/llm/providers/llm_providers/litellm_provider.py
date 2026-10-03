@@ -8,6 +8,7 @@ import hashlib
 import os
 import secrets
 import string
+from collections.abc import AsyncIterator
 from typing import Any
 
 import json_repair
@@ -229,7 +230,7 @@ class LiteLLMProvider(LLMProvider):
                 clean["tool_call_id"] = map_id(clean["tool_call_id"])
         return sanitized
 
-    async def chat(
+    def _build_chat_kwargs(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
@@ -238,19 +239,26 @@ class LiteLLMProvider(LLMProvider):
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
         tool_choice: str | dict[str, Any] | None = None,
-    ) -> LLMResponse:
-        """
-        Send a chat completion request via LiteLLM.
+    ) -> dict[str, Any]:
+        """Build the request kwargs shared by chat() and stream_chat().
+
+        Applies model resolution, gateway params, prompt caching, message
+        sanitization, model overrides, and auth/header injection.
 
         Args:
             messages: List of message dicts with 'role' and 'content'.
             tools: Optional list of tool definitions in OpenAI format.
-            model: Model identifier (e.g., 'anthropic/claude-sonnet-4-5'). 为None时使用spec中指定的默认模型
+            model: Model identifier (e.g., 'anthropic/claude-sonnet-4-5').
             max_tokens: Maximum tokens in response.
             temperature: Sampling temperature.
+            reasoning_effort: Optional reasoning effort hint.
+            tool_choice: Tool selection strategy ("auto", "required", or specific tool dict).
 
         Returns:
-            LLMResponse with content and/or tool calls.
+            dict: Keyword arguments for the completion request.
+
+        Raises:
+            ValueError: When the last user message content is a string.
         """
         self._validate_last_user_content_is_multimodal(messages)
         original_model = model or self.default_model
@@ -302,6 +310,34 @@ class LiteLLMProvider(LLMProvider):
             kwargs["tools"] = tools
             kwargs["tool_choice"] = tool_choice or "auto"
 
+        return kwargs
+
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        reasoning_effort: str | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        """
+        Send a chat completion request via LiteLLM.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'.
+            tools: Optional list of tool definitions in OpenAI format.
+            model: Model identifier (e.g., 'anthropic/claude-sonnet-4-5'). 为None时使用spec中指定的默认模型
+            max_tokens: Maximum tokens in response.
+            temperature: Sampling temperature.
+
+        Returns:
+            LLMResponse with content and/or tool calls.
+        """
+        kwargs = self._build_chat_kwargs(
+            messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
+        )
         try:
             response = await acompletion(**kwargs)
             return self._parse_response(response)
@@ -311,6 +347,38 @@ class LiteLLMProvider(LLMProvider):
                 content=f"Error calling LLM: {str(e)}",
                 finish_reason="error",
             )
+
+    async def stream_chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        reasoning_effort: str | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+    ) -> AsyncIterator[Any]:
+        """Stream a chat completion via LiteLLM, yielding raw chunks without parsing.
+
+        Exceptions propagate unchanged; no retry is attempted. The underlying
+        stream is always closed, including on cancellation.
+
+        Yields:
+            Raw chunk objects from the streaming completion API.
+        """
+        kwargs = self._build_chat_kwargs(
+            messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
+        )
+        kwargs["stream"] = True
+        kwargs["stream_options"] = {"include_usage": True}
+        stream = await acompletion(**kwargs)
+        try:
+            async for chunk in stream:
+                yield chunk
+        finally:
+            aclose = getattr(stream, "aclose", None) or getattr(stream, "close", None)
+            if aclose is not None:
+                await aclose()
 
     @staticmethod
     def _parse_xml_tool_calls(content: str) -> list[ToolCallRequest]:

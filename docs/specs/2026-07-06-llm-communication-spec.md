@@ -1,11 +1,13 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated: 初始版本
+updated_at: 2026-10-03
+last_updated: 标注旧内核执行契约已由 myagent Runtime 规格替代
 abstract: LLM 通信与会话模块核心契约 — Channel 消息平台接入、ChatBot 对话入口、Session 生命周期管理、内容分类管线、LLM Functions 功能集
 module: llm-communication
 ---
+
+> 迁移提示（2026-10-03）：本文中的旧 AgentLoop/Context/Session 执行描述已归档。当前运行以 [myagent Runtime 规格](2026-10-03-myagent-runtime-spec.md) 为准；旧会话业务属于 P4，暂不可用。其他业务描述仍供按需参考。
 
 # LLM 通信与会话模块核心契约
 
@@ -14,6 +16,7 @@ module: llm-communication
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿 |
+| 1.1 | 标注 myagent 迁移后执行边界 |
 
 ## Overview
 

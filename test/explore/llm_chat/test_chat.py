@@ -1,7 +1,7 @@
 """使用 bus 进行 LLM 对话的测试"""
 import asyncio
 from lifeprism.llm.bus import bus
-from lifeprism.llm.agent.loop import agent_loop
+from lifeprism.llm.deprecated_agent.loop import agent_loop
 
 async def test_chat():
     """控制台对话测试"""

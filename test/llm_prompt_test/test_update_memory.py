@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import openpyxl
 from llm_test_base import LLMTestBase, TestLog
 
-from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary
+from lifeprism.llm.deprecated_agent.tools.lifeprismsystem import query_user_activity_summary
 from lifeprism.llm.prompts import Prompts, prompt_loader
 from lifeprism.llm.providers import LLMResponse, create_llm_client
 from lifeprism.llm.utils.md_os import read_md

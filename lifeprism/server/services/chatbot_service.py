@@ -1,274 +1,111 @@
-import warnings
+"""Project myagent Runtime events into the existing local SSE contract."""
+
+import contextlib
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
 from typing import Any
 
-import pytz
+from fastapi import HTTPException
 
-from lifeprism.config import get_user_timezone
-from lifeprism.server.schemas.chatbot_schemas import (
-    ChatHistoryResponse,
-    ChatMessage,
-    ChatSession,
-    ChatSessionListResponse,
-    ChatStreamEvent,
-    ChatStreamStartResponse,
-    ModelConfig,
-    SSEEventType,
-    UpdateSessionRequest,
-)
+from lifeprism.llm.chat.chat_bot import ChatBot
+from lifeprism.server.schemas.chatbot_schemas import ChatStreamEvent, ModelConfig, SSEEventType
 from lifeprism.utils import LazySingleton, get_logger
-from lifeprism.utils.exceptions import NotFoundError
-from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
 
-class ChatbotServiceV1:
-    """
-    聊天机器人服务类 V1（已弃用）
-    """
-
-    def __init__(self):
-        warnings.warn(
-            "ChatbotServiceV1 已弃用，请使用 ChatbotService（V2版本）",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    async def initialize(self):
-        pass
-
-    async def shutdown(self):
-        pass
-
-
 class ChatbotService:
-    """
-    聊天机器人服务类 V2
-
-    已重构：
-    - 移除了冗余的 SQLite 会话存储，完全依赖 ChatBot (JSONL)
-    - 简化了会话生命周期管理
-    """
-
     def __init__(self):
-        """初始化服务"""
-        from lifeprism.llm.chat.chat_bot import ChatBot
-
-        self._chatbot = ChatBot()  # 直接实例化，它现在是业务逻辑的入口
-        self._current_session_id: str | None = None
+        self._chatbot = ChatBot()
         self._model_config = ModelConfig()
-        self._is_initialized = True
 
-    async def initialize(self):
-        """初始化（保持兼容性）"""
-        pass
+    async def initialize(self) -> None:
+        """Contexts are created only when a chat is submitted."""
 
-    async def shutdown(self):
-        """清理资源（保持兼容性）"""
-        pass
-
-    async def _ensure_initialized(self):
-        """确保服务已初始化"""
-        pass
-
-    # ========== 会话管理 ==========
-
-    async def get_sessions(self, page: int, page_size: int) -> ChatSessionListResponse:
-        """获取会话列表（优化版：只读取元数据）"""
-        from lifeprism.llm.session.manager import SessionManager
-
-        session_ids = self._chatbot.list_sessions()
-        all_items = []
-        for sid in session_ids:
-            metadata = SessionManager.get_session_metadata(sid)
-            if metadata:
-                all_items.append(
-                    ChatSession(
-                        id=sid,
-                        name=metadata.get("name", "default_name"),
-                        created_at=metadata.get("created_at", get_utc_now_iso()),
-                        updated_at=metadata.get("updated_at", get_utc_now_iso()),
-                        message_count=metadata.get("message_len", 0),
-                    )
-                )
-
-        # 简单的内存分页
-        all_items.sort(key=lambda x: x.updated_at, reverse=True)
-        total = len(all_items)
-        start = (page - 1) * page_size
-        end = start + page_size
-        items = all_items[start:end]
-
-        return ChatSessionListResponse(items=items, total=total)
-
-    async def get_or_create_session(
-        self, session_id: str | None, first_message: str
-    ) -> ChatStreamStartResponse:
-        """获取或创建会话"""
-        # 如果传入了 ID，尝试获取现有会话
-        if session_id:
-            session = self._chatbot.get_session(session_id)
-            if session:
-                self._current_session_id = session_id
-                return ChatStreamStartResponse(
-                    session_id=session_id, session_name=session.name, is_new_session=False
-                )
-
-        # 创建新会话
-        session = self._chatbot.get_or_create_session(session_id)
-        # 如果是新会话（消息列表为空），更新名称
-        if not session.messages:
-            name = first_message.strip()[:20]
-            if len(first_message) > 20:
-                name += "..."
-            local_now = datetime.now(timezone.utc).astimezone(pytz.timezone(get_user_timezone()))
-            session.name = name or f"新会话 {local_now.strftime('%m-%d %H:%M')}"
-            self._chatbot.save_session(session)
-            is_new = True
-        else:
-            is_new = False
-
-        self._current_session_id = session.id
-        return ChatStreamStartResponse(
-            session_id=session.id, session_name=session.name, is_new_session=is_new
-        )
-
-    async def update_session(self, session_id: str, request: UpdateSessionRequest) -> ChatSession:
-        """更新会话名称"""
-        self._chatbot.update_session_name(session_id, request.name)
-        logger.info("更新会话名称: session_id=%s, name=%s", session_id, request.name)
-        session = self._chatbot.get_session(session_id)
-        if session:
-            return ChatSession(
-                id=session.id,
-                name=session.name,
-                created_at=session.created_at.isoformat()
-                if session.created_at
-                else get_utc_now_iso(),
-                updated_at=session.updated_at.isoformat()
-                if session.updated_at
-                else get_utc_now_iso(),
-                message_count=len(session.messages),
-            )
-        raise NotFoundError(message=f"会话 {session_id} 不存在", code="SESSION_NOT_FOUND")
-
-    async def delete_session(self, session_id: str) -> bool:
-        """删除会话"""
-        self._chatbot.delete_session(session_id)
-        logger.info("删除会话: session_id=%s", session_id)
-        return True
+    async def shutdown(self) -> None:
+        """The application lifecycle owns the shared Runtime."""
 
     @staticmethod
-    def _normalize_content(content: str | list | None) -> str:
-        """将消息 content 统一转为字符串格式
-
-        LLM API 返回的 content 可能是:
-        - 纯文本字符串: "你好"
-        - 结构化列表: [{"type": "text", "text": "你好"}, {"type": "image", ...}]
-        这里提取其中的文本部分拼接返回。
-        """
-        if content is None:
-            return ""
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            text_parts = []
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    text_parts.append(block.get("text", ""))
-            return "".join(text_parts)
-        return str(content)
-
-    async def get_history(self, session_id: str) -> ChatHistoryResponse:
-        """获取会话历史记录"""
-        session = self._chatbot.get_session(session_id)
-        if not session:
-            return ChatHistoryResponse(session_id=session_id, session_name="未知", messages=[])
-
-        # 只返回 user 和 assistant 消息，过滤掉 tool 调用结果等内部消息
-        display_roles = {"user", "assistant"}
-        messages = [
-            ChatMessage(
-                role=msg["role"],
-                content=self._normalize_content(msg.get("content")),
-                timestamp=msg.get("timestamp"),
-            )
-            for msg in session.messages
-            if msg.get("role") in display_roles
-        ]
-        return ChatHistoryResponse(
-            session_id=session.id, session_name=session.name, messages=messages
+    def _session_deferred() -> None:
+        raise HTTPException(
+            status_code=501,
+            detail="会话管理与旧历史适配留到迁移 P4，当前可新建聊天并继续本次会话。",
         )
 
-    # ========== 模型配置 ==========
+    async def get_sessions(self, page: int, page_size: int):
+        self._session_deferred()
+
+    async def update_session(self, session_id: str, request):
+        self._session_deferred()
+
+    async def delete_session(self, session_id: str):
+        self._session_deferred()
+
+    async def get_history(self, session_id: str):
+        self._session_deferred()
 
     async def get_model_config(self) -> ModelConfig:
-        """获取当前模型配置"""
         return self._model_config
 
     async def update_model_config(self, request: Any) -> ModelConfig:
-        """更新模型配置"""
-        if isinstance(request, dict):
-            if "enable_search" in request:
-                self._model_config.enable_search = request["enable_search"]
-            if "enable_thinking" in request:
-                self._model_config.enable_thinking = request["enable_thinking"]
-        else:
-            if hasattr(request, "enable_search") and request.enable_search is not None:
-                self._model_config.enable_search = request.enable_search
-            if hasattr(request, "enable_thinking") and request.enable_thinking is not None:
-                self._model_config.enable_thinking = request.enable_thinking
+        updates = request if isinstance(request, dict) else request.model_dump(exclude_unset=True)
+        for name in ("enable_search", "enable_thinking"):
+            if name in updates and updates[name] is not None:
+                setattr(self._model_config, name, updates[name])
         return self._model_config
-
-    # ========== 对话功能 ==========
 
     async def send_message(
         self, content: str, session_id: str | None = None
     ) -> AsyncGenerator[ChatStreamEvent, None]:
-        """发送消息并生成流式响应事件 (重构为调用 ChatBot.chat)"""
-        # 1. 确保会话存在
-        start_info = await self.get_or_create_session(session_id, content)
-        sid = start_info.session_id
-
-        # 2. 发送 session 事件
-        yield ChatStreamEvent(
-            type=SSEEventType.SESSION,
-            session_id=sid,
-            session_name=start_info.session_name,
-            is_new_session=start_info.is_new_session,
-        )
-
-        # 3. 调用 ChatBot 发送消息
+        """Yield real deltas and one explicit completion or error event."""
         try:
-            logger.info("LLM 对话开始: session_id=%s, content_len=%s", sid, len(content))
-            response = await self._chatbot.chat(content, sid)
-
-            # 发送 content 事件
-            yield ChatStreamEvent(type=SSEEventType.CONTENT, message=response.content)
-
-            # 发送 done 事件
-            yield ChatStreamEvent(type=SSEEventType.DONE, message=response.content)
-
-        except Exception as e:
-            logger.error("对话失败: error=%s", e)
-            yield ChatStreamEvent(type=SSEEventType.ERROR, error=str(e))
+            async with contextlib.aclosing(self._chatbot.stream(content, session_id)) as events:
+                async for event in events:
+                    common = {
+                        "run_id": event.run_id,
+                        "session_id": event.session_id,
+                        "turn": event.turn,
+                        "step": event.step,
+                        "seq": event.seq,
+                    }
+                    if event.type == "session":
+                        yield ChatStreamEvent(
+                            type=SSEEventType.SESSION,
+                            **common,
+                            session_name=event.data["name"],
+                            is_new_session=event.data["is_new"],
+                        )
+                    elif event.type == "content":
+                        yield ChatStreamEvent(
+                            type=SSEEventType.CONTENT, message=event.text, **common
+                        )
+                    elif event.type in ("tool/call", "tool/result"):
+                        yield ChatStreamEvent(
+                            type=SSEEventType.STATUS,
+                            node=event.type,
+                            message=event.data.get("tool_name"),
+                            data=event.data,
+                            **common,
+                        )
+                    elif event.type == "done":
+                        usage = event.result.response.usage
+                        yield ChatStreamEvent(
+                            type=SSEEventType.DONE,
+                            message=event.result.response.content,
+                            usage={
+                                "input_tokens": usage.get("prompt_tokens", 0),
+                                "output_tokens": usage.get("completion_tokens", 0),
+                                "total_tokens": usage.get("total_tokens", 0),
+                            },
+                            **common,
+                        )
+                    elif event.type == "error":
+                        yield ChatStreamEvent(type=SSEEventType.ERROR, error=event.text, **common)
+        except Exception as exc:
+            logger.error("聊天流失败: %s", exc)
+            yield ChatStreamEvent(type=SSEEventType.ERROR, error=str(exc))
 
     async def get_tokens_usage(self, session_id: str | None = None) -> dict[str, Any]:
-        """获取 Token 使用情况统计 (已简化)"""
-        default_usage = {
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "total_tokens": 0,
-            "search_count": 0,
-        }
-        return {"turn_usage": default_usage.copy(), "session_usage": default_usage.copy()}
+        self._session_deferred()
 
 
-# 创建单例
 chatbot_service = LazySingleton(ChatbotService)
-
-
-def get_chatbot_service_v1():
-    return ChatbotServiceV1()

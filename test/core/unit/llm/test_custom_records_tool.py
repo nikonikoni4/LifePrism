@@ -16,8 +16,8 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from lifeprism.llm.agent.tools.base import ERROR, SUCCESS
-from lifeprism.llm.agent.tools.custom_records_tool import QueryCustomRecordEntriesTool
+from lifeprism.llm.runtime_tools.base import ERROR, SUCCESS
+from lifeprism.llm.runtime_tools.custom_records_tool import QueryCustomRecordEntriesTool
 from lifeprism.utils.exceptions import ValidationError
 
 
@@ -54,7 +54,7 @@ class TestQueryCustomRecordEntriesTool:
         fake_total = 2
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.return_value = (fake_entries, fake_total)
 
@@ -79,7 +79,7 @@ class TestQueryCustomRecordEntriesTool:
         tool = QueryCustomRecordEntriesTool()
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.return_value = ([], 0)
 
@@ -97,8 +97,8 @@ class TestQueryCustomRecordEntriesTool:
 
         result = await tool.execute()
 
-        assert result.startswith(ERROR)
-        assert "type_id" in result
+        assert result.is_error
+        assert "type_id" in result.content
 
 
 # ==================== filters 字段级过滤测试（2026-08-18 新增） ====================
@@ -115,7 +115,7 @@ class TestQueryEntriesFilters:
         filters = [{"field_key": "heart_rate", "op": "gt", "value": 100}]
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.return_value = ([], 0)
 
@@ -133,7 +133,7 @@ class TestQueryEntriesFilters:
         tool = QueryCustomRecordEntriesTool()
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.return_value = ([], 0)
 
@@ -149,8 +149,8 @@ class TestQueryEntriesFilters:
 
         result = await tool.execute(type_id="crt-abc12345", filters={"field_key": "x"})
 
-        assert result.startswith(ERROR)
-        assert "filters" in result
+        assert result.is_error
+        assert "filters" in result.content
 
     @pytest.mark.asyncio
     async def test_invalid_field_key_returns_structured_error(self):
@@ -158,7 +158,7 @@ class TestQueryEntriesFilters:
         tool = QueryCustomRecordEntriesTool()
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.side_effect = ValidationError(
                 message="过滤字段不存在: wrong_field",
@@ -176,8 +176,8 @@ class TestQueryEntriesFilters:
                 filters=[{"field_key": "wrong_field", "op": "eq", "value": 1}],
             )
 
-        assert result.startswith(ERROR)
-        payload = json.loads(result[len(ERROR):])
+        assert result.is_error
+        payload = json.loads(result.content[len(ERROR):])
         assert payload["error"] == "INVALID_FIELD_KEY"
         assert payload["valid_fields"][0]["field_key"] == "heart_rate"
 
@@ -187,7 +187,7 @@ class TestQueryEntriesFilters:
         tool = QueryCustomRecordEntriesTool()
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.side_effect = ValidationError(
                 message="过滤操作符无效: contains（字段 heart_rate 类型 integer）",
@@ -204,8 +204,8 @@ class TestQueryEntriesFilters:
                 filters=[{"field_key": "heart_rate", "op": "contains", "value": "12"}],
             )
 
-        assert result.startswith(ERROR)
-        payload = json.loads(result[len(ERROR):])
+        assert result.is_error
+        payload = json.loads(result.content[len(ERROR):])
         assert payload["error"] == "INVALID_FILTER_OP"
         assert "contains" not in payload["allowed_ops"]
         assert "gte" in payload["allowed_ops"]
@@ -216,7 +216,7 @@ class TestQueryEntriesFilters:
         tool = QueryCustomRecordEntriesTool()
 
         with patch(
-            "lifeprism.llm.agent.tools.custom_records_tool.custom_record_repository"
+            "lifeprism.llm.runtime_tools.custom_records_tool.custom_record_repository"
         ) as mock_repo:
             mock_repo.query_entries.side_effect = ValidationError(
                 message="过滤值类型不匹配: heart_rate",
@@ -233,8 +233,8 @@ class TestQueryEntriesFilters:
                 filters=[{"field_key": "heart_rate", "op": "eq", "value": "abc"}],
             )
 
-        assert result.startswith(ERROR)
-        payload = json.loads(result[len(ERROR):])
+        assert result.is_error
+        payload = json.loads(result.content[len(ERROR):])
         assert payload["error"] == "INVALID_FIELD_VALUE"
         assert payload["invalid_fields"][0]["field_key"] == "heart_rate"
 

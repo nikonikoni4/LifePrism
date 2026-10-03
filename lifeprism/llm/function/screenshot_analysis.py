@@ -727,7 +727,7 @@ if __name__ == "__main__":
     import asyncio
 
     async def test_single_chunk():
-        from lifeprism.llm.agent.loop import agent_loop
+        from lifeprism.llm.runtime.worker import agent_loop
 
         asyncio.create_task(agent_loop.loop())
 

@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lifeprism.llm.agent.context import Context
+from lifeprism.llm.deprecated_agent.context import Context
 from lifeprism.llm.bus import InboundMessage, MessageType
 
 pytestmark = pytest.mark.core
@@ -25,7 +25,7 @@ _FAKE_DATA_PATH = Path("D:/fake/lifeprism_data")
 @pytest.fixture
 def mock_settings():
     """mock context 模块内的 settings，隔离真实路径解析"""
-    with patch("lifeprism.llm.agent.context.settings") as mock_s:
+    with patch("lifeprism.llm.deprecated_agent.context.settings") as mock_s:
         mock_s.lifeprism_data_path = _FAKE_DATA_PATH
         yield mock_s
 

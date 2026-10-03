@@ -7,6 +7,7 @@ Licensed under the MIT License.
 import asyncio
 import json
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -77,6 +78,15 @@ class GenerationSettings:
 
 
 class LLMProvider(ABC):
+    def stream_chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[Any]:
+        """Yield raw provider SDK deltas; unsupported implementations fail explicitly."""
+        raise NotImplementedError("This provider does not implement streaming")
+
     _CHAT_RETRY_DELAYS = (1, 2, 4)  # 重试的延迟时间， 第一次失败等待1s，第二次等待2s...
     _TRANSIENT_ERROR_MARKERS = (  # 可重试错误
         "429",  # HTTP 429: 请求频率过高，触发了 API 的频率限制 (Rate Limit)

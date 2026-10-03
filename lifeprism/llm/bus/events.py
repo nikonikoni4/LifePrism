@@ -106,12 +106,13 @@ class MessageContent(list):
 @dataclass
 class InboundMessage:
     type: str  # 功能类型， 具体的功能类型会影响cotext模块最初的system prompt的构建
-    id: str = field(default_factory=lambda: str(uuid.uuid4())[:4])  # 随机id,用于进行任务的
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))  # 完整请求 ID，避免并发关联碰撞
     channel: str = ChannelType.LOCAL
     content: MessageContentInput = ""  # 消息内容，统一归一化为多模态列表
     session_id: str | None = None  # 用户继续会话的id，未传入时会自动创建session
     token_type: str | None = None  # token 统计类型，为空时使用 type
     extra: dict | None = None
+    _cancelled: bool = field(default=False, init=False, repr=False)
 
     # extra 说明
     # 对于classify 包括 system_prompt:str ，每个节点单独传递
@@ -132,3 +133,4 @@ class OutboundMessage:
     response: LLMResponse | None = None  # 返回消息
     session_id: str | None = None  # 用户当创建首次创建session时返回id，tokens_usage保存需要
     extra: dict | None = None  # 额外数据，用于传递 channel 特定信息（如 wechat_user_id）
+    error: str | None = None  # 后台执行失败，等待者及时结束

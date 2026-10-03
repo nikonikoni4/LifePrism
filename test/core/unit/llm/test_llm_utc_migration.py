@@ -212,7 +212,7 @@ class TestHelpersUtc:
 
 
 class TestContextUtc:
-    """测试 lifeprism.llm.agent.context 的 UTC 时间处理"""
+    """测试 lifeprism.llm.deprecated_agent.context 的 UTC 时间处理"""
 
     def test_build_run_context_uses_utc_source(self):
         """_build_run_context() 应基于 datetime.now(timezone.utc) 生成时间
@@ -220,7 +220,7 @@ class TestContextUtc:
         验证策略：mock datetime.now(timezone.utc) 返回固定时间，
         检查 context 中是否包含该时间的本地表示。
         """
-        from lifeprism.llm.agent.context import Context
+        from lifeprism.llm.deprecated_agent.context import Context
         from lifeprism.llm.bus import ChannelType
 
         # 固定 UTC 时间
@@ -229,7 +229,7 @@ class TestContextUtc:
         mock_msg = MagicMock()
         mock_msg.channel = ChannelType.LOCAL
 
-        with patch("lifeprism.llm.agent.context.datetime") as mock_datetime:
+        with patch("lifeprism.llm.deprecated_agent.context.datetime") as mock_datetime:
             # mock datetime.now(timezone.utc) 返回固定时间
             def mock_now(tz=None):
                 if tz is not None:
@@ -254,7 +254,7 @@ class TestContextUtc:
 
         验证：显示的时间应与 UTC 时间不同（除非系统时区恰好是 UTC）。
         """
-        from lifeprism.llm.agent.context import Context
+        from lifeprism.llm.deprecated_agent.context import Context
         from lifeprism.llm.bus import ChannelType
 
         mock_msg = MagicMock()

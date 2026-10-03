@@ -9,20 +9,18 @@
 """
 
 import asyncio
-import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from lifeprism.config import settings
-from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary, query_user_mood
-from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage, TokenType, bus
+from lifeprism.llm.bus import InboundMessage, MessageType, TokenType, bus
 from lifeprism.llm.exceptions import LLMResponseError
 from lifeprism.llm.prompts import Prompts, prompt_loader
-from lifeprism.llm.session import ChatHistoryManager, Session, session_manager
+from lifeprism.llm.runtime_tools.lifeprismsystem import query_user_activity_summary, query_user_mood
 from lifeprism.llm.utils import llm_call_logger
 from lifeprism.llm.utils.md_os import extract_date_logs_from_file, read_md, write_date_md
 from lifeprism.utils import DEBUG, get_logger
-from lifeprism.utils.time_utils import build_local_datetime, get_local_today, local_to_utc_iso
+from lifeprism.utils.time_utils import build_local_datetime, local_to_utc_iso
 
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
@@ -366,47 +364,9 @@ async def dreaming(date: str) -> None:
 # 2. 时间间隔任务：
 
 
-async def extract_from_chat_messages(session: Session) -> str | None:
-    """从历史消息中提取有效信息
-
-    Args:
-        session: Session 对象
-
-    Returns:
-        str | None: 提取的内容，如果没有可提取内容则返回 None
-    """
-    # 加载 prompt
-    extract_chat_prompt = prompt_loader.load_prompt(Prompts.Schedule.EXTRACT_CHAT)
-
-    # 将message[获取所有消息记录中长度不等于last_processed_loc的消息:]转化为str
-    message = session.messages[session.last_processed_loc :]
-    if message:
-        summary_raw_content = json.dumps(message, ensure_ascii=False)
-        msg = InboundMessage(
-            type=MessageType.GENERAL_TASK,
-            token_type=MessageType.DREAM_TASK,
-            content=f"## 需要总结的内容 \n {summary_raw_content}",
-            extra={"system_prompt": extract_chat_prompt},
-        )
-        logger.info("[process_session_message] 发送 LLM 请求提取聊天消息")
-        result: OutboundMessage = await bus.send(msg)
-        llm_call_logger.log_call(
-            msg,
-            result,
-            prompt_module=Prompts.Schedule.EXTRACT_CHAT.module,
-            prompt_name=Prompts.Schedule.EXTRACT_CHAT.name,
-        )
-
-        session.last_processed_loc = len(session.messages)
-        session_manager.save_session(session)
-
-        if (
-            result.response
-            and result.response.content
-            and result.response.content != "无可提取内容"
-        ):
-            return result.response.content
-    return None
+async def extract_from_chat_messages(session: object) -> str | None:
+    """Deferred until P4 defines native session extraction progress."""
+    raise NotImplementedError("会话提取和独立处理进度字段留到迁移 P4")
 
 
 def format_chat_history(history: list[dict]) -> str:
@@ -435,169 +395,14 @@ def format_chat_history(history: list[dict]) -> str:
 
 
 async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> None:
-    """将当前的session中没有提取的会话进行提取，将结果放入chat_history.json中
-
-    每隔2h执行一次
-
-    Args:
-        days_offset: 处理日期限制，旧session不在处理
-    """
-    logger.info("[process_session_message] 开始处理会话消息, days_offset=%s", days_offset)
-
-    # 1. 加载session meta,获取需要处理的消息
-    _session_to_process = []
-    session_list = session_manager.show_session_list()
-    logger.debug("[process_session_message] 获取到 %s 个 session", len(session_list))
-
-    for session_id in session_list:
-        meta_data = session_manager.get_session_metadata(session_id)
-        logger.debug(
-            "[process_session_message] 检查 session: %s, meta_data keys: %s",
-            session_id,
-            list(meta_data.keys()) if meta_data else "None",
-        )
-
-        if meta_data.get("message_len", None):
-            message_len = meta_data["message_len"]
-            last_processed_loc = meta_data.get("last_processed_loc", 0)
-            # session 文件中的 update_at 已迁移为 UTC aware ISO 格式，
-            # 向后兼容：旧文件中的 naive 时间戳视为 UTC。
-            update_at = datetime.fromisoformat(
-                meta_data.get("update_at", datetime.now(timezone.utc).isoformat())
-            )
-            if update_at.tzinfo is None:
-                update_at = update_at.replace(tzinfo=timezone.utc)
-            logger.debug(
-                "[process_session_message] session %s: message_len=%s, last_processed_loc=%s, update_at=%s",
-                session_id,
-                message_len,
-                last_processed_loc,
-                update_at,
-            )
-
-            # 判断是否有未处理消息 且 update_at > 今天 - days_offset
-            if message_len > last_processed_loc and update_at > datetime.now(
-                timezone.utc
-            ) - timedelta(days=days_offset):
-                _session_to_process.append(session_id)
-                logger.debug(
-                    "[process_session_message] session %s 需要处理 (有 %s 条新消息)",
-                    session_id,
-                    message_len - last_processed_loc,
-                )
-            else:
-                logger.debug(
-                    "[process_session_message] session %s 跳过: message_len(%s) <= last_processed_loc(%s) 或 update_at(%s) 过期",
-                    session_id,
-                    message_len,
-                    last_processed_loc,
-                    update_at,
-                )
-        else:
-            logger.debug("[process_session_message] session %s 跳过: 无 message_len", session_id)
-
-    logger.debug(
-        "[process_session_message] 共 %s 个 session 需要处理: %s",
-        len(_session_to_process),
-        _session_to_process,
-    )
-
-    # 处理消息（分组处理，每组最多10个）
-    history_manager = ChatHistoryManager()
-    if _session_to_process:
-        all_results = []  # 存储 (session_id, content) 元组
-
-        try:
-            # 分组处理
-            total_batches = (
-                len(_session_to_process) + SESSION_BATCH_SIZE - 1
-            ) // SESSION_BATCH_SIZE
-            logger.debug(
-                "[process_session_message] 开始分组处理, 每组 %s 个, 共 %s 组",
-                SESSION_BATCH_SIZE,
-                total_batches,
-            )
-
-            for i in range(0, len(_session_to_process), SESSION_BATCH_SIZE):
-                batch = _session_to_process[i : i + SESSION_BATCH_SIZE]
-                batch_num = i // SESSION_BATCH_SIZE + 1
-                logger.debug(
-                    "[process_session_message] 处理第 %s/%s 组: %s", batch_num, total_batches, batch
-                )
-
-                # 先加载 session 对象
-                sessions = [session_manager._load_session(sid) for sid in batch]
-                logger.debug("[process_session_message] 第 %s 组 session 加载完成", batch_num)
-
-                batch_results = await asyncio.gather(
-                    *[extract_from_chat_messages(session) for session in sessions]
-                )
-
-                # 保持 session_id 和结果的对应关系
-                for session, result in zip(sessions, batch_results, strict=False):
-                    if result is not None:
-                        all_results.append((session.id, result))
-
-                valid_count = len([r for r in batch_results if r is not None])
-                logger.debug(
-                    "[process_session_message] 第 %s 组处理完成, 获取 %s/%s 个有效结果",
-                    batch_num,
-                    valid_count,
-                    len(batch_results),
-                )
-
-        finally:
-            # 删除加载的session_id
-            logger.debug(
-                "[process_session_message] 清理 session 缓存, 共 %s 个", len(_session_to_process)
-            )
-            for session_id in _session_to_process:
-                session_manager.remove_from_cache(session_id)
-            logger.debug("[process_session_message] session 缓存清理完成")
-
-        # 创建history
-        logger.info("[process_session_message] 开始保存历史记录, 共 %s 条结果", len(all_results))
-        for session_id, content in all_results:
-            history_manager.add_content(content, session_id=session_id)
-        history_manager.save_history()
-        logger.debug("[process_session_message] 历史记录保存完成")
-    else:
-        logger.debug("[process_session_message] 没有需要处理的 session")
-
-    # 将chat_history 更新到behavior
-    logger.info("[process_session_message] 开始更新 behavior")
-    history = history_manager.get_histories_to_dream()
-    if history:
-        logger.debug(
-            "[process_session_message] 获取到 %s 条历史记录用于更新 behavior", len(history)
-        )
-        history_content = format_chat_history(history)
-        if history_content:
-            logger.debug(
-                "[process_session_message] 格式化后 history_content 长度: %s 字符",
-                len(history_content),
-            )
-            write_date_md(
-                settings.lifeprism_data_path / "user/daily_data/behavior.md",
-                get_local_today().isoformat(),
-                history_content,
-                "聊天记录总结",
-            )
-            # 更新 last_processed_time
-            history_manager.save_history(datetime.now(timezone.utc))
-            logger.info("[process_session_message] behavior 更新完成")
-        else:
-            logger.debug("[process_session_message] history_content 为空, 跳过更新")
-    else:
-        logger.debug("[process_session_message] 没有历史记录需要更新 behavior")
-
-    logger.info("[process_session_message] 会话消息处理完成")
+    """Deferred: never process legacy sessions after the kernel migration."""
+    raise NotImplementedError("process_session_message 留到 P4，当前未注册定时任务")
 
 
 if __name__ == "__main__":
     from datetime import timedelta
 
-    from lifeprism.llm.agent.loop import agent_loop
+    from lifeprism.llm.runtime.worker import agent_loop
 
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())

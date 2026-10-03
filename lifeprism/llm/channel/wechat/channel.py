@@ -6,11 +6,11 @@ import asyncio
 import contextlib
 import json
 from typing import Any
+from uuid import UUID
 
 import httpx
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.llm.agent.context import Context
 from lifeprism.llm.bus import (
     ChannelType,
     InboundMessage,
@@ -25,8 +25,7 @@ from lifeprism.llm.channel.wechat.config import WechatConfig
 from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
 from lifeprism.llm.channel.wechat.media import WechatMedia
 from lifeprism.llm.providers import LLMResponse
-from lifeprism.llm.utils.llm_call_logger import llm_call_logger
-from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.llm.runtime import agent_runtime
 from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -491,6 +490,31 @@ class WechatChannel(BaseChannel):
             # 使用 or None 确保空字符串被规范化为 None
             session_id = self._user_data.get(wechat_user_id, {}).get("last_session_id") or None
 
+            # Native new sessions only; old history and resume commands are deferred to P4.
+            if session_id:
+                try:
+                    UUID(session_id)
+                except ValueError:
+                    session_id = None
+            if content.strip() == "/new":
+                self._user_data.setdefault(wechat_user_id, {})["last_session_id"] = ""
+                self._save_user_data_to_db()
+                await self.send(
+                    OutboundMessage(
+                        response=LLMResponse(content="已清空当前会话，下条消息将开始新会话。"),
+                        extra={"wechat_user_id": wechat_user_id},
+                    )
+                )
+                return
+            if content.strip().startswith(("/continue", "/session-list")):
+                await self.send(
+                    OutboundMessage(
+                        response=LLMResponse(content="会话恢复和历史列表功能留到迁移 P4。"),
+                        extra={"wechat_user_id": wechat_user_id},
+                    )
+                )
+                return
+
             # 构造 InboundMessage
             inbound_msg = InboundMessage(
                 type=MessageType.CHAT,
@@ -503,25 +527,10 @@ class WechatChannel(BaseChannel):
                 },
             )
 
-            logger.info("准备发布到 bus: id=%s, content=%s", inbound_msg.id, content)
-            # 发送到 bus
+            logger.info("提交聊天到 Runtime: id=%s", inbound_msg.id)
             try:
-                response: OutboundMessage = await self.bus.send(inbound_msg)
-
-                # 记录 LLM 调用（命令消息如 /new /continue 不记录）
-                if not content.startswith("/"):
-                    try:
-                        system_prompt = Context.build_system_prompt(inbound_msg)
-                        llm_call_logger.log_call(
-                            inbound_msg=inbound_msg,
-                            outbound_msg=response,
-                            prompt_module="chat",
-                            prompt_name="wechat_chat",
-                            system_prompt=system_prompt,
-                        )
-                    except Exception as log_e:
-                        # ✅ 日志记录是辅助操作，允许 except Exception 防止影响主流程
-                        logger.warning("记录 LLM 调用日志失败: %s", log_e)
+                # execute collects the final response from registered session events.
+                response: OutboundMessage = await agent_runtime.execute(inbound_msg)
 
                 if response.session_id:
                     # 使用最新的session_id继续处理
@@ -547,12 +556,14 @@ class WechatChannel(BaseChannel):
                 response.extra["wechat_user_id"] = wechat_user_id
 
                 await self.send(response)
-            except LWBaseError as e:
+            except Exception as e:
                 logger.error("处理消息失败: error=%s", e, exc_info=True)
                 # 发送错误消息给用户
                 error_response = OutboundMessage(
                     id=inbound_msg.id,
-                    response=LLMResponse(content=f"[ERROR] 处理消息时出错: {e.message or str(e)}"),
+                    response=LLMResponse(
+                        content=f"[ERROR] 处理消息时出错: {getattr(e, 'message', None) or str(e)}"
+                    ),
                     extra={"wechat_user_id": wechat_user_id},  # 传递用户ID
                 )
 

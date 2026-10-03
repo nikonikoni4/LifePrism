@@ -84,11 +84,11 @@ async def start_agent_and_channel() -> tuple[asyncio.Task, object]:
 
     Returns:
         tuple: (agent_loop_task, wechat_channel)
-        - agent_loop_task: AgentLoop 的 asyncio.Task，用于后续取消
+        - agent_loop_task: AgentBusWorker 的 asyncio.Task，用于后续取消
         - wechat_channel: wechat_channel 单例，用于后续停止
     """
-    from lifeprism.llm.agent.loop import agent_loop
     from lifeprism.llm.channel import wechat_channel
+    from lifeprism.llm.runtime.worker import agent_loop
 
     # 启动微信渠道
     try:
@@ -97,9 +97,9 @@ async def start_agent_and_channel() -> tuple[asyncio.Task, object]:
     except Exception as e:
         logger.warning("启动微信渠道失败: error=%s", e)
 
-    # 启动 AgentLoop
+    # 启动 AgentBusWorker
     loop_task = asyncio.create_task(agent_loop.loop())
-    logger.info("AgentLoop started")
+    logger.info("AgentBusWorker started")
 
     return loop_task, wechat_channel
 
@@ -116,10 +116,10 @@ async def stop_agent_and_channel(loop_task: asyncio.Task, wechat_channel: object
     if wechat_channel and wechat_channel._running:
         await wechat_channel.stop()
 
-    # 取消 AgentLoop
+    # 取消 AgentBusWorker
     if loop_task and not loop_task.done():
         loop_task.cancel()
         try:
             await loop_task
         except asyncio.CancelledError:
-            logger.info("[SHUTDOWN] AgentLoop stopped")
+            logger.info("[SHUTDOWN] AgentBusWorker stopped")

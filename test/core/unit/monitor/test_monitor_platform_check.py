@@ -58,7 +58,7 @@ def mock_lifespan_deps():
         patch("lifeprism.utils.logger.enable_uvicorn_file_logging"),
         patch("lifeprism.llm.channel.wechat_channel", mock_wechat),
         patch("lifeprism.server.services.schedule_service.schedule_service", mock_schedule),
-        patch("lifeprism.llm.agent.loop.agent_loop", mock_agent),
+        patch("lifeprism.llm.runtime.worker.agent_loop", mock_agent),
     ]
 
     for p in patches:

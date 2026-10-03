@@ -100,6 +100,13 @@ a = Analysis(
         'cryptography.hazmat.primitives.ciphers.modes',
         'cryptography.hazmat.backends',
 
+        # 外部 Agent 执行内核 myagent（editable 路径依赖，需显式声明随包收集）
+        'myagent',
+        'myagent.agent.agent_context',
+        'myagent.agent.core.agent.loop',
+        'myagent.agent.core.session.persistence',
+        'myagent.infra.events.service',
+
         # 其他可能需要的模块
         'multipart',
         'python_multipart',
@@ -117,6 +124,12 @@ a = Analysis(
         'unittest',
         'test',
         'tests',
+        'lifeprism.llm.deprecated_agent',
+        # Backend UI is served by Electron; incidental environment Qt bindings are unused.
+        'PyQt5',
+        'PyQt6',
+        'PySide2',
+        'PySide6',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

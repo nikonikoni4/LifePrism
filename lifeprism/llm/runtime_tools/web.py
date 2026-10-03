@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from lifeprism.llm.agent.tools.base import Tool
+from lifeprism.llm.runtime_tools.base import Tool, ToolResult, normalize_tool_result
 from lifeprism.llm.utils.helpers import build_image_content_blocks
 from lifeprism.utils import get_logger
 
@@ -104,13 +104,17 @@ class WebSearchTool(Tool):
         base_url: str = "",
         proxy: str | None = None,
     ):
+        super().__init__()
         self.provider = provider
         self.api_key = api_key
         self.max_results = max_results
         self.base_url = base_url
         self.proxy = proxy
 
-    async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
+    @normalize_tool_result
+    async def execute(
+        self, query: str, count: int | None = None, **kwargs: Any
+    ) -> ToolResult | str:
         provider = self.provider.strip().lower() or "duckduckgo"
         n = min(max(count or self.max_results, 1), 10)
 
@@ -277,9 +281,12 @@ class WebFetchTool(Tool):
         }
 
     def __init__(self, max_chars: int = 50000, proxy: str | None = None):
+        super().__init__()
         self.max_chars = max_chars
         self.proxy = proxy
 
+    # 不套用 normalize_tool_result：本方法的成功返回值可能是多模态内容块列表
+    # （build_image_content_blocks），装饰器的 dict/list → JSON 序列化会破坏该结构。
     async def execute(
         self, url: str, extractMode: str = "markdown", maxChars: int | None = None, **kwargs: Any
     ) -> Any:

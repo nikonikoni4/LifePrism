@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lifeprism.llm.agent.loop import AgentLoop
+from lifeprism.llm.deprecated_agent.loop import AgentLoop
 from lifeprism.llm.bus import InboundMessage, MessageQueue, MessageType
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.llm.session import Session
@@ -57,9 +57,9 @@ class TestAutoCompactSaveSessionGuard:
         chat_msg = InboundMessage(type=MessageType.CHAT, content="测试")
 
         with (
-            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
-            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
-            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.deprecated_agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.deprecated_agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_sm,
         ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩内容"))
@@ -82,9 +82,9 @@ class TestAutoCompactSaveSessionGuard:
         )
 
         with (
-            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
-            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
-            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.deprecated_agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.deprecated_agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_sm,
         ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩内容"))
@@ -134,9 +134,9 @@ class TestConflictResolveToolRegistration:
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
-            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_sm,
             patch(
-                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                "lifeprism.llm.deprecated_agent.loop.Context.build_prefix_messages",
                 return_value=[{"role": "system", "content": "系统提示"}],
             ),
             patch.object(
@@ -171,9 +171,9 @@ class TestConflictResolveToolRegistration:
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
-            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_sm,
             patch(
-                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                "lifeprism.llm.deprecated_agent.loop.Context.build_prefix_messages",
                 return_value=[{"role": "system", "content": "系统提示"}],
             ),
             patch.object(
@@ -209,9 +209,9 @@ class TestConflictResolveToolRegistration:
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
-            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_sm,
             patch(
-                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                "lifeprism.llm.deprecated_agent.loop.Context.build_prefix_messages",
                 return_value=[{"role": "system", "content": "系统提示"}],
             ),
             patch.object(
@@ -246,9 +246,9 @@ class TestConflictResolveToolRegistration:
 
         with (
             patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
-            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_sm,
             patch(
-                "lifeprism.llm.agent.loop.Context.build_prefix_messages",
+                "lifeprism.llm.deprecated_agent.loop.Context.build_prefix_messages",
                 return_value=[{"role": "system", "content": "系统提示"}],
             ),
             patch.object(

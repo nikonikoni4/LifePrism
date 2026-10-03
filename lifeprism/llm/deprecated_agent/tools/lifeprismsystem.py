@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
+from lifeprism.llm.deprecated_agent.tools.base import ERROR, SUCCESS, Tool
 from lifeprism.llm.utils import build_time_segments
 from lifeprism.repository import (
     QueryOptions,

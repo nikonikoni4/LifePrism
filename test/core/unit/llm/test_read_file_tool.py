@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lifeprism.llm.agent.tools.filesystem import ReadFileTool, _read_file
+from lifeprism.llm.deprecated_agent.tools.filesystem import ReadFileTool, _read_file
 
 
 @pytest.mark.core

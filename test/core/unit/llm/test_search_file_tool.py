@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from lifeprism.config import settings
-from lifeprism.llm.agent.tools.filesystem import (
+from lifeprism.llm.deprecated_agent.tools.filesystem import (
     ALLOWED_SEARCH_EXTENSIONS,
     FileTreeTool,
     SearchFileTool,

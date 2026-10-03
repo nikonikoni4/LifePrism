@@ -1,11 +1,13 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-07-06
-updated_at: 2026-08-18
-last_updated: 新增习惯打卡工具组（query_user_habits / checkin_habit / cancel_checkin_habit / backfill_checkin）
+updated_at: 2026-10-03
+last_updated: 标注旧内核执行契约已由 myagent Runtime 规格替代
 abstract: Agent 执行引擎核心契约 — AgentLoop 主循环、Context 系统提示词构建、Skill 加载与匹配、Tool 注册/校验/安全沙箱、Event Bus 消息队列、Session 自动压缩
 module: llm-agent
 ---
+
+> 迁移提示（2026-10-03）：本文中的旧 AgentLoop/Context/Session 执行描述已归档。当前运行以 [myagent Runtime 规格](2026-10-03-myagent-runtime-spec.md) 为准；旧会话业务属于 P4，暂不可用。其他业务描述仍供按需参考。
 
 # Agent 执行引擎核心契约
 
@@ -15,6 +17,7 @@ module: llm-agent
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿 |
 | 1.1 | 新增习惯打卡工具组（habit_tool.py）：query_user_habits / checkin_habit / cancel_checkin_habit / backfill_checkin，仅 CHAT 消息类型注册 |
+| 1.2 | 标注 myagent 迁移后执行边界 |
 
 ## Overview
 

@@ -3,7 +3,7 @@
 # 需要实现： 1. 添加工具 name : tool类 2. 执行函数 3. 返回可使用工具列表schemas
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool
+from lifeprism.llm.deprecated_agent.tools.base import Tool
 
 
 class ToolRegistry:

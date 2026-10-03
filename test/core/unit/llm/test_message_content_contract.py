@@ -2,8 +2,8 @@
 
 import pytest
 
-from lifeprism.llm.agent.context import Context
-from lifeprism.llm.agent.loop import AgentLoop
+from lifeprism.llm.deprecated_agent.context import Context
+from lifeprism.llm.deprecated_agent.loop import AgentLoop
 from lifeprism.llm.bus import InboundMessage, MessageContent, MessageType
 from lifeprism.llm.providers.llm_providers.base import LLMProvider
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lifeprism.llm.agent.tools.filesystem import (
+from lifeprism.llm.deprecated_agent.tools.filesystem import (
     EditFileTool,
     FileTreeTool,
     ReadFileTool,

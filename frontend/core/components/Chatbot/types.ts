@@ -64,6 +64,16 @@ export interface SSEEvent {
     isNewSession?: boolean;
     /** 错误信息（error 事件） */
     error?: string;
+    /** 运行 ID（流式事件，用于关联同一次请求） */
+    runId?: string;
+    /** 轮次编号（流式事件） */
+    turn?: number;
+    /** 步骤编号（流式事件） */
+    step?: number;
+    /** 事件序号（流式事件） */
+    seq?: number;
+    /** 结构化附加数据（流式事件） */
+    data?: Record<string, unknown>;
     /** Token 使用情况（done 事件） */
     usage?: TokenUsage;
     /** @deprecated 使用 message 替代 */

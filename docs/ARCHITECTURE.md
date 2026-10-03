@@ -1,8 +1,8 @@
 ---
-version: 2.2
+version: 3.0
 created_at: 2026-04-09
-updated_at: 2026-08-19
-last_updated: 更新已知耦合说明：原 llm provider/summary_context 反向依赖 server 已解除；新增 habit_tool.py 反向依赖 server.services.habit_service 的耦合点说明
+updated_at: 2026-10-03
+last_updated: 替换 Agent 内核为 myagent，区分聊天事件与后台 bus 入口
 abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后端架构、主干数据流和关键依赖方向。
 ---
 
@@ -19,6 +19,8 @@ abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后�
 | 2.0 | 全面重写：参照 agents-hub 格式重构，新增 LLM Agent/Channel/Repository 等核心模块，补充技术栈表、分层架构图、4 条主干数据流和文档导航 |
 | 2.1 | 新增自定义记录模块（Custom Records）：前端架构图和目录结构同步更新 |
 | 2.2 | 更新已知耦合说明：原 llm provider/summary_context 反向依赖 server 已解除；新增 habit_tool.py 反向依赖 server.services.habit_service 的耦合点说明，关联技术债文档 |
+
+| 3.0 | myagent Runtime、原生 Session、事件聊天与后台 bus 双入口 |
 
 ## 项目概述
 
@@ -128,10 +130,12 @@ lifeprism/
 │   └── errors/                     # 错误处理
 │
 ├── llm/                            # LLM 智能层
-│   ├── agent/                      # Agent 执行引擎（AgentLoop、命令处理）
+│   ├── runtime/                    # myagent 适配、事件订阅与后台 worker
+│   ├── runtime_tools/              # 原生 Tool 业务实现
+│   ├── deprecated_agent/           # 旧内核归档（生产不导入）
 │   ├── chat/                       # ChatBot API 入口
 │   ├── channel/                    # 多渠道消息接入（WeChat Channel 等）
-│   ├── session/                    # Session 生命周期（JSONL 持久化 + 内存缓存）
+│   ├── session/                    # 旧 Session 业务代码（新运行不使用）
 │   ├── classify/                   # AI 内容分类（ClassifyGraph / ClassifySimple）
 │   ├── providers/                  # LLM Provider 适配（LiteLLM + Custom）
 │   ├── tools/                      # Tool 注册、执行、安全沙箱
@@ -203,7 +207,7 @@ utils → config → repository → monitor → processors → server
 
 **已知耦合**：
 - ~~`llm` 中的部分 provider / summary_context 代码反向依赖了 `server` 的 provider 或 service~~（已解除）
-- 当前耦合点：`lifeprism/llm/agent/tools/habit_tool.py` 反向依赖 `lifeprism/server/services/habit_service` 与 `lifeprism/server/schemas/habit_schemas`，通过函数体内延迟导入（`_get_habit_service()`）规避循环依赖。这是 `lifeprism/llm/` 目录下唯一此类离群点，同目录其他工具均直连 repository 层
+- 当前耦合点：`lifeprism/llm/runtime_tools/habit_tool.py` 反向依赖 `lifeprism/server/services/habit_service` 与 `lifeprism/server/schemas/habit_schemas`，通过函数体内延迟导入（`_get_habit_service()`）规避循环依赖。这是 `lifeprism/llm/` 目录下唯一此类离群点，同目录其他工具均直连 repository 层
 - 修复方向：将 Service 从 `server` 中剥离，形成独立 application/service 层，使 Service 可同时服务于 LLM 和 HTTP Application。详见 [docs/technical-debt/2026-08-19-llm-server-service-coupling.md](technical-debt/2026-08-19-llm-server-service-coupling.md)
 - 主体结构上 `server` 是对外汇总层，但 `llm` 与 `server` 之间尚未完全解耦
 
@@ -212,13 +216,13 @@ utils → config → repository → monitor → processors → server
 | 模块 | 职责 | 通信方式 | Spec |
 |------|------|---------|------|
 | server/ | FastAPI 服务入口，REST API + WebSocket，生命周期管理 | HTTP + WebSocket | - |
-| llm/agent/ | Agent 执行引擎，消息分发、命令处理、工具调用循环 | 内部调用 | [llm-agent](specs/2026-07-06-llm-agent-spec.md) |
+| llm/runtime/ | myagent 原生执行适配、终态和生命周期 | 事件订阅 / 后台 bus | [myagent-runtime](specs/2026-10-03-myagent-runtime-spec.md) |
 | llm/chat/ | ChatBot 无状态对话 API | HTTP | [llm-communication](specs/2026-07-06-llm-communication-spec.md) |
 | llm/channel/ | 多渠道消息接入（WeChat Channel 完整实现） | HTTP 轮询 | [wechat-channel-integration](specs/2026-05-01-wechat-channel-integration-spec.md) |
-| llm/session/ | Session 生命周期，JSONL 持久化 + 内存缓存 | 内部调用 | [llm-communication](specs/2026-07-06-llm-communication-spec.md) |
+| llm/session/ | 旧 Session 业务留存，新执行使用 myagent 原生 Session | 内部调用 | [llm-communication](specs/2026-07-06-llm-communication-spec.md) |
 | llm/classify/ | AI 内容分类（ClassifyGraph 多步 / ClassifySimple 单步） | 内部调用 | [classify](specs/2026-04-16-classify-spec.md) |
 | llm/providers/ | LLM Provider 适配（LiteLLM 多服务商 + Custom OpenAI SDK） | HTTPS | [llm-infrastructure](specs/2026-07-06-llm-infrastructure-spec.md) |
-| llm/tools/ | Tool 注册、参数校验、安全沙箱（白名单 + 命令黑名单） | 内部调用 | [llm-agent](specs/2026-07-06-llm-agent-spec.md) |
+| llm/runtime_tools/ | 原生 Tool 业务实现、安全沙箱（白名单 + 命令黑名单） | 内部调用 | [llm-agent](specs/2026-07-06-llm-agent-spec.md) |
 | llm/bus/ | Event Bus 消息队列（asyncio.Queue），解耦消息收发 | 内部调用 | [llm-agent](specs/2026-07-06-llm-agent-spec.md) |
 | processors/ | ActivityWatch 数据清洗与分类管线 | 内部调用 | [classify](specs/2026-04-16-classify-spec.md) |
 | monitor/ | Windows 窗口监控、截图采集（定时/主动/Enter） | 系统 API | [monitor-screenshot](specs/2026-04-02-monitor-screenshot-spec.md) |
@@ -236,7 +240,7 @@ utils → config → repository → monitor → processors → server
 | 目标管理（GoalMaster） | `apps/goals/` | server/services + repository/aggregators | - |
 | 习惯养成（Habits） | `apps/habits/` | server/services + repository/providers | [habit-system](specs/2026-04-15-habit-system.md) |
 | 内心探索（Mind Space） | `apps/mindspace/` | server/services + repository/providers | [mood-module](specs/2026-05-20-mood-module-spec.md) |
-| 自定义记录（Custom Records） | `apps/custom-records/` | server/api + repository/aggregators + llm/agent/tools | [custom-records-module](specs/custom-records-module.md) |
+| 自定义记录（Custom Records） | `apps/custom-records/` | server/api + repository/aggregators + llm/runtime_tools | [custom-records-module](specs/custom-records-module.md) |
 
 **自定义记录模块特殊性**：该模块是唯一采用**动态建表 + meta 表元数据驱动**的业务模块。`CustomRecordRepository` 独立实现（不继承 `LWBaseDataProvider`），因为动态表名 `custom_<slug>` 运行时才确定，无法套用静态元数据模式。AI 通过 4 个 LLM Tool（列出/创建类型、录入/查询记录）参与类型创建和数据录入。前端采用 L1/L2/L3 三层布局引擎实现卡片自适应展示。
 
@@ -342,22 +346,21 @@ settings_manager（单例初始化）
 ### 4. LLM Agent 对话流
 
 ```
-用户消息（ChatBot API / WeChat Channel）
-  → channel 接收 → bus.send() 入队
-    → AgentLoop.consume_inbound()
-      → 命令处理（/new /continue /session-list）
-        → Context 构建（CHAT/CLASSIFY/GENERAL_TASK/DREAM_TASK 四路分支）
-          → Tool 注册（7 类 17 个工具）
-            → auto_compact（token 阈值检测 → LLM 压缩）
-              → _run_agent_loop（LLM 调用 → 工具执行循环，最多 20 轮）
-                → publish_outbound（结果推送）
-                  → Session 持久化（JSONL 文件 + 内存缓存）
+本地 ChatBot / 微信 → Runtime → myagent turn
+                           ↑         ↓
+                    session/event 订阅
+                           ↓
+                 本地 SSE / 微信最终答复
+
+后台任务 → bus.send → AgentBusWorker → 同一 Runtime
+                   ← OutboundMessage ← 事件收集的最终结果
 ```
 
 **关键点**：
-- 消息通过 `asyncio.Queue` 解耦收发
-- 工具调用含安全沙箱（`allowed_dir_path` 白名单 + 命令黑名单）
-- Session 采用 JSONL 文件持久化 + 内存缓存双层架构
+- 聊天与工具执行直接使用原生事件；bus 保留后台请求响应职责。
+- Runtime 统一事件关联、同会话串行、模型限速、用量统计与执行取消。
+- 提示词使用 myagent SystemPrompt 注册，工具继承原生 Tool；原生 Session 负责执行记录和持久化。
+- 旧会话业务及错误策略尚未迁移，契约见 [myagent Runtime](specs/2026-10-03-myagent-runtime-spec.md)，决策见 [ADR](adr/2026-10-03-myagent-runtime.md)。
 
 ### 5. 自定义记录 AI 录入流
 
@@ -411,7 +414,7 @@ utils → config → repository → monitor → processors → server
 6. **llm** — 依赖 utils + config + repository：Agent 引擎、Session 管理、多渠道接入
 7. **server** — 对外服务层：汇总 repository / processors / llm / config 的能力，对前端暴露 API
 
-> **注意**：`llm` 与 `server` 之间存在现实代码耦合。历史上的 `llm` provider/summary_context 反向依赖 `server` 已解除；当前剩余耦合点为 `lifeprism/llm/agent/tools/habit_tool.py` 反向依赖 `lifeprism/server/services/habit_service`（通过延迟导入规避循环依赖），尚未完全解耦，详见 [docs/technical-debt/2026-08-19-llm-server-service-coupling.md](technical-debt/2026-08-19-llm-server-service-coupling.md)。
+> **注意**：`llm` 与 `server` 之间存在现实代码耦合。历史上的 `llm` provider/summary_context 反向依赖 `server` 已解除；当前剩余耦合点为 `lifeprism/llm/runtime_tools/habit_tool.py` 反向依赖 `lifeprism/server/services/habit_service`（通过延迟导入规避循环依赖），尚未完全解耦，详见 [docs/technical-debt/2026-08-19-llm-server-service-coupling.md](technical-debt/2026-08-19-llm-server-service-coupling.md)。
 
 ## 文档导航
 

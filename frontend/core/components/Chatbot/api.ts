@@ -233,6 +233,12 @@ export async function sendMessageStream(
                             isNewSession: eventData.is_new_session,
                             // error 事件字段
                             error: eventData.error,
+                            // 运行标识与序号（流式事件透传）
+                            runId: eventData.run_id,
+                            turn: eventData.turn,
+                            step: eventData.step,
+                            seq: eventData.seq,
+                            data: eventData.data,
                             // done 事件的 usage 字段
                             usage: eventData.usage,
                             // 兼容旧的 content 字段（如有）

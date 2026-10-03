@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from lifeprism.llm.agent.tools.lifeprismsystem import (
+from lifeprism.llm.deprecated_agent.tools.lifeprismsystem import (
     UpdateUserBehaviorNoteTool,
     UserActivitySummaryTool,
     UserComputerLogTool,

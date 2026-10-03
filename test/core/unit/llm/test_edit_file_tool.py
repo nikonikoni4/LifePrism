@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lifeprism.llm.agent.tools.filesystem import EditFileTool, _replace_content
+from lifeprism.llm.deprecated_agent.tools.filesystem import EditFileTool, _replace_content
 
 
 @pytest.mark.core

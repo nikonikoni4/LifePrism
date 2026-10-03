@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 from lifeprism.config import settings
-from lifeprism.llm.agent.tools.base import ERROR, Tool
+from lifeprism.llm.deprecated_agent.tools.base import ERROR, Tool
 from lifeprism.llm.session.manager import ChatHistoryManager, SessionManager
 from lifeprism.utils import get_logger
 from lifeprism.utils.time_utils import utc_to_local_display

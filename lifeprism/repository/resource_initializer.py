@@ -9,15 +9,16 @@
   templates/config/...  -> config_base_path/config/...
   templates/<其他>/...  -> lifeprism_data_path/<其他>/...
 
-强制覆盖策略（覆盖优先级：bootstrap.md 特殊跳过 > OVERWRITE_FILE_LIST > OVERWRITE_DIR_LIST > 仅复制不覆盖）：
-0. bootstrap.md 特殊跳过（最高优先级，防御性保护）：仅在 agent/chat 目录首次出现
-   时复制。用户完成引导后会删除 bootstrap.md，下次启动若 agent/chat 已存在则不再
-   复制，避免反复出现。**此判断必须早于所有覆盖逻辑**，防止 OVERWRITE_DIR_LIST
-   误包含 "agent" 时绕过保护导致 bug 复发（历史 bug 见
+强制覆盖策略（覆盖优先级：bootstrap.md 恒定跳过 > OVERWRITE_FILE_LIST > OVERWRITE_DIR_LIST > 仅复制不覆盖）：
+0. bootstrap.md 恒定跳过（最高优先级，已退休）：templates/agent/chat/bootstrap.md
+   已于 2026-10-03 退休，永不初始化。此分支不再依赖任何状态判断，恒为跳过，
+   用于防御历史分发包（PyInstaller bundle）中残留的旧模板在升级后重新生成该文件。
+   **此判断必须早于所有覆盖逻辑**，防止 OVERWRITE_DIR_LIST 误包含 "agent" 时绕过
+   保护导致 bug 复发（历史 bug 见
    docs/history-bugs/2026-07-27-bootstrap-md-recurring-after-overwrite.md）。
 1. OVERWRITE_FILE_LIST：精确文件路径白名单，用于混杂系统提示词与用户数据的目录
    （如 agent/chat/ 下既有系统提示词 soul.md/agent.md/tool.md，又有用户数据
-   identity.md、引导文件 bootstrap.md）。仅覆盖白名单内文件，保护用户数据。
+   identity.md）。仅覆盖白名单内文件，保护用户数据。
 2. OVERWRITE_DIR_LIST：第一级子目录白名单，整个目录下所有文件强制覆盖
    （如 prompts/，全部为系统级提示词，无用户数据）。
 3. 其余文件遵循"仅复制不覆盖"原则，保护用户数据。
@@ -39,7 +40,7 @@ OVERWRITE_DIR_LIST = ["prompts"]
 
 # 需要强制覆盖的特定文件白名单（相对 templates/ 的 POSIX 路径，精确匹配）
 # 用于混杂系统提示词与用户数据的目录（如 agent/）
-# 仅覆盖系统级提示词，保护用户数据（identity.md）与引导文件（bootstrap.md）
+# 仅覆盖系统级提示词，保护用户数据（identity.md）
 OVERWRITE_FILE_LIST = {
     "agent/README.md",
     "agent/chat/agent.md",
@@ -55,7 +56,7 @@ def initialize_resources() -> None:
     初始化资源文件
 
     扫描模板根目录下所有文件，按强制覆盖策略处理：
-    - bootstrap.md 特殊跳过（最高优先级）：agent/chat 已存在时不再复制
+    - bootstrap.md 恒定跳过（最高优先级）：该引导文件已退休，永不初始化
     - OVERWRITE_FILE_LIST 命中 → 强制覆盖（精确文件路径）
     - OVERWRITE_DIR_LIST 命中 → 强制覆盖（第一级子目录）
     - 其余 → 仅当目标不存在时复制
@@ -78,11 +79,6 @@ def initialize_resources() -> None:
         logger.warning("内嵌 templates 目录不存在，跳过资源初始化: %s", templates_dir)
         return
 
-    # 记录初始化前 agent/chat 目录是否已存在
-    # 用于决定是否复制 bootstrap.md：用户完成引导后会删除 bootstrap.md，
-    # 下次启动若 agent/chat 已存在则不再复制，避免反复出现
-    agent_chat_existed_before = (data_path / "agent/chat").exists()
-
     for source in templates_dir.rglob("*"):
         if not source.is_file():
             continue
@@ -94,11 +90,13 @@ def initialize_resources() -> None:
         # 第一级子目录决定目标基础路径
         target = config_path / rel if rel.parts[0] == _CONFIG_SUBDIR else data_path / rel
 
-        # 优先级 0（最高，防御性保护）：bootstrap.md 特殊跳过
-        # 必须早于所有覆盖逻辑，防止 OVERWRITE_DIR_LIST 误包含 "agent" 时绕过保护
-        # 导致 bug 复发（历史 bug 见 docs/history-bugs/2026-07-27-bootstrap-md-recurring-after-overwrite.md）
-        if rel_posix == "agent/chat/bootstrap.md" and agent_chat_existed_before:
-            logger.debug("agent/chat 目录已存在，跳过复制 bootstrap.md: %s", target)
+        # 优先级 0（最高，防御性保护）：bootstrap.md 恒定跳过
+        # bootstrap.md 已退休，永不初始化；此处恒为跳过，用于防御历史分发包中残留的
+        # 旧模板在升级后重新生成该文件。必须早于所有覆盖逻辑，防止 OVERWRITE_DIR_LIST
+        # 误包含 "agent" 时绕过保护导致 bug 复发
+        # （历史 bug 见 docs/history-bugs/2026-07-27-bootstrap-md-recurring-after-overwrite.md）
+        if rel_posix == "agent/chat/bootstrap.md":
+            logger.debug("bootstrap.md 已退休，跳过复制: %s", target)
             continue
 
         # 优先级 1：精确文件路径白名单命中 → 强制覆盖

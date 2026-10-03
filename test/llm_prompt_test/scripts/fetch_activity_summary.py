@@ -16,7 +16,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary
+from lifeprism.llm.deprecated_agent.tools.lifeprismsystem import query_user_activity_summary
 from lifeprism.utils.time_utils import local_to_utc_iso
 
 # 常量定义

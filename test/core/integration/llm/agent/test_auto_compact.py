@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from lifeprism.config import settings
-from lifeprism.llm.agent.loop import AgentLoop
+from lifeprism.llm.deprecated_agent.loop import AgentLoop
 from lifeprism.llm.bus import MessageQueue
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.llm.session import Session, session_manager
@@ -50,8 +50,8 @@ class TestAutoCompact:
         # Mock estimate_prompt_tokens 使其返回超过限制的值
         # Mock LLM 调用返回压缩内容
         with (
-            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
-            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.deprecated_agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.deprecated_agent.loop.create_llm_client") as mock_llm,
         ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
@@ -72,8 +72,8 @@ class TestAutoCompact:
 
         # Mock 使压缩触发
         with (
-            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
-            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.deprecated_agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.deprecated_agent.loop.create_llm_client") as mock_llm,
         ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
@@ -97,8 +97,8 @@ class TestAutoCompact:
 
         # Mock 使压缩触发
         with (
-            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
-            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.deprecated_agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.deprecated_agent.loop.create_llm_client") as mock_llm,
         ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
@@ -120,8 +120,8 @@ class TestAutoCompact:
         """测试压缩后 get_history_message() 能从正确位置加载"""
         # Mock 使压缩触发
         with (
-            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
-            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.deprecated_agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.deprecated_agent.loop.create_llm_client") as mock_llm,
         ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))

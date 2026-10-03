@@ -8,7 +8,7 @@ from typing import Any
 import pytz
 
 from lifeprism.config import ALLOWED_DIRS, get_user_timezone, settings
-from lifeprism.llm.agent.skill import SkillLoad
+from lifeprism.llm.deprecated_agent.skill import SkillLoad
 from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
 from lifeprism.utils import get_logger
 

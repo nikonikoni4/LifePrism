@@ -6,7 +6,7 @@ Licensed under the MIT License.
 
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import ERROR, Tool
+from lifeprism.llm.deprecated_agent.tools.base import ERROR, Tool
 
 
 class ToolRegistry:

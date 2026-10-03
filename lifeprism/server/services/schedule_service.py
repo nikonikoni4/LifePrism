@@ -6,7 +6,7 @@
 import asyncio
 import json
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytz
@@ -133,24 +133,20 @@ class ScheduleService:
         self._system_jobs = []
 
         # 根据配置决定是否注册任务
+        # 会话信息提取（process_session_message）延后到 P4，此处不再注册 interval 定时任务。
+        # 注意：TEST_MODE 下原用于缩短该任务间隔的 TEST_INTERVAL_MINUTES 分支随之移除，
+        # 仅影响本任务；dreaming（TEST_MODE 用 TEST_CRON_AFTER_MINUTES）与备份任务不受影响。
+        # 包装函数 _process_session_message 与导入保留，便于 P4 恢复注册。
         if settings.auto_summary_session:
-            interval_minutes = TEST_INTERVAL_MINUTES if TEST_MODE else None
-            interval_hours = None if TEST_MODE else 4
-            self._system_jobs.append(
-                {
-                    "func": _process_session_message,
-                    "trigger": "interval",
-                    "kwargs": {"hours": interval_hours, "minutes": interval_minutes},
-                    "job_id": "process_session_message",
-                }
+            logger.info(
+                "auto_summary_session=True，但会话信息提取（process_session_message）"
+                "已延后至 P4，本次不注册 interval 定时任务"
             )
 
         if settings.auto_update_memory or settings.auto_diary_summary:
             if TEST_MODE:
                 # TEST_MODE 下基于 UTC 时间生成 cron 表达式（与 CronTrigger 的 UTC 时区一致）
-                target_time = datetime.now(timezone.utc) + timedelta(
-                    minutes=TEST_CRON_AFTER_MINUTES
-                )
+                target_time = datetime.now(UTC) + timedelta(minutes=TEST_CRON_AFTER_MINUTES)
                 cron_expr = f"{target_time.minute} {target_time.hour} * * *"
             else:
                 cron_expr = "0 10 * * *"  # 本地 10:00
@@ -520,7 +516,7 @@ schedule_service = ScheduleService()
 
 
 if __name__ == "__main__":
-    from lifeprism.llm.agent.loop import agent_loop
+    from lifeprism.llm.runtime.worker import agent_loop
 
     async def test_schedule():
         # 先启动 agent_loop

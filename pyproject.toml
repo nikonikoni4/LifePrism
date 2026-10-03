@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 name = "lifeprism"
 version = "0.2.0"
 description = "AI-powered software monitoring and classification system"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 
 # 项目依赖
 dependencies = [
@@ -46,6 +46,8 @@ dependencies = [
     "qrcode>=7.4.0",
     "typing-extensions>=4.8.0",
     "asyncssh>=2.14.0",
+    # 外部 Agent 执行内核（开发期通过 [tool.uv.sources] 以本地路径 editable 引入）
+    "myagent==0.1.0",
 ]
 
 # 可选依赖
@@ -53,12 +55,18 @@ dependencies = [
 dev = [
     "pytest>=6.0",
 ]
-[tool.setuptools]
-packages = ["lifeprism"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lifeprism*"]
+exclude = ["lifeprism.llm.deprecated_agent*"]
+
+# 开发期 myagent 指向本地 ../agent 目录（editable），正式发布时移除此覆盖即可从索引安装
+[tool.uv.sources]
+myagent = { path = '../agent', editable = true }
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 extend-exclude = [
     "frontend",
     ".claude",
@@ -85,7 +93,7 @@ ignore = [
 "lifeprism/repository/__init__.py" = ["E402"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 files = ["lifeprism"]
 strict_optional = true
 warn_unused_ignores = true

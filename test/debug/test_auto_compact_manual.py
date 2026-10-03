@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 import asyncio
 import shutil
 
-from lifeprism.llm.agent.loop import AgentLoop
+from lifeprism.llm.deprecated_agent.loop import AgentLoop
 from lifeprism.llm.bus import MessageQueue
 from lifeprism.llm.session import session_manager
 

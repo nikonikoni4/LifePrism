@@ -5,7 +5,7 @@
 
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from lifeprism.config import settings
 from lifeprism.llm.function import screenshot_analysis, screenshot_behavior_summary
@@ -48,8 +48,8 @@ async def screen_behavior_anlysis(start_time: str, end_time: str) -> list[Behavi
     screenshot_retention_days = settings.get("screenshot_retention_days", 3)
     requested_start_time = datetime.fromisoformat(start_time)
     if requested_start_time.tzinfo is None:
-        requested_start_time = requested_start_time.replace(tzinfo=timezone.utc)
-    earliest_available_time = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(
+        requested_start_time = requested_start_time.replace(tzinfo=UTC)
+    earliest_available_time = datetime.now(UTC).replace(microsecond=0) - timedelta(
         days=screenshot_retention_days
     )
     start_time = (
@@ -145,12 +145,10 @@ class SyncService:
                     analysis_start_time = last_records[0]["end_time"]
                 else:
                     # 如果表为空，使用当前时间往前推 1 天
-                    analysis_start_time = (
-                        datetime.now(timezone.utc) - timedelta(days=1)
-                    ).isoformat()
+                    analysis_start_time = (datetime.now(UTC) - timedelta(days=1)).isoformat()
 
                 # 使用当前时间作为结束时间
-                analysis_end_time = datetime.now(timezone.utc).isoformat()
+                analysis_end_time = datetime.now(UTC).isoformat()
 
                 # 后台执行截图分析，不阻塞 sync 响应
                 asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))
@@ -251,7 +249,7 @@ class SyncService:
 if __name__ == "__main__":
     import asyncio
 
-    from lifeprism.llm.agent.loop import agent_loop
+    from lifeprism.llm.runtime.worker import agent_loop
 
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())

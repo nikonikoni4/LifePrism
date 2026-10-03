@@ -139,7 +139,7 @@ if __name__ == "__main__":
     mood = "不太好"
     import asyncio
 
-    from lifeprism.llm.agent.loop import agent_loop
+    from lifeprism.llm.runtime.worker import agent_loop
 
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())

@@ -12,7 +12,7 @@ import mimetypes
 from pathlib import Path
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool
+from lifeprism.llm.deprecated_agent.tools.base import Tool
 from lifeprism.llm.utils.helpers import build_image_content_blocks, detect_image_mime
 
 

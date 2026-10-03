@@ -5,8 +5,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from lifeprism.llm.agent.tools.base import ERROR, SUCCESS
-from lifeprism.llm.agent.tools.habit_tool import (
+from lifeprism.llm.deprecated_agent.tools.base import ERROR, SUCCESS
+from lifeprism.llm.deprecated_agent.tools.habit_tool import (
     BackfillCheckinTool,
     CancelCheckinHabitTool,
     CheckinHabitTool,

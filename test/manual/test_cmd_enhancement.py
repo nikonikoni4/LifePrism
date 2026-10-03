@@ -13,7 +13,7 @@ def test_continue_command():
     print("=== 测试 /continue 命令 ===\n")
 
     # 延迟导入，避免循环导入
-    from lifeprism.llm.agent.loop import AgentLoop
+    from lifeprism.llm.deprecated_agent.loop import AgentLoop
     from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
     from lifeprism.llm.session import Session
 
@@ -53,7 +53,7 @@ def test_continue_command():
         session_id=None,
     )
 
-    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+    with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
         mock_manager.show_session_list.return_value = ["test-session-123"]
         mock_manager.get_or_create_session.return_value = mock_session
 
@@ -78,7 +78,7 @@ def test_continue_command():
         session_id=None,
     )
 
-    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+    with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
         mock_manager.show_session_list.return_value = ["session-1", "session-2"]
 
         result = agent_loop._process_cmd(msg)
@@ -93,7 +93,7 @@ def test_new_command():
     """测试 /new 命令增强"""
     print("=== 测试 /new 命令 ===\n")
 
-    from lifeprism.llm.agent.loop import AgentLoop
+    from lifeprism.llm.deprecated_agent.loop import AgentLoop
     from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
 
     mock_bus = Mock()
@@ -109,7 +109,7 @@ def test_new_command():
         session_id="old-session-123",
     )
 
-    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+    with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
         mock_new_session = Mock()
         mock_new_session.id = "new-session-456"
         mock_manager.get_or_create_session.return_value = mock_new_session
@@ -133,7 +133,7 @@ def test_new_command():
         session_id=None,
     )
 
-    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+    with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
         mock_new_session = Mock()
         mock_new_session.id = "new-session-789"
         mock_manager.get_or_create_session.return_value = mock_new_session

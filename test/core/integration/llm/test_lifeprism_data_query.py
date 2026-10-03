@@ -2,7 +2,7 @@
 
 import pytest
 
-from lifeprism.llm.agent.tools.lifeprismsystem import query_data
+from lifeprism.llm.deprecated_agent.tools.lifeprismsystem import query_data
 from lifeprism.repository.aggregators import computer_usage_aggregator, todo_aggregator
 from lifeprism.repository.providers import behavior_analysis_provider, custom_block_provider
 

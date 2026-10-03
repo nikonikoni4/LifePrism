@@ -10,7 +10,7 @@ import pytest
 def agent_loop():
     """创建 AgentLoop 实例"""
     # 延迟导入，避免模块级别的循环导入
-    from lifeprism.llm.agent.loop import AgentLoop
+    from lifeprism.llm.deprecated_agent.loop import AgentLoop
 
     mock_bus = Mock()
     return AgentLoop(mock_bus)
@@ -103,7 +103,7 @@ class TestContinueCommand:
         )
 
         # Mock session_manager
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_manager.show_session_list.return_value = ["test-session-123"]
             mock_manager.get_or_create_session.return_value = mock_session_with_messages
 
@@ -131,7 +131,7 @@ class TestContinueCommand:
             session_id=None,
         )
 
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_manager.show_session_list.return_value = ["test-session-456"]
             mock_manager.get_or_create_session.return_value = mock_session_with_few_messages
 
@@ -153,7 +153,7 @@ class TestContinueCommand:
             session_id=None,
         )
 
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_manager.show_session_list.return_value = ["test-session-789"]
             mock_manager.get_or_create_session.return_value = mock_session_with_multimodal
 
@@ -175,7 +175,7 @@ class TestContinueCommand:
             session_id=None,
         )
 
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_manager.show_session_list.return_value = ["session-1", "session-2"]
 
             result = agent_loop._process_cmd(msg)
@@ -219,7 +219,7 @@ class TestNewCommand:
             session_id="old-session-123",
         )
 
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_new_session = Mock()
             mock_new_session.id = "new-session-456"
             mock_manager.get_or_create_session.return_value = mock_new_session
@@ -246,7 +246,7 @@ class TestNewCommand:
             session_id=None,
         )
 
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_new_session = Mock()
             mock_new_session.id = "new-session-789"
             mock_manager.get_or_create_session.return_value = mock_new_session
@@ -286,7 +286,7 @@ class TestCommandEdgeCases:
         empty_session.id = "empty-session"
         empty_session.messages = []
 
-        with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
+        with patch("lifeprism.llm.deprecated_agent.loop.session_manager") as mock_manager:
             mock_manager.show_session_list.return_value = ["empty-session"]
             mock_manager.get_or_create_session.return_value = empty_session
 

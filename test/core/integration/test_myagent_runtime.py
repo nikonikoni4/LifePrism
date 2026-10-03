@@ -1,0 +1,407 @@
+"""使用真实 myagent 循环与确定性模型响应的迁移契约测试。"""
+
+import asyncio
+import contextlib
+
+import pytest
+from myagent.agent.core.provider import ChatParams, LLMResponse, RawToolCall, StreamChunk, Usage
+from myagent.agent.core.tool.tool import Tool, ToolResult
+
+from lifeprism.llm.bus import InboundMessage, MessageQueue, MessageType
+from lifeprism.llm.runtime import AgentRuntime
+from lifeprism.llm.runtime.worker import AgentBusWorker
+from lifeprism.llm.runtime_tools.base import normalize_tool_result
+
+pytestmark = pytest.mark.core
+
+
+class EchoTool(Tool):
+    """最简 Tool 测试替身，回显文本，并对哨兵输入返回失败。"""
+    name = "echo"
+    description = "Echo the supplied text"
+    parameters = {
+        "type": "object",
+        "properties": {"text": {"type": "string"}},
+        "required": ["text"],
+    }
+
+    @normalize_tool_result
+    async def execute(self, text: str):
+        """对哨兵输入 ``fail`` 返回 native 错误结果，其余输入原样回显。"""
+        return "Error: rejected" if text == "fail" else text
+
+
+class FakeClient:
+    """确定性的流式 provider 测试替身，提供脚本化轮次与多种失败模式。"""
+    model = "fake"
+    params = ChatParams()
+
+    def __init__(self, with_tool=False, fail=False, block=False):
+        """初始化脚本化的 client。
+
+        Args:
+            with_tool: 为 True 时，首轮在最终回答前先发一次工具调用。
+            fail: 为 True 时，每次流式调用都抛出 provider 错误。
+            block: 为 True 时，流式调用阻塞直到被取消，用于模拟卡住的模型。
+        """
+        self.with_tool = with_tool
+        self.fail = fail
+        self.block = block
+        self.calls = []
+        self.cancelled = False
+
+    async def stream_chat(self, messages, tools=None):
+        """按脚本产出分块；当 client 被设为失败时改为抛错。"""
+        self.calls.append(messages)
+        if self.fail:
+            raise RuntimeError("provider failed")
+        if self.block:
+            try:
+                await asyncio.Event().wait()
+            finally:
+                self.cancelled = True
+        if self.with_tool and len(self.calls) == 1:
+            yield LLMResponse(
+                content="checking",
+                tool_call_requests=[
+                    RawToolCall(
+                        id="call-1",
+                        name="echo",
+                        arguments='{"text":"hello"}',
+                    )
+                ],
+                usage=Usage(2, 3, 5),
+            )
+        else:
+            yield StreamChunk(content="hel")
+            await asyncio.sleep(0)
+            yield StreamChunk(content="lo")
+            yield LLMResponse(content="hello", usage=Usage(4, 5, 9))
+
+
+def make_runtime(tmp_path, client, usage=None):
+    """构建一个绑定到指定 client 与内存写入器的 AgentRuntime。
+
+    Args:
+        tmp_path: 作为 runtime 数据路径的临时目录。
+        client: client 工厂返回的流式 provider 测试替身。
+        usage: 可选列表；提供时会记录每次 usage 写入。
+
+    Returns:
+        AgentRuntime: 用于确定性离线运行的 runtime 实例。
+    """
+    async def write_usage(sid, values, mode):
+        """测试需要采集时，把一次 usage 写入记录到共享列表。"""
+        if usage is not None:
+            usage.append((sid, values, mode))
+
+    async def skip_log(*args):
+        """丢弃日志写入，避免测试触碰文件系统。"""
+        pass
+
+    return AgentRuntime(
+        data_path=tmp_path,
+        session_folder=tmp_path / "sessions",
+        client_factory=lambda: client,
+        tools_factory=lambda kind: [EchoTool()],
+        usage_writer=write_usage,
+        log_writer=skip_log,
+    )
+
+
+def test_tool_turn_waits_for_final_message_and_accounts_all_steps(tmp_path):
+    """守护一次工具轮次产出分块、工具事件、最终回答以及一次 usage 写入。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动工具轮次的 runtime 场景。"""
+        usage = []
+        client = FakeClient(with_tool=True)
+        runtime = make_runtime(tmp_path, client, usage)
+        try:
+            events = [
+                event
+                async for event in runtime.stream(
+                    InboundMessage(type=MessageType.CHAT, content="test")
+                )
+            ]
+            assert [e.text for e in events if e.type == "content"] == ["hel", "lo"]
+            assert any(e.type == "tool/call" for e in events)
+            assert any(e.type == "tool/result" for e in events)
+            assert events[-1].type == "done"
+            assert events[-1].result.response.content == "hello"
+            assert events[-1].result.response.usage["total_tokens"] == 14
+            assert len({e.run_id for e in events}) == 1
+            assert len(usage) == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_session_serializes_runs_and_refreshes_prompt_files(tmp_path):
+    """守护同一 session 上的并发运行被串行化，且每轮重新加载 prompt 文件。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动同 session 并发场景。"""
+        prompt_file = tmp_path / "agent/chat/soul.md"
+        prompt_file.parent.mkdir(parents=True)
+        prompt_file.write_text("first prompt", encoding="utf-8")
+        client = FakeClient()
+        runtime = make_runtime(tmp_path, client)
+        try:
+            first = await runtime.execute(InboundMessage(type=MessageType.CHAT, content="first"))
+            sid = first.session_id
+            prompt_file.write_text("second prompt", encoding="utf-8")
+            results = await asyncio.gather(
+                *[
+                    runtime.execute(
+                        InboundMessage(type=MessageType.CHAT, content=str(i), session_id=sid)
+                    )
+                    for i in range(2)
+                ]
+            )
+            assert all(result.session_id == sid for result in results)
+            assert "first prompt" in client.calls[0][0].content
+            assert all("second prompt" in call[0].content for call in client.calls[1:])
+            assert runtime._slots[sid].context.session.turn == 3
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_provider_failure_emits_error_without_success(tmp_path):
+    """守护 provider 失败时只透出 error 事件，绝不产生 done 事件。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动 provider 失败场景。"""
+        runtime = make_runtime(tmp_path, FakeClient(fail=True))
+        try:
+            events = [
+                e async for e in runtime.stream(InboundMessage(type=MessageType.CHAT, content="x"))
+            ]
+            assert events[-1].type == "error"
+            assert "provider failed" in events[-1].text
+            assert not any(e.type == "done" for e in events)
+            assert next(e for e in events if e.type == "turn/end").data["reason_type"] == "error"
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_abandoned_stream_cancels_turn_and_persists_terminal(tmp_path):
+    """守护关闭流会取消当前轮次，并落盘一条 interrupted 终止记录。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动流被中途放弃的场景。"""
+        client = FakeClient(block=True)
+        runtime = make_runtime(tmp_path, client)
+        events = runtime.stream(InboundMessage(type=MessageType.CHAT, content="x"))
+        first = await anext(events)
+        while not client.calls:
+            await asyncio.sleep(0)
+        await events.aclose()
+        assert client.cancelled
+        records = runtime._slots[first.session_id].context.session.record_list
+        assert records[-1].type == "turn/end"
+        assert records[-1].data.reason_type == "interrupted"
+        assert not runtime._tasks
+        await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_background_bus_returns_result_and_releases_context(tmp_path):
+    """守护后台 bus 任务返回结果并释放 session 槽位。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动后台任务成功的场景。"""
+        runtime = make_runtime(tmp_path, FakeClient())
+        bus = MessageQueue()
+        worker = AgentBusWorker(bus, runtime)
+        task = asyncio.create_task(worker.loop())
+        try:
+            response = await asyncio.wait_for(
+                bus.send(InboundMessage(type=MessageType.GENERAL_TASK, content="job")), 3
+            )
+            assert response.response.content == "hello"
+            assert not runtime._slots
+            assert not bus._pending
+        finally:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(scenario())
+
+
+def test_background_failure_rejects_waiter_immediately(tmp_path):
+    """守护后台任务失败会立即拒绝等待方，而不是一直挂起。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动后台任务失败场景。"""
+        runtime = make_runtime(tmp_path, FakeClient(fail=True))
+        bus = MessageQueue()
+        worker = AgentBusWorker(bus, runtime)
+        task = asyncio.create_task(worker.loop())
+        try:
+            with pytest.raises(RuntimeError, match="provider failed"):
+                await asyncio.wait_for(
+                    bus.send(InboundMessage(type=MessageType.GENERAL_TASK, content="job")), 3
+                )
+            assert not bus._pending
+        finally:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(scenario())
+
+
+def test_old_session_is_not_loaded(tmp_path):
+    """守护早于迁移切点的 session id 会被拒绝，而不是被恢复。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动过期 session 场景。"""
+        runtime = make_runtime(tmp_path, FakeClient())
+        with pytest.raises(ValueError, match="P4"):
+            await runtime.execute(
+                InboundMessage(type=MessageType.CHAT, content="x", session_id="session_20261002")
+            )
+        await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_tool_failure_uses_native_result_and_default_breaker():
+    """守护工具失败保持 native 结果形态与默认熔断设置。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动工具熔断默认值场景。"""
+        tool = EchoTool()
+        result = await tool.execute("fail")
+        assert isinstance(result, ToolResult) and result.is_error
+        assert tool.max_consecutive_failures is None
+        assert tool.breaker_mode == "schema_hide"
+        assert tool.raise_on_break is False
+
+    asyncio.run(scenario())
+
+
+def test_runtime_shutdown_cancels_live_subscriber_without_deadlock(tmp_path):
+    """守护 runtime 关闭会取消存活的订阅者且不发生死锁。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动 runtime 关闭场景。"""
+        client = FakeClient(block=True)
+        runtime = make_runtime(tmp_path, client)
+
+        async def consume():
+            """为关闭场景收集 runtime 流中的全部事件。"""
+            return [
+                e async for e in runtime.stream(InboundMessage(type=MessageType.CHAT, content="x"))
+            ]
+
+        consumer = asyncio.create_task(consume())
+        while not client.calls:
+            await asyncio.sleep(0)
+        await asyncio.wait_for(runtime.close(), 3)
+        assert consumer.cancelled()
+        assert client.cancelled
+        assert not runtime._slots
+        assert not runtime._tasks
+
+    asyncio.run(scenario())
+
+
+def test_bus_caller_cancellation_stops_background_model(tmp_path):
+    """守护取消 bus 调用方会一并取消后台模型轮次。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动调用方取消场景。"""
+        client = FakeClient(block=True)
+        runtime = make_runtime(tmp_path, client)
+        bus = MessageQueue()
+        worker = AgentBusWorker(bus, runtime)
+        task = asyncio.create_task(worker.loop())
+        caller = asyncio.create_task(
+            bus.send(InboundMessage(type=MessageType.GENERAL_TASK, content="job"))
+        )
+        try:
+            while not client.calls:
+                await asyncio.sleep(0)
+            caller.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await caller
+            for _ in range(100):
+                if not worker._active_tasks:
+                    break
+                await asyncio.sleep(0.01)
+            assert client.cancelled
+            assert not worker._active_tasks
+            assert not bus._pending
+        finally:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(scenario())
+
+
+def test_worker_can_restart_after_shutdown(tmp_path):
+    """守护 worker 循环在生命周期被取消后仍能重新启动。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动 worker 重启场景。"""
+        runtime = make_runtime(tmp_path, FakeClient())
+        bus = MessageQueue()
+        worker = AgentBusWorker(bus, runtime)
+        for _ in range(2):
+            task = asyncio.create_task(worker.loop())
+            try:
+                result = await asyncio.wait_for(
+                    bus.send(InboundMessage(type=MessageType.GENERAL_TASK, content="restart")), 3
+                )
+                assert result.response.content == "hello"
+            finally:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    asyncio.run(scenario())
+
+
+def test_setup_failure_releases_new_context(tmp_path):
+    """守护工具构建失败时会释放刚创建的 session 槽位。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动工具构建失败场景。"""
+        runtime = make_runtime(tmp_path, FakeClient())
+
+        def broken_tools(kind):
+            """抛出异常，模拟在构建阶段失败的工具工厂。"""
+            raise RuntimeError("tool setup failed")
+
+        runtime._tools_factory = broken_tools
+        try:
+            with pytest.raises(RuntimeError, match="tool setup failed"):
+                await runtime.execute(InboundMessage(type=MessageType.GENERAL_TASK, content="job"))
+            assert not runtime._slots
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_chat_logging_uses_native_prompt_and_does_not_duplicate_background(tmp_path, monkeypatch):
+    """守护 chat 轮次用 native prompt 只记录一次日志，而后台任务不记录。"""
+    async def scenario():
+        """在 `asyncio.run` 下驱动 chat 日志场景。"""
+        from lifeprism.llm.utils.llm_call_logger import llm_call_logger
+
+        logged = []
+        monkeypatch.setattr(llm_call_logger, "log_call", lambda **kwargs: logged.append(kwargs))
+        runtime = make_runtime(tmp_path, FakeClient(with_tool=True))
+        runtime._log_writer = runtime._log_chat
+        try:
+            result = await runtime.execute(InboundMessage(type=MessageType.CHAT, content="log me"))
+            assert len(logged) == 1
+            assert logged[0]["inbound_msg"].session_id == result.session_id
+            assert logged[0]["outbound_msg"].response.usage["total_tokens"] == 14
+            assert logged[0]["system_prompt"]
+            assert logged[0]["model"] == "fake"
+            await runtime.execute(InboundMessage(type=MessageType.GENERAL_TASK, content="job"))
+            assert len(logged) == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())

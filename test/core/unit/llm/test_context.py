@@ -1,4 +1,4 @@
-"""测试 lifeprism.llm.agent.context 模块的 _read_file 参数注入功能"""
+"""测试 lifeprism.llm.deprecated_agent.context 模块的 _read_file 参数注入功能"""
 
 import json
 import tempfile
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lifeprism.llm.agent.context import Context
+from lifeprism.llm.deprecated_agent.context import Context
 
 
 @pytest.mark.core
@@ -77,7 +77,7 @@ class TestReadFile:
         finally:
             Path(temp_path).unlink()
 
-    @patch("lifeprism.llm.agent.context.logger")
+    @patch("lifeprism.llm.deprecated_agent.context.logger")
     def test_missing_params_warning(self, mock_logger):
         """测试缺失参数时输出 warning 日志"""
         with tempfile.NamedTemporaryFile(
@@ -169,7 +169,7 @@ class TestReadFile:
 class TestBuildExpandDir:
     """测试 _build_expand_dir 方法"""
 
-    @patch("lifeprism.llm.agent.context.settings")
+    @patch("lifeprism.llm.deprecated_agent.context.settings")
     def test_expand_dir_not_exists(self, mock_settings):
         """测试 expand_meta_data.json 不存在时返回 '无'"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -177,7 +177,7 @@ class TestBuildExpandDir:
             result = Context._build_expand_dir()
             assert result == "无"
 
-    @patch("lifeprism.llm.agent.context.settings")
+    @patch("lifeprism.llm.deprecated_agent.context.settings")
     def test_expand_dir_empty_list(self, mock_settings):
         """测试 expand_meta_data.json 为空列表时返回 '无'"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -189,7 +189,7 @@ class TestBuildExpandDir:
             result = Context._build_expand_dir()
             assert result == "无"
 
-    @patch("lifeprism.llm.agent.context.settings")
+    @patch("lifeprism.llm.deprecated_agent.context.settings")
     def test_expand_dir_with_data(self, mock_settings):
         """测试 expand_meta_data.json 有数据时正确格式化"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -210,7 +210,7 @@ class TestBuildExpandDir:
             assert "- /data/projects (项目目录): 存放所有项目文件" in result
             assert "- /data/backup (备份目录): 数据备份位置" in result
 
-    @patch("lifeprism.llm.agent.context.settings")
+    @patch("lifeprism.llm.deprecated_agent.context.settings")
     def test_expand_dir_invalid_json(self, mock_settings):
         """测试 expand_meta_data.json 格式错误时返回 '无'"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -227,7 +227,7 @@ class TestBuildExpandDir:
 class TestBuildBootstrap:
     """测试 _build_bootstrap 方法的参数注入"""
 
-    @patch("lifeprism.llm.agent.context.settings")
+    @patch("lifeprism.llm.deprecated_agent.context.settings")
     def test_agent_md_params_injection(self, mock_settings):
         """测试 agent.md 参数注入"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -251,7 +251,7 @@ class TestBuildBootstrap:
             assert f"用户路径: {tmpdir_path / 'user'}" in result
             assert f"日记路径: {tmpdir_path / 'diary'}" in result
 
-    @patch("lifeprism.llm.agent.context.settings")
+    @patch("lifeprism.llm.deprecated_agent.context.settings")
     def test_agent_md_with_expand_dir(self, mock_settings):
         """测试 agent.md 包含 expand_dir 参数"""
         with tempfile.TemporaryDirectory() as tmpdir:

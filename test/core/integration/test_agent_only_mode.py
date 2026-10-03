@@ -114,7 +114,7 @@ class TestAgentOnlyToolsAvailable:
 
     def test_custom_records_tools_importable(self):
         """自定义记录 LLM 工具可导入"""
-        from lifeprism.llm.agent.tools.custom_records_tool import (
+        from lifeprism.llm.runtime_tools.custom_records_tool import (
             CreateCustomRecordEntryTool,
             CreateCustomRecordTypeTool,
             ListCustomRecordTypesTool,
@@ -128,7 +128,7 @@ class TestAgentOnlyToolsAvailable:
 
     def test_agent_loop_importable(self):
         """AgentLoop 可导入"""
-        from lifeprism.llm.agent.loop import agent_loop
+        from lifeprism.llm.runtime.worker import agent_loop
 
         assert agent_loop is not None
 
@@ -154,7 +154,7 @@ class TestBootstrapFunctionsBehavior:
 
         with (
             patch("lifeprism.llm.channel.wechat_channel", mock_wechat),
-            patch("lifeprism.llm.agent.loop.agent_loop", mock_agent),
+            patch("lifeprism.llm.runtime.worker.agent_loop", mock_agent),
         ):
             from lifeprism.server.bootstrap import start_agent_and_channel
 
@@ -181,7 +181,7 @@ class TestBootstrapFunctionsBehavior:
 
         with (
             patch("lifeprism.llm.channel.wechat_channel", mock_wechat),
-            patch("lifeprism.llm.agent.loop.agent_loop", mock_agent),
+            patch("lifeprism.llm.runtime.worker.agent_loop", mock_agent),
         ):
             from lifeprism.server.bootstrap import (
                 start_agent_and_channel,

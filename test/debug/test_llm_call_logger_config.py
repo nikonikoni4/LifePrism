@@ -80,7 +80,7 @@ async def test_llm_call_logger():
 
 
 if __name__ == "__main__":
-    from lifeprism.llm.agent.loop import agent_loop
+    from lifeprism.llm.deprecated_agent.loop import agent_loop
 
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
