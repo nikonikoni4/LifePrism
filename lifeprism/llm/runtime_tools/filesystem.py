@@ -1,11 +1,15 @@
-"""文件系统工具"""
+"""文件系统工具
+
+访问范围校验已上移到 ToolUseGuard（订阅 tool/call，见
+``myagent.agent.guard.tool_use_guard``），由它在工具执行前按白名单逐条裁决。
+本模块不再做路径校验，也不再限制可搜索的文件类型。
+"""
 
 import asyncio
 import re
 from pathlib import Path
 from typing import Any
 
-from lifeprism.config import ALLOWED_DIRS, settings
 from lifeprism.llm.runtime_tools.base import (
     ERROR,
     SUCCESS,
@@ -18,52 +22,12 @@ from lifeprism.utils import get_logger
 logger = get_logger(__name__)
 
 
-class _FileTool(Tool):
-    """文件系统工具基类，提供路径权限验证功能"""
-
-    def __init__(self):
-        super().__init__()
-        self.allowed_dir_path: list[Path] = settings.allowed_dir_path
-        logger.debug("允许的工作目录: %s", self.allowed_dir_path)
-
-    def _check_workspace_permission(self, file_path: str) -> tuple[bool, str]:
-        """检查文件路径是否在允许的工作目录内
-
-        Args:
-            file_path: 要检查的文件路径
-
-        Returns:
-            Tuple[bool, str]: (是否允许, 错误信息)
-                              如果允许，返回 (True, "")
-                              如果不允许，返回 (False, 错误信息)
-        """
-        if not self.allowed_dir_path:
-            return True, ""
-
-        file_path_obj = Path(file_path).resolve()
-
-        for allowed_dir in self.allowed_dir_path:
-            try:
-                file_path_obj.relative_to(allowed_dir)
-                return True, ""
-            except ValueError:
-                continue
-
-        return (
-            False,
-            f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in self.allowed_dir_path]}",
-        )
-
-
 # ==========================================
 # 读取文件工具
 # ==========================================
 
 
-class ReadFileTool(_FileTool):
-    def __init__(self):
-        super().__init__()
-
+class ReadFileTool(Tool):
     @property
     def name(self) -> str:
         return "read_file"
@@ -126,11 +90,6 @@ class ReadFileTool(_FileTool):
 
         if not file_path:
             return f"{ERROR}文件路径不能为空"
-
-        # 权限检查
-        is_allowed, error_msg = self._check_workspace_permission(file_path)
-        if not is_allowed:
-            return f"{ERROR}{error_msg}"
 
         # 将 offset/limit 转换为 start_line/end_line（内部使用从0开始的索引）
         start_line = offset - 1  # offset 从1开始，start_line 从0开始
@@ -283,10 +242,7 @@ def _read_file(
 # ==========================================
 
 
-class WriteFileTool(_FileTool):
-    def __init__(self):
-        super().__init__()
-
+class WriteFileTool(Tool):
     @property
     def name(self) -> str:
         return "write_file"
@@ -313,10 +269,6 @@ class WriteFileTool(_FileTool):
         if not file_path or not content:
             return f"{ERROR}: 缺少参数 file_path 或 content"
         try:
-            # 确保文件路径在允许的目录中
-            permission, error_msg = self._check_workspace_permission(file_path)
-            if not permission:
-                return f"{ERROR}: {error_msg}"
             # 写入文件内容
             file_path = Path(file_path)
             # 确保路径和文件存在
@@ -407,11 +359,8 @@ def _replace_content(
         return {"error": f"更新文件时出错: {str(e)}"}
 
 
-class EditFileTool(_FileTool):
+class EditFileTool(Tool):
     """编辑文件工具，通过内容替换的方式修改文件"""
-
-    def __init__(self):
-        super().__init__()
 
     @property
     def name(self) -> str:
@@ -476,11 +425,6 @@ class EditFileTool(_FileTool):
         if new_content is None:
             return f"{ERROR}new_content 不能为 None"
 
-        # 权限检查
-        is_allowed, error_msg = self._check_workspace_permission(file_path)
-        if not is_allowed:
-            return f"{ERROR}{error_msg}"
-
         # 调用底层实现
         result = _replace_content(
             file_path=file_path,
@@ -502,14 +446,11 @@ class EditFileTool(_FileTool):
 # ==========================================
 
 
-class FileTreeTool(_FileTool):
+class FileTreeTool(Tool):
     """文件树工具 - 纯 Python 实现
 
     使用 pathlib 遍历目录，无命令注入风险
     """
-
-    def __init__(self):
-        super().__init__()
 
     @property
     def name(self) -> str:
@@ -567,11 +508,6 @@ class FileTreeTool(_FileTool):
 
         if not dir_path:
             return f"{ERROR}目录路径不能为空"
-
-        # 权限检查
-        is_allowed, error_msg = self._check_workspace_permission(dir_path)
-        if not is_allowed:
-            return f"{ERROR}{error_msg}"
 
         # 检查路径是否存在
         dir_path_obj = Path(dir_path).resolve()
@@ -707,16 +643,13 @@ def _format_size(size: int) -> str:
 # ==========================================
 
 
-class SearchFileTool(_FileTool):
+class SearchFileTool(Tool):
     """搜索文件工具 - 纯 Python 实现
 
     使用 pathlib.rglob() 搜索文件，无命令注入风险
     """
 
     DEFAULT_TIMEOUT = 30.0
-
-    def __init__(self):
-        super().__init__()
 
     @property
     def name(self) -> str:
@@ -787,10 +720,6 @@ class SearchFileTool(_FileTool):
             return f"{ERROR}搜索目录不能为空"
         if not file_name:
             return f"{ERROR}文件名不能为空"
-
-        is_allowed, error_msg = self._check_workspace_permission(search_dir)
-        if not is_allowed:
-            return f"{ERROR}{error_msg}"
 
         try:
             async with asyncio.timeout(timeout):
@@ -875,16 +804,13 @@ def _search_files_py(
 # ==========================================
 
 
-class SearchStringTool(_FileTool):
+class SearchStringTool(Tool):
     """搜索字符串工具 - 纯 Python 实现
 
     使用 Python 的 re 模块搜索文件内容，无命令注入风险
     """
 
     DEFAULT_TIMEOUT = 30.0
-
-    def __init__(self):
-        super().__init__()
 
     @property
     def name(self) -> str:
@@ -968,10 +894,6 @@ class SearchStringTool(_FileTool):
         if not pattern:
             return f"{ERROR}搜索模式不能为空"
 
-        is_allowed, error_msg = self._check_workspace_permission(path)
-        if not is_allowed:
-            return f"{ERROR}{error_msg}"
-
         try:
             async with asyncio.timeout(timeout):
                 result = await asyncio.to_thread(
@@ -990,10 +912,6 @@ class SearchStringTool(_FileTool):
             return f"{ERROR}{result['error']}"
 
         return f"{SUCCESS}{result['result']}"
-
-
-# 允许搜索的文本文件后缀（硬约束）
-ALLOWED_SEARCH_EXTENSIONS = {".txt", ".md", ".json", ".log", ".csv"}
 
 
 def _search_string_py(
@@ -1032,11 +950,6 @@ def _search_string_py(
         total_matches = 0
 
         if path_obj.is_file():
-            # 硬约束：直接指定的文件也必须是允许的文本文件后缀
-            if path_obj.suffix.lower() not in ALLOWED_SEARCH_EXTENSIONS:
-                return {
-                    "error": f"文件 {path} 不是可搜索的文本文件类型，允许的后缀: {', '.join(sorted(ALLOWED_SEARCH_EXTENSIONS))}"
-                }
             files_to_search = [path_obj]
         else:
             base_depth = len(path_obj.absolute().parts)
@@ -1053,10 +966,6 @@ def _search_string_py(
         for file_path in files_to_search:
             if total_matches >= max_results:
                 break
-
-            # 硬约束：只搜索允许的文本文件后缀
-            if file_path.suffix.lower() not in ALLOWED_SEARCH_EXTENSIONS:
-                continue
 
             try:
                 with open(file_path, encoding="utf-8") as f:
@@ -1128,42 +1037,3 @@ def _search_string_py(
     except Exception as e:
         logger.error("搜索字符串时出错: %s", e)
         return {"error": f"搜索时出错: {str(e)}"}
-
-
-if __name__ == "__main__":
-
-    def _check_workspace_permission(file_path: str) -> tuple[bool, str]:
-        """检查文件路径是否在允许的工作目录内
-
-        Args:
-            file_path: 要检查的文件路径
-
-        Returns:
-            Tuple[bool, str]: (是否允许, 错误信息)
-                              如果允许，返回 (True, "")
-                              如果不允许，返回 (False, 错误信息)
-        """
-        workspace = settings.lifeprism_data_path
-        allowed_dirs = ALLOWED_DIRS
-        allowed_dir_path: list[Path] = []
-        for dir in allowed_dirs:
-            allowed_dir_path.append(Path(workspace / dir).resolve())
-        print(f"允许的工作目录: {[allowed_dir_path]}")
-        if not allowed_dir_path:
-            return True, ""
-
-        file_path_obj = Path(file_path).resolve()
-
-        for allowed_dir in allowed_dir_path:
-            try:
-                file_path_obj.relative_to(allowed_dir)
-                return True, ""
-            except ValueError:
-                continue
-
-        return (
-            False,
-            f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in allowed_dir_path]}",
-        )
-
-    print(_check_workspace_permission("user/user.md"))
