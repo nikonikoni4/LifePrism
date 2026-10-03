@@ -4,6 +4,8 @@ LLM Providers 模块（新架构）
 - llm_providers/: LLM 服务提供者
 """
 
+from .errors import LLMProviderError, ProviderErrorKind
+
 # 从 llm_providers 子模块导入
 from .llm_providers import (
     PROVIDERS,
@@ -21,6 +23,8 @@ from .llm_providers import (
 )
 
 __all__ = [
+    "LLMProviderError",
+    "ProviderErrorKind",
     # 抽象层
     "LLMProvider",
     "LLMResponse",

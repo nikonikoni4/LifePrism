@@ -11,9 +11,9 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-import json_repair
 from openai import AsyncOpenAI
 
+from lifeprism.llm.providers.errors import LLMProviderError
 from lifeprism.llm.providers.llm_providers.base import LLMProvider, LLMResponse, ToolCallRequest
 
 
@@ -37,6 +37,7 @@ class CustomProvider(LLMProvider):
             api_key=api_key,
             base_url=api_base,
             default_headers=default_headers,
+            max_retries=0,
         )
 
     def _build_chat_kwargs(
@@ -92,16 +93,11 @@ class CustomProvider(LLMProvider):
         kwargs = self._build_chat_kwargs(
             messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
         )
-        try:
-            return self._parse(await self._client.chat.completions.create(**kwargs))
-        except Exception as e:
-            # JSONDecodeError.doc / APIError.response.text may carry the raw body
-            # (e.g. "unsupported model: xxx") which is far more useful than the
-            # generic "Expecting value …" message.  Truncate to avoid huge HTML pages.
-            body = getattr(e, "doc", None) or getattr(getattr(e, "response", None), "text", None)
-            if body and body.strip():
-                return LLMResponse(content=f"Error: {body.strip()[:500]}", finish_reason="error")
-            return LLMResponse(content=f"Error: {e}", finish_reason="error")
+        request_model = kwargs["model"]
+        response = await self._call_once(
+            self._client.chat.completions.create(**kwargs), model=request_model
+        )
+        return self._parse(response, model=request_model)
 
     async def stream_chat(
         self,
@@ -126,14 +122,16 @@ class CustomProvider(LLMProvider):
         )
         kwargs["stream"] = True
         kwargs["stream_options"] = {"include_usage": True}
-        stream = await self._client.chat.completions.create(**kwargs)
+        request_model = kwargs["model"]
+        stream = await self._call_once(
+            self._client.chat.completions.create(**kwargs), model=request_model
+        )
+        wrapped = self._stream_once(stream, model=request_model)
         try:
-            async for chunk in stream:
+            async for chunk in wrapped:
                 yield chunk
         finally:
-            aclose = getattr(stream, "aclose", None) or getattr(stream, "close", None)
-            if aclose is not None:
-                await aclose()
+            await wrapped.aclose()
 
     @staticmethod
     def _parse_xml_tool_calls(content: str) -> list[ToolCallRequest]:
@@ -196,24 +194,31 @@ class CustomProvider(LLMProvider):
 
         return tool_calls
 
-    def _parse(self, response: Any) -> LLMResponse:
+    def _invalid_response(self, reason: str, model: str | None = None) -> LLMProviderError:
+        return LLMProviderError(
+            f"invalid provider response: {reason}",
+            kind="invalid_response",
+            reason=reason,
+            provider=getattr(self, "provider_name", type(self).__name__),
+            model=model or self.default_model,
+            phase="response",
+        )
+
+    def _parse(self, response: Any, model: str | None = None) -> LLMResponse:
         if not response.choices:
-            return LLMResponse(
-                content="Error: API returned empty choices. This may indicate a temporary service issue or an invalid model response.",
-                finish_reason="error",
-            )
+            raise self._invalid_response("empty_choices", model)
         choice = response.choices[0]
         msg = choice.message
         content = msg.content
         finish_reason = choice.finish_reason
+        if not finish_reason:
+            raise self._invalid_response("missing_finish_reason", model)
 
         tool_calls = [
             ToolCallRequest(
                 id=tc.id,
                 name=tc.function.name,
-                arguments=json_repair.loads(tc.function.arguments)
-                if isinstance(tc.function.arguments, str)
-                else tc.function.arguments,
+                arguments=self.parse_tool_arguments(tc.function.arguments),
             )
             for tc in (msg.tool_calls or [])
         ]
@@ -236,7 +241,7 @@ class CustomProvider(LLMProvider):
         return LLMResponse(
             content=content,
             tool_calls=tool_calls,
-            finish_reason=finish_reason or "stop",
+            finish_reason=finish_reason,
             usage={
                 "prompt_tokens": u.prompt_tokens,
                 "completion_tokens": u.completion_tokens,

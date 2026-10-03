@@ -13,6 +13,7 @@ from myagent.agent.core.provider import (
 )
 
 from lifeprism.llm.providers import LLMProvider
+from lifeprism.llm.providers.errors import LLMProviderError, classify_provider_error
 
 
 def _value(obj: Any, key: str, default: Any = None) -> Any:
@@ -83,6 +84,17 @@ class ProviderAdapter:
         await self.aclose()
         self.provider = provider
 
+    def _protocol_error(self, message, reason, partial_output=False):
+        return LLMProviderError(
+            message,
+            kind="invalid_response",
+            reason=reason,
+            provider=getattr(self.provider, "provider_name", type(self.provider).__name__),
+            model=self.model,
+            phase="response",
+            partial_output=partial_output,
+        )
+
     async def chat(self, messages: list[Message], tools: list[dict] | None = None) -> LLMResponse:
         """通过排空流式路径完成一次非流式请求。
 
@@ -94,12 +106,14 @@ class ProviderAdapter:
             流式路径产出的完整响应。
 
         Raises:
-            RuntimeError: 数据流结束前始终未产出最终响应。
+            LLMProviderError: 数据流结束前始终未产出最终响应。
         """
         async for item in self.stream_chat(messages, tools):
             if isinstance(item, LLMResponse):
                 return item
-        raise RuntimeError("Provider stream did not produce a final response")
+        raise self._protocol_error(
+            "Provider stream did not produce a final response", "missing_final_response"
+        )
 
     async def stream_chat(
         self, messages: list[Message], tools: list[dict] | None = None
@@ -121,7 +135,7 @@ class ProviderAdapter:
             原因与 token 用量。
 
         Raises:
-            RuntimeError: 数据流结束时缺少 finish reason，或 provider 以
+            LLMProviderError: 数据流结束时缺少 finish reason，或 provider 以
                 ``finish_reason="error"`` 上报失败。
         """
         if self.limiter is not None:
@@ -139,6 +153,8 @@ class ProviderAdapter:
             temperature=generation.temperature,
             reasoning_effort=generation.reasoning_effort,
         )
+        failed = False
+        partial_output = False
         try:
             async for raw in stream:
                 raw_usage = _value(raw, "usage")
@@ -156,6 +172,7 @@ class ProviderAdapter:
                 delta = _value(choice, "delta", {})
                 content = _value(delta, "content")
                 thought = _value(delta, "reasoning_content")
+                partial_output |= bool(content or thought or _value(delta, "tool_calls"))
                 if content:
                     text.append(content)
                 if thought:
@@ -187,12 +204,34 @@ class ProviderAdapter:
                 if reason:
                     finish_reason = reason
                     yield StreamChunk(finish_reason=reason)
+        except BaseException as error:
+            failed = True
+            converted = classify_provider_error(
+                error,
+                provider=getattr(self.provider, "provider_name", type(self.provider).__name__),
+                model=self.model,
+                phase="streaming",
+                partial_output=partial_output,
+            )
+            if converted is error:
+                raise
+            raise converted from error
         finally:
-            await stream.aclose()
+            try:
+                await stream.aclose()
+            except BaseException:
+                if not failed:
+                    raise
         if finish_reason is None:
-            raise RuntimeError("Provider stream ended without a finish reason")
+            raise self._protocol_error(
+                "Provider stream ended without a finish reason",
+                "missing_finish_reason",
+                partial_output,
+            )
         if finish_reason == "error":
-            raise RuntimeError("".join(text) or "Provider request failed")
+            raise self._protocol_error(
+                "".join(text) or "Provider request failed", "error_finish_reason", partial_output
+            )
         tool_calls = [
             RawToolCall(
                 id=slot["id"],

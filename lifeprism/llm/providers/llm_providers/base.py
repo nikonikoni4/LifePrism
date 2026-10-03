@@ -4,7 +4,6 @@ Copyright (c) [2026.3.22] [HKUDS]
 Licensed under the MIT License.
 """
 
-import asyncio
 import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -22,7 +21,7 @@ class ToolCallRequest:
 
     id: str
     name: str
-    arguments: dict[str, Any]
+    arguments: dict[str, Any] | str
     provider_specific_fields: dict[str, Any] | None = None
     function_provider_specific_fields: dict[str, Any] | None = None
 
@@ -33,7 +32,9 @@ class ToolCallRequest:
             "type": "function",
             "function": {
                 "name": self.name,
-                "arguments": json.dumps(self.arguments, ensure_ascii=False),
+                "arguments": self.arguments
+                if isinstance(self.arguments, str)
+                else json.dumps(self.arguments, ensure_ascii=False),
             },
         }
         if self.provider_specific_fields:
@@ -87,21 +88,6 @@ class LLMProvider(ABC):
         """Yield raw provider SDK deltas; unsupported implementations fail explicitly."""
         raise NotImplementedError("This provider does not implement streaming")
 
-    _CHAT_RETRY_DELAYS = (1, 2, 4)  # 重试的延迟时间， 第一次失败等待1s，第二次等待2s...
-    _TRANSIENT_ERROR_MARKERS = (  # 可重试错误
-        "429",  # HTTP 429: 请求频率过高，触发了 API 的频率限制 (Rate Limit)
-        "rate limit",  # 文本描述的频率限制错误，对应 OpenAI 等平台的常见返回
-        "500",  # HTTP 500: 模型服务器内部通用错误，通常是后端短暂崩溃
-        "502",  # HTTP 502: 无效网关，通常是模型网关层负载均衡出现抖动
-        "503",  # HTTP 503: 服务不可用，服务器当前无法处理请求（如维护中）
-        "504",  # HTTP 504: 网关超时，模型计算时间过长导致上层代理断开连接
-        "overloaded",  # 模型后端当前处于超负荷状态，建议稍后再试
-        "timeout",  # 客户端或服务器侦测到的通用的连接超时
-        "timed out",  # 常见的超时文本描述，确保覆盖不同平台的报错习惯
-        "connection",  # 网络连接异常，如 DNS 解析失败或 TCP 握手被重置
-        "server error",  # 供应商返回的服务器端通用错误描述
-        "temporarily unavailable",  # 本服务暂时不可用，多见于模型灰度升级或短暂下线
-    )
     _SENTINEL = object()
 
     def __init__(self, api_key: str | None = None, api_base: str | None = None):
@@ -217,41 +203,77 @@ class LLMProvider(ABC):
         """
         pass
 
-    @classmethod
-    def _is_transient_error(cls, content: str | None) -> bool:
-        err = (content or "").lower()
-        return any(marker in err for marker in cls._TRANSIENT_ERROR_MARKERS)
-
     @staticmethod
-    def _strip_image_content(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-        """Replace image_url blocks with text placeholder. Returns None if no images found."""
-        found = False
-        result = []
-        for msg in messages:
-            content = msg.get("content")
-            if isinstance(content, list):
-                new_content = []
-                for b in content:
-                    if isinstance(b, dict) and b.get("type") == "image_url":
-                        path = (b.get("_meta") or {}).get("path", "")
-                        placeholder = f"[image: {path}]" if path else "[image omitted]"
-                        new_content.append({"type": "text", "text": placeholder})
-                        found = True
-                    else:
-                        new_content.append(b)
-                result.append({**msg, "content": new_content})
-            else:
-                result.append(msg)
-        return result if found else None
-
-    async def _safe_chat(self, **kwargs: Any) -> LLMResponse:
-        """Call chat() and convert unexpected exceptions to error responses."""
+    def parse_tool_arguments(arguments):
+        """Keep invalid or non-object JSON raw for the tool layer."""
+        if not isinstance(arguments, str):
+            return arguments
         try:
-            return await self.chat(**kwargs)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            return LLMResponse(content=f"Error calling LLM: {exc}", finish_reason="error")
+            parsed = json.loads(arguments)
+        except (ValueError, TypeError):
+            return arguments
+        return parsed if isinstance(parsed, dict) else arguments
+
+    def _normalize_error(self, error, *, model=None, phase="request", partial_output=False):
+        from lifeprism.llm.providers.errors import classify_provider_error
+
+        return classify_provider_error(
+            error,
+            provider=getattr(self, "provider_name", type(self).__name__),
+            model=model or self.get_default_model(),
+            phase=phase,
+            partial_output=partial_output,
+        )
+
+    async def _call_once(self, operation, *, model=None):
+        try:
+            return await operation
+        except Exception as error:
+            converted = self._normalize_error(error, model=model)
+            if converted is error:
+                raise
+            raise converted from error
+
+    async def _stream_once(self, stream, *, model=None):
+        partial = False
+        failed = False
+        try:
+            async for chunk in stream:
+                choices = getattr(chunk, "choices", None)
+                if isinstance(chunk, dict):
+                    choices = chunk.get("choices")
+                for choice in choices or []:
+                    delta = (
+                        choice.get("delta", {})
+                        if isinstance(choice, dict)
+                        else getattr(choice, "delta", None)
+                    )
+                    if delta:
+                        get = (
+                            delta.get
+                            if isinstance(delta, dict)
+                            else lambda key, delta=delta: getattr(delta, key, None)
+                        )
+                        partial |= bool(
+                            get("content") or get("reasoning_content") or get("tool_calls")
+                        )
+                yield chunk
+        except BaseException as error:
+            failed = True
+            converted = self._normalize_error(
+                error, model=model, phase="streaming", partial_output=partial
+            )
+            if converted is error:
+                raise
+            raise converted from error
+        finally:
+            close = getattr(stream, "aclose", None) or getattr(stream, "close", None)
+            if close:
+                try:
+                    await close()
+                except BaseException:
+                    if not failed:
+                        raise
 
     async def chat_with_retry(
         self,
@@ -263,7 +285,7 @@ class LLMProvider(ABC):
         reasoning_effort: object = _SENTINEL,
         tool_choice: str | dict[str, Any] | None = None,
     ) -> LLMResponse:
-        """Call chat() with retry on transient provider failures.
+        """Compatibility entry point: one call, with generation defaults and no recovery policy.
 
         Parameters default to ``self.generation`` when not explicitly passed,
         so callers no longer need to thread temperature / max_tokens /
@@ -286,31 +308,7 @@ class LLMProvider(ABC):
             tool_choice=tool_choice,
         )
 
-        for attempt, delay in enumerate(self._CHAT_RETRY_DELAYS, start=1):
-            response = await self._safe_chat(**kw)
-
-            if response.finish_reason != "error":
-                return response
-
-            if not self._is_transient_error(response.content):
-                stripped = self._strip_image_content(messages)
-                if stripped is not None:
-                    logger.warning(
-                        "Non-transient LLM error with image content, retrying without images"
-                    )
-                    return await self._safe_chat(**{**kw, "messages": stripped})
-                return response
-
-            logger.warning(
-                "LLM transient error (attempt {}/{}), retrying in {}s: {}",
-                attempt,
-                len(self._CHAT_RETRY_DELAYS),
-                delay,
-                (response.content or "")[:120].lower(),
-            )
-            await asyncio.sleep(delay)
-
-        return await self._safe_chat(**kw)
+        return await self.chat(**kw)
 
     @abstractmethod
     def get_default_model(self) -> str:

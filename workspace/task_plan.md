@@ -147,3 +147,10 @@ P0/P1/P2 代码迁移与限定验证完成。Windows 冻结构建成功，在线
 
 - 冻结构建最终成功；PYZ 检查包含 runtime 和 30 个实际使用的 myagent 模块、排除 deprecated_agent，历史用量 501 修复已包含。最后格式清理后未再次冻结，构建产物用于本轮模块收集验证，未作为正式发布包交付。
 - 本地提交尝试被 pre-commit 的全仓库 lint 阻挡；已修迁移活跃文件可安全修复项，保留旧 Enum 升级建议、弃用代码和其他模块既有债务；未绕过 hook、未推送。
+
+## Provider 分类基础（2026-10-03）
+
+- 按用户批准实现最小结构化错误分类，接入两个生产 provider 和 ProviderAdapter。
+- Claude CLI 完成两个生产 provider 的机械接线；Codex 完成分类器、共享边界与生命周期修正。
+- 禁用 SDK 自动重试与旧 chat_with_retry 的恢复行为，严格保留无效工具参数原文。
+- P3 恢复策略仍未实现。具体契约、验证和兼容风险见 workspace/provider-errors-implementation.md。

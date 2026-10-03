@@ -11,10 +11,10 @@ import string
 from collections.abc import AsyncIterator
 from typing import Any
 
-import json_repair
 import litellm
 from litellm import acompletion
 
+from lifeprism.llm.providers.errors import LLMProviderError
 from lifeprism.llm.providers.llm_providers.base import LLMProvider, LLMResponse, ToolCallRequest
 from lifeprism.llm.providers.llm_providers.registry import find_by_model, find_gateway
 from lifeprism.utils import get_logger
@@ -86,6 +86,7 @@ class LiteLLMProvider(LLMProvider):
         super().__init__(api_key, api_base)
 
         self.extra_headers = extra_headers or {}
+        self.provider_name = provider_name
 
         # Detect gateway / local deployment.
         # provider_name (from config key) is the primary signal;
@@ -287,6 +288,10 @@ class LiteLLMProvider(LLMProvider):
         # Apply model-specific overrides (e.g. kimi-k2.5 temperature)
         self._apply_model_overrides(model, kwargs)
 
+        # Recovery policy belongs to the agent loop, not LiteLLM.
+        kwargs["num_retries"] = 0
+        kwargs["max_retries"] = 0
+
         if self._langsmith_enabled:
             kwargs.setdefault("callbacks", []).append("langsmith")
 
@@ -338,15 +343,9 @@ class LiteLLMProvider(LLMProvider):
         kwargs = self._build_chat_kwargs(
             messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
         )
-        try:
-            response = await acompletion(**kwargs)
-            return self._parse_response(response)
-        except Exception as e:
-            # Return error as content for graceful handling
-            return LLMResponse(
-                content=f"Error calling LLM: {str(e)}",
-                finish_reason="error",
-            )
+        request_model = kwargs["model"]
+        response = await self._call_once(acompletion(**kwargs), model=request_model)
+        return self._parse_response(response, model=request_model)
 
     async def stream_chat(
         self,
@@ -371,14 +370,14 @@ class LiteLLMProvider(LLMProvider):
         )
         kwargs["stream"] = True
         kwargs["stream_options"] = {"include_usage": True}
-        stream = await acompletion(**kwargs)
+        request_model = kwargs["model"]
+        stream = await self._call_once(acompletion(**kwargs), model=request_model)
+        wrapped = self._stream_once(stream, model=request_model)
         try:
-            async for chunk in stream:
+            async for chunk in wrapped:
                 yield chunk
         finally:
-            aclose = getattr(stream, "aclose", None) or getattr(stream, "close", None)
-            if aclose is not None:
-                await aclose()
+            await wrapped.aclose()
 
     @staticmethod
     def _parse_xml_tool_calls(content: str) -> list[ToolCallRequest]:
@@ -447,8 +446,20 @@ class LiteLLMProvider(LLMProvider):
 
         return tool_calls
 
-    def _parse_response(self, response: Any) -> LLMResponse:
+    def _invalid_response(self, reason: str, model: str | None = None) -> LLMProviderError:
+        return LLMProviderError(
+            f"invalid provider response: {reason}",
+            kind="invalid_response",
+            reason=reason,
+            provider=self.provider_name,
+            model=model or self.default_model,
+            phase="response",
+        )
+
+    def _parse_response(self, response: Any, model: str | None = None) -> LLMResponse:
         """Parse LiteLLM response into our standard format."""
+        if not response.choices:
+            raise self._invalid_response("empty_choices", model)
         choice = response.choices[0]
         message = choice.message
         content = message.content
@@ -473,12 +484,13 @@ class LiteLLMProvider(LLMProvider):
                 len(raw_tool_calls),
             )
 
+        if not finish_reason:
+            raise self._invalid_response("missing_finish_reason", model)
+
         tool_calls = []
         for tc in raw_tool_calls:
-            # Parse arguments from JSON string if needed
-            args = tc.function.arguments
-            if isinstance(args, str):
-                args = json_repair.loads(args)
+            # Keep invalid or non-object JSON raw for the tool layer.
+            args = self.parse_tool_arguments(tc.function.arguments)
 
             provider_specific_fields = getattr(tc, "provider_specific_fields", None) or None
             function_provider_specific_fields = (
@@ -524,7 +536,7 @@ class LiteLLMProvider(LLMProvider):
         return LLMResponse(
             content=content,
             tool_calls=tool_calls,
-            finish_reason=finish_reason or "stop",
+            finish_reason=finish_reason,
             usage=usage,
             reasoning_content=reasoning_content,
             thinking_blocks=thinking_blocks,

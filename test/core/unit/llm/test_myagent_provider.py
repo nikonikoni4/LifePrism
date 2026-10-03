@@ -6,6 +6,7 @@ import pytest
 from myagent.agent.core.provider import LLMResponse, Message, StreamChunk
 
 from lifeprism.llm.providers import GenerationSettings
+from lifeprism.llm.providers.errors import LLMProviderError
 from lifeprism.llm.runtime.provider import ProviderAdapter
 
 pytestmark = pytest.mark.core
@@ -13,6 +14,7 @@ pytestmark = pytest.mark.core
 
 class RawProvider:
     """流式 provider 测试替身，回放 OpenAI 风格的原始分块字典。"""
+
     generation = GenerationSettings()
 
     def __init__(self, chunks):
@@ -55,6 +57,7 @@ def raw(delta=None, finish=None, usage=None):
 
 def test_stream_preserves_raw_arguments_and_both_text_channels():
     """守护 adapter 保留原始参数、两条文本通道以及合并后的 usage。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动原始参数流式场景。"""
         provider = RawProvider(
@@ -109,10 +112,11 @@ def test_stream_preserves_raw_arguments_and_both_text_channels():
 
 def test_unfinished_stream_cannot_be_reported_as_success():
     """守护没有结束原因就中断的流会抛错，而不是被当作成功。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动未完成流场景。"""
         provider = RawProvider([raw({"content": "partial"})])
-        with pytest.raises(RuntimeError, match="finish reason"):
+        with pytest.raises(LLMProviderError, match="finish reason"):
             _ = [item async for item in ProviderAdapter(provider).stream_chat([])]
         assert provider.closed
 
@@ -121,6 +125,7 @@ def test_unfinished_stream_cannot_be_reported_as_success():
 
 def test_truncated_tool_arguments_are_preserved_for_native_validation():
     """守护被截断的工具参数会带着 truncated 标记进入 native 校验。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动工具参数被截断的场景。"""
         provider = RawProvider(
@@ -148,6 +153,7 @@ def test_truncated_tool_arguments_are_preserved_for_native_validation():
 
 def test_refresh_releases_previous_provider_and_changes_model():
     """守护刷新 adapter 会关闭旧 provider 并采用新模型。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动 provider 刷新场景。"""
         closed = []
@@ -178,6 +184,7 @@ def test_production_stream_closes_sdk_when_consumer_disconnects(monkeypatch, kin
     Args:
         kind: 被测的 provider 类型，取值为 ``custom`` 或 ``litellm``。
     """
+
     async def scenario():
         """在 `asyncio.run` 下驱动 SDK 断开场景。"""
         from types import SimpleNamespace
