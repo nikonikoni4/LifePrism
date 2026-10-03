@@ -16,6 +16,7 @@ from typing import Any, Optional
 import keyring
 import yaml
 
+from lifeprism.config.agent_config import AgentSettings
 from lifeprism.config.exceptions import InvalidConfigError
 from lifeprism.utils import get_logger
 
@@ -100,6 +101,8 @@ class SettingsManager:
         "sync.ssh_tunnel.local_port": 8102,
         "sync.ssh_tunnel.remote_host": "127.0.0.1",
         "sync.ssh_tunnel.remote_port": 8102,
+        # Agent 配置的默认快照，读写请走 agent 属性 / _normalize_agent()
+        "agent": AgentSettings().model_dump(),
     }
 
     def __new__(cls) -> "SettingsManager":
@@ -753,6 +756,10 @@ class SettingsManager:
             value: 配置值
             save: 是否立即保存到文件 (api_key 忽略此参数，始终保存到 keyring)
         """
+        # agent 特殊处理：先校验并归一化，失败时不产生任何写入
+        if key == "agent":
+            value = self._normalize_agent(value)
+
         # api_key 特殊处理：保存到 keyring
         if key == "api_key":
             if value:
@@ -781,7 +788,14 @@ class SettingsManager:
         Args:
             updates: 要更新的配置字典
             save: 是否立即保存到文件
+
+        Raises:
+            pydantic.ValidationError: agent 配置非法时，在任何写入前抛出。
         """
+        # 验证并归一化 agent（必须早于任何 _config 变更与密钥写入）
+        if "agent" in updates:
+            updates["agent"] = self._normalize_agent(updates["agent"])
+
         # 验证 screenshot_retention_days
         if "screenshot_retention_days" in updates:
             days = updates["screenshot_retention_days"]
@@ -886,6 +900,28 @@ class SettingsManager:
         result.pop("lw_db_path", None)
 
         return result
+
+    @staticmethod
+    def _normalize_agent(value: Any) -> dict[str, Any]:
+        """校验并序列化 agent 配置。
+
+        Args:
+            value: AgentSettings 实例或可被其校验的原始字典。
+
+        Returns:
+            可直接写入 config.yaml 的字典。
+
+        Raises:
+            pydantic.ValidationError: 输入不满足 AgentSettings 约束时原样抛出。
+        """
+        if isinstance(value, AgentSettings):
+            return value.model_dump()
+        return AgentSettings.model_validate(value).model_dump()
+
+    @property
+    def agent(self) -> AgentSettings:
+        """当前 agent 配置的类型化视图，缺失时回落到 DEFAULTS"""
+        return AgentSettings.model_validate(self.get("agent"))
 
     def get_for_display(self) -> dict[str, Any]:
         """

@@ -6,6 +6,7 @@ from . import (
     crawler,  # noqa: F401
     database,  # noqa: F401
 )
+from .agent_config import AgentSettings
 from .provider_manager import (
     ProviderManager,
     provider_manager,
@@ -48,6 +49,7 @@ __all__ = [
     "settings",
     "database",
     "crawler",
+    "AgentSettings",
     "SettingsManager",
     "get_setting",
     "set_setting",
