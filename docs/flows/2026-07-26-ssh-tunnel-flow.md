@@ -112,8 +112,8 @@ _closed: bool                           # 控制保活循环退出的标志（cl
   - main._start_ssh_tunnel 调用:349
   - main._stop_ssh_tunnel 调用:579
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager.get_storage_key:484
-  - settings_manager.SettingsManager.set_storage_key:503
+  - settings_manager.SettingsManager.get_storage_key:487
+  - settings_manager.SettingsManager.set_storage_key:506
 </key_function>
 
 ## 流程概览

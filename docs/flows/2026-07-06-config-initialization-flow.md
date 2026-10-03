@@ -74,15 +74,15 @@ class ConfigInitState:
 
 <key_function>
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager.__new__:105
-  - settings_manager.SettingsManager._initialize:114
-  - settings_manager.SettingsManager._resolve_config_base_path:160
-  - settings_manager.SettingsManager._load_config:267
-  - settings_manager.SettingsManager._resolve_default_data_path:178
-  - settings_manager.SettingsManager._setup_logging:231
-  - settings_manager.SettingsManager._check_data_path_safety:241
-  - settings_manager.SettingsManager._resolve_allowed_dir_paths:197
-  - settings_manager.SettingsManager._save_config:283
+  - settings_manager.SettingsManager.__new__:108
+  - settings_manager.SettingsManager._initialize:117
+  - settings_manager.SettingsManager._resolve_config_base_path:163
+  - settings_manager.SettingsManager._load_config:270
+  - settings_manager.SettingsManager._resolve_default_data_path:181
+  - settings_manager.SettingsManager._setup_logging:234
+  - settings_manager.SettingsManager._check_data_path_safety:244
+  - settings_manager.SettingsManager._resolve_allowed_dir_paths:200
+  - settings_manager.SettingsManager._save_config:286
 - lifeprism/config/provider_manager.py
   - provider_manager.ProviderManager.__new__:556
   - provider_manager.ProviderManager._initialize:566

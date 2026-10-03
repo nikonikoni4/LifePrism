@@ -166,7 +166,7 @@ module: llm-infrastructure
 <key_function>
 - lifeprism/llm/providers/llm_providers/base.py
   - base.LLMProvider.chat:184
-  - base.LLMProvider.chat_with_retry:246
+  - base.LLMProvider.chat_with_retry:278
   - base.LLMProvider.get_default_model:306
   - base.LLMProvider._sanitize_empty_content:102
   - base.LLMProvider._sanitize_request_messages:155

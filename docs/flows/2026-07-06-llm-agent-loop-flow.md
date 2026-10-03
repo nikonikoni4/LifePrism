@@ -111,9 +111,9 @@ class AgentExecutionTrace:
   - context.Context._build_user_message:188
   - context.Context._bulid_recent_state:200
 - lifeprism/llm/bus/queue.py
-  - queue.MessageQueue.send:105
-  - queue.MessageQueue.consume_inbound:48
-  - queue.MessageQueue.publish_outbound:51
+  - queue.MessageQueue.send:83
+  - queue.MessageQueue.consume_inbound:40
+  - queue.MessageQueue.publish_outbound:43
 - lifeprism/llm/session/manager.py
   - manager.SessionManager.get_or_create_session:132
   - manager.SessionManager.save_session:199

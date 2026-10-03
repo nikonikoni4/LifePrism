@@ -62,12 +62,12 @@ P3 错误策略及 P4 会话业务另行设计。当前不提供旧会话迁移�
 
 <key_function>
 - lifeprism/llm/runtime/service.py
-  - service.AgentRuntime.start:117
-  - service.AgentRuntime.stream:161
-  - service.AgentRuntime.execute:270
-  - service.AgentRuntime.close:315
+  - service.AgentRuntime.start:177
+  - service.AgentRuntime.stream:260
+  - service.AgentRuntime.execute:406
+  - service.AgentRuntime.close:481
 - lifeprism/llm/runtime/worker.py
-  - worker.AgentBusWorker.loop:27
+  - worker.AgentBusWorker.loop:52
 - lifeprism/server/api/chatbot_api.py
   - chatbot_api.chat_stream:152
 </key_function>

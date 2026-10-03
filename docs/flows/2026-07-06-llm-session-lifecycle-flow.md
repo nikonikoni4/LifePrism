@@ -115,7 +115,7 @@ class SessionLifecycleTrace:
   - loop.AgentLoop._process_msg:468
   - loop.AgentLoop.auto_compact:606
 - lifeprism/llm/chat/chat_bot.py
-  - chat_bot.ChatBot.chat:17
+  - chat_bot.ChatBot.chat:26
 </key_function>
 
 ## 流程概览
