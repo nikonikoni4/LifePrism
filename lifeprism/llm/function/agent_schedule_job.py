@@ -9,10 +9,13 @@
 """
 
 import asyncio
+import json
+import os
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
-from lifeprism.config import settings
+from lifeprism.config import get_user_timezone, settings
 from lifeprism.llm.bus import InboundMessage, MessageType, TokenType, bus
 from lifeprism.llm.exceptions import LLMResponseError
 from lifeprism.llm.prompts import Prompts, prompt_loader
@@ -20,7 +23,12 @@ from lifeprism.llm.runtime_tools.lifeprismsystem import query_user_activity_summ
 from lifeprism.llm.utils import llm_call_logger
 from lifeprism.llm.utils.md_os import extract_date_logs_from_file, read_md, write_date_md
 from lifeprism.utils import DEBUG, get_logger
-from lifeprism.utils.time_utils import build_local_datetime, local_to_utc_iso
+from lifeprism.utils.time_utils import (
+    build_local_datetime,
+    get_local_today,
+    local_to_utc_iso,
+    utc_to_local_display,
+)
 
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
@@ -93,6 +101,7 @@ async def summary_activities(activities: str, start_time: str, end_time: str) ->
             token_type=TokenType.DREAM_TASK,
             content=activities,
             extra={"system_prompt": activity_summary_prompt},
+            workflow_id="daily-memory",
         )
         result = await bus.send(msg)
         llm_call_logger.log_call(
@@ -170,6 +179,7 @@ async def summary_moods(mood_data: str) -> str:
         token_type=TokenType.DREAM_TASK,
         content=f"## 需要总结的心情数据\n{mood_data}",
         extra={"system_prompt": mood_summary_prompt},
+        workflow_id="daily-memory",
     )
     result = await bus.send(msg)
     llm_call_logger.log_call(
@@ -269,6 +279,7 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
         token_type=TokenType.DREAM_TASK,
         content=content,
         extra={"system_prompt": update_memory_prompt},
+        workflow_id="daily-memory",
     )
     result = await bus.send(msg)
     llm_call_logger.log_call(
@@ -364,9 +375,35 @@ async def dreaming(date: str) -> None:
 # 2. 时间间隔任务：
 
 
-async def extract_from_chat_messages(session: object) -> str | None:
-    """Deferred until P4 defines native session extraction progress."""
-    raise NotImplementedError("会话提取和独立处理进度字段留到迁移 P4")
+async def extract_from_chat_messages(messages: list[dict]) -> str | None:
+    """提取已结束轮次的聊天投影，不消费旧 Session 或内部工具轨迹。"""
+    if not messages:
+        return None
+    prompt = prompt_loader.load_prompt(Prompts.Schedule.EXTRACT_CHAT)
+    display_messages = [
+        {**message, "timestamp": utc_to_local_display(message["timestamp"])} for message in messages
+    ]
+    msg = InboundMessage(
+        type=MessageType.GENERAL_TASK,
+        token_type=TokenType.DREAM_TASK,
+        workflow_id="chat-extraction",
+        content=f"时区：{get_user_timezone()}\n## 需要总结的内容\n"
+        + json.dumps(display_messages, ensure_ascii=False),
+        extra={"system_prompt": prompt},
+    )
+    result = await bus.send(msg)
+    if result.error:
+        raise RuntimeError(result.error)
+    if not result.response or not result.response.content or not result.response.content.strip():
+        raise LLMResponseError("聊天信息提取返回空响应")
+    llm_call_logger.log_call(
+        msg,
+        result,
+        prompt_module=Prompts.Schedule.EXTRACT_CHAT.module,
+        prompt_name=Prompts.Schedule.EXTRACT_CHAT.name,
+    )
+    content = result.response.content.strip()
+    return None if content == "无可提取内容" else content
 
 
 def format_chat_history(history: list[dict]) -> str:
@@ -395,8 +432,105 @@ def format_chat_history(history: list[dict]) -> str:
 
 
 async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> None:
-    """Deferred: never process legacy sessions after the kernel migration."""
-    raise NotImplementedError("process_session_message 留到 P4，当前未注册定时任务")
+    """提取近期统一聊天目录的新轮次，保存历史后推进 meta.extra 游标。"""
+    from lifeprism.llm.runtime import agent_runtime
+    from lifeprism.llm.session import ChatHistoryManager
+
+    if type(days_offset) is not int or days_offset < 0:
+        raise ValueError("days_offset 必须为非负整数")
+    # 同一进程的调度/手动调用互斥，避免多个历史管理器互相覆盖。
+    if _session_processing_lock.locked():
+        logger.info("[process_session_message] 已有任务执行，跳过本次")
+        return
+    async with _session_processing_lock:
+        path = settings.lifeprism_data_path / "user/daily_data/chat_history.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        history_manager = ChatHistoryManager(path)
+
+        def save_history(last_processed_time: datetime | None = None) -> None:
+            """原子替换历史，写入失败时保留上一次完整文件。"""
+            temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+            history_manager.path = temporary
+            try:
+                history_manager.save_history(last_processed_time)
+                os.replace(temporary, path)
+            finally:
+                history_manager.path = path
+                temporary.unlink(missing_ok=True)
+
+        manager = agent_runtime.chat_sessions
+        cutoff = datetime.now(UTC) - timedelta(days=days_offset)
+
+        async def process_one(sid: str) -> None:
+            """保存每个窗口；已持久化的历史允许游标提交失败后安全重试。"""
+
+            async def save_window(messages: list[dict], start: int, end: int) -> None:
+                covered = max(
+                    (
+                        item.get("end_turn", 0)
+                        for item in history_manager.histories
+                        if item.get("session_id") == sid
+                    ),
+                    default=0,
+                )
+                if covered >= end:
+                    return
+                if covered >= start:
+                    messages = [message for message in messages if message["turn"] > covered]
+                    start = covered + 1
+                content = await extract_from_chat_messages(messages)
+                history_manager.histories.append(
+                    {
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "content": content or "",
+                        "session_id": sid,
+                        "start_turn": start,
+                        "end_turn": end,
+                    }
+                )
+                save_history()
+
+            try:
+                loaded = manager._read(sid)
+                if loaded is None:
+                    return
+                meta, records = loaded
+                # 业务游标不修改更新时间；日期筛选以对话记录时间为准。
+                timestamp = records[-1]["timestamp"] if records else meta["updated_at"]
+                updated = datetime.fromisoformat(timestamp)
+                if updated.tzinfo is None:
+                    raise ValueError("原生 Session 时间必须包含时区")
+                if updated >= cutoff:
+                    await manager.process_pending(sid, save_window)
+            except Exception:
+                logger.exception("[process_session_message] 会话提取失败: %s", sid)
+
+        ids = [p.stem for p in agent_runtime.chat_session_folder.glob("*.jsonl")]
+        for offset in range(0, len(ids), SESSION_BATCH_SIZE):
+            await asyncio.gather(
+                *(process_one(sid) for sid in ids[offset : offset + SESSION_BATCH_SIZE])
+            )
+        history = history_manager.get_histories_to_dream()
+        date = get_local_today().isoformat()
+        for item in history or []:
+            item["behavior_date"] = date
+        # 重建当天完整章节，避免第二次提取覆盖第一次，也让写入失败可重试。
+        content = format_chat_history(
+            [item for item in history_manager.histories if item.get("behavior_date") == date]
+        )
+        if history and content:
+            write_date_md(
+                settings.lifeprism_data_path / "user/daily_data/behavior.md",
+                date,
+                content,
+                "聊天记录总结",
+                mode="overwrite",
+            )
+        if history:
+            save_history(datetime.now(UTC))
+
+
+_session_processing_lock = asyncio.Lock()
 
 
 if __name__ == "__main__":

@@ -106,6 +106,7 @@ async def ai_diary_summary(
         type=MessageType.GENERAL_TASK,
         token_type=MessageType.DREAM_TASK,
         extra={"system_prompt": system_prompt},
+        workflow_id="diary-summary",
     )
     try:
         llm_result: OutboundMessage = await bus.send(msg)

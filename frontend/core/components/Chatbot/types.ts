@@ -16,6 +16,8 @@ export interface ChatMessage {
     role: 'user' | 'model';
     text: string;
     isLoading?: boolean;
+    /** 消息时间戳（来自历史接口，实时消息可缺省） */
+    timestamp?: string;
     /** Token 使用情况（仅在 AI 回复后显示） */
     tokenUsage?: TokenUsage;
 }
@@ -27,6 +29,8 @@ export interface ChatSession {
     createdAt: string;
     updatedAt: string;
     messageCount: number;
+    /** 该会话是否正在执行（列表接口 is_running），运行中禁止删除 */
+    isRunning: boolean;
 }
 
 /** 模型配置 */
@@ -93,7 +97,7 @@ export interface TokenUsage {
     /** 本轮对话使用量 */
     turn_usage: TurnTokenUsage;
     /** 会话累计使用量 */
-    session_usage: TurnTokenUsage;
+    session_usage?: TurnTokenUsage;
 }
 
 /** 功能模式 */

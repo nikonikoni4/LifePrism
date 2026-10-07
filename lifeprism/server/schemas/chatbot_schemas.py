@@ -9,7 +9,7 @@ Chatbot 模块的 schemas 定义
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ============================================================================
 # 会话 Schemas
@@ -24,6 +24,7 @@ class ChatSession(BaseModel):
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="最后更新时间")
     message_count: int = Field(default=0, description="消息数量")
+    is_running: bool = Field(default=False, description="是否正在执行或排队中")
 
 
 class ChatSessionListResponse(BaseModel):
@@ -36,7 +37,13 @@ class ChatSessionListResponse(BaseModel):
 class UpdateSessionRequest(BaseModel):
     """更新会话请求"""
 
-    name: str = Field(..., description="新的会话名称")
+    name: str = Field(..., min_length=1, max_length=200, description="新的会话名称（1–200 字符）")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_name(cls, value: object) -> object:
+        """先去除首尾空白，空白名称随后由长度约束拒绝。"""
+        return value.strip() if isinstance(value, str) else value
 
 
 # ============================================================================

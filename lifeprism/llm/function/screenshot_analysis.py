@@ -387,6 +387,7 @@ async def analyze_chunk_screenshots(
             content=user_content,
             type=MessageType.GENERAL_TASK,
             extra={"system_prompt": analysis_prompt},
+            workflow_id="screenshot-analysis",
         )
         llm_result: OutboundMessage = await bus.send(msg)
         response_content = llm_result.response.content
@@ -602,6 +603,7 @@ async def _behavior_summary(
             content=user_prompt,
             type=MessageType.GENERAL_TASK,
             extra={"system_prompt": summary_prompt},
+            workflow_id="behavior-summary",
         )
         logger.info("开始行为总结: start_time=%s", start_time)
         llm_result: OutboundMessage = await bus.send(msg)

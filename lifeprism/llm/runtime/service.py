@@ -5,6 +5,7 @@ import contextlib
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from myagent.agent.agent_context import AgentContext, AgentPolicySpec
@@ -15,15 +16,19 @@ from myagent.agent.guard.tool_use_guard import ToolUseGuard
 from myagent.infra.events.eventspec import REQUEST_ERROR, SESSION_EVENT, TOOL_CALL
 
 from lifeprism.config import settings
-from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage
+from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType, OutboundMessage
 from lifeprism.llm.providers import LLMResponse, create_llm_client
 from lifeprism.llm.providers.llm_retry import LLMRetry
 from lifeprism.llm.runtime.limiter import ModelCallLimiter
 from lifeprism.llm.runtime.prompts import register_prompts
 from lifeprism.llm.runtime.provider import ProviderAdapter
+from lifeprism.llm.runtime.session_storage import resolve_session_category, resolve_session_folder
 from lifeprism.utils import LazySingleton, get_logger
 
 logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from lifeprism.llm.runtime.chat_sessions import ChatSessionManager
 
 
 @dataclass
@@ -63,15 +68,17 @@ class _AgentSlot:
     消费的 ``queue`` 上。
     """
 
-    def __init__(self, context: AgentContext, client):
+    def __init__(self, context: AgentContext, client, session_folder: Path):
         """绑定执行 context 并订阅其会话记录。
 
         Args:
             context: 持有会话与 agent loop 的 native myagent context。
             client: 本会话所有模型调用共用的 provider adapter。
+            session_folder: 已验证的会话存储归属目录。
         """
         self.context = context
         self.client = client
+        self.session_folder = session_folder
         self.lock = asyncio.Lock()
         self.queue: asyncio.Queue | None = None
         self.run_id = ""
@@ -145,8 +152,8 @@ class AgentRuntime:
         Args:
             data_path: LifePrism 数据根目录；省略时回退到
                 ``settings.lifeprism_data_path``。
-            session_folder: 存放 native myagent 会话的目录；省略时回退到
-                ``<data_path>/localData/myagent_sessions``。
+            session_folder: 业务会话的存储根目录，其下按工作流或聊天分目录；省略时回退到
+                ``<data_path>/myagent_sessions``。
             client_factory: 零参数工厂，为每个新会话返回一个 provider。传
                 ``None`` 时创建生产 LLM client 并用 :class:`ProviderAdapter`
                 包装。
@@ -168,6 +175,48 @@ class AgentRuntime:
         self._consumers: set[asyncio.Task] = set()
         self._limiter = ModelCallLimiter()
         self._closing = False
+        self._active_sessions: dict[str, int] = {}
+        self._managed_sessions: set[str] = set()
+
+    @property
+    def chat_sessions(self) -> "ChatSessionManager":
+        """返回仅管理 chat 目录的会话接口。"""
+        from lifeprism.llm.runtime.chat_sessions import ChatSessionManager
+
+        return ChatSessionManager(self)
+
+    @property
+    def chat_session_folder(self) -> Path:
+        """返回经过归属校验的统一聊天目录。"""
+        return resolve_session_folder(
+            self._session_folder or self.data_path / "myagent_sessions",
+            InboundMessage(type=MessageType.CHAT, content=""),
+        )
+
+    def is_session_running(self, session_id: str) -> bool:
+        """执行及等待同会话锁的请求均视为运行中。"""
+        return self._active_sessions.get(session_id, 0) > 0
+
+    @contextlib.asynccontextmanager
+    async def manage_chat_session(self, session_id: str) -> AsyncIterator[None]:
+        """预留空闲会话，阻止管理过程中创建新的执行 context。"""
+        if self._closing:
+            raise RuntimeError("Agent Runtime 正在关闭")
+        if self.is_session_running(session_id):
+            raise RuntimeError("Session 正在执行，不能修改或删除")
+        if session_id in self._managed_sessions:
+            raise RuntimeError("Session 正在管理中")
+        slot = self._slots.get(session_id)
+        if slot is not None and slot.session_folder != self.chat_session_folder:
+            raise ValueError("Session 不属于聊天目录")
+        self._managed_sessions.add(session_id)
+        try:
+            if slot is not None:
+                await self._close_slot(slot)
+                self._slots.pop(session_id, None)
+            yield
+        finally:
+            self._managed_sessions.discard(session_id)
 
     @property
     def data_path(self) -> Path:
@@ -210,18 +259,30 @@ class AgentRuntime:
         if self._closing:
             raise RuntimeError("Agent Runtime 正在关闭")
         sid = message.session_id
+        if sid in self._managed_sessions:
+            raise RuntimeError("Session 正在管理中")
+        root = self._session_folder or self.data_path / "myagent_sessions"
+        folder = resolve_session_folder(root, message)
         if sid:
             try:
                 UUID(sid)
             except ValueError as exc:
                 raise ValueError("仅支持 myagent 新会话，旧会话适配留到 P4") from exc
             if sid in self._slots:
+                if self._slots[sid].session_folder != folder:
+                    raise ValueError("Session 归属与当前聊天或工作流不一致")
                 return self._slots[sid], False
-        folder = self._session_folder or self.data_path / "localData/myagent_sessions"
-        store = SessionStore(folder)
+        store = SessionStore(folder, flat=True)
         session = store.load(sid, self.data_path) if sid else None
         if sid and session is None:
-            raise ValueError("myagent 会话不存在；旧会话适配留到 P4")
+            guidance = (
+                "请发送 /new 开始新会话"
+                if message.channel == ChannelType.WECHAT
+                else "请开始新会话"
+            )
+            raise ValueError(
+                f"myagent 会话不存在于当前归属目录；{guidance}；旧目录会话暂不自动迁移"
+            )
         is_new = session is None
         if is_new:
             preview = "".join(block.get("text", "") for block in message.content)[:20]
@@ -252,7 +313,7 @@ class AgentRuntime:
         context.register_policy(
             AgentPolicySpec(TOOL_CALL, [tool_guard.file_sys_path_guard], tool_guard)
         )
-        slot = _AgentSlot(context, client)
+        slot = _AgentSlot(context, client, folder)
         self._slots[session.meta_data.session_id] = slot
         return slot, is_new
 
@@ -271,14 +332,26 @@ class AgentRuntime:
         """
         consumer = asyncio.current_task()
         self._consumers.add(consumer)
+        sid = None
         try:
-            async with contextlib.aclosing(self._stream(message)) as events:
+            slot, is_new = self._get_slot(message)
+            sid = slot.context.session.meta_data.session_id
+            self._active_sessions[sid] = self._active_sessions.get(sid, 0) + 1
+            async with contextlib.aclosing(self._stream(message, slot, is_new)) as events:
                 async for event in events:
                     yield event
         finally:
+            if sid is not None:
+                remaining = self._active_sessions[sid] - 1
+                if remaining:
+                    self._active_sessions[sid] = remaining
+                else:
+                    self._active_sessions.pop(sid, None)
             self._consumers.discard(consumer)
 
-    async def _stream(self, message: InboundMessage) -> AsyncIterator[RuntimeEvent]:
+    async def _stream(
+        self, message: InboundMessage, slot: _AgentSlot, is_new: bool
+    ) -> AsyncIterator[RuntimeEvent]:
         """执行一轮串行化的运行并产出其事件。
 
         queue 会在 agent 任务启动前安装好，因此不会漏掉任何会话记录。模型与轮次
@@ -296,7 +369,6 @@ class AgentRuntime:
             RuntimeError: runtime 正在关闭，或轮次准备阶段失败。
             ValueError: 消息指向不受支持的旧式会话。
         """
-        slot, is_new = self._get_slot(message)
         sid = slot.context.session.meta_data.session_id
         run_id = uuid4().hex
         async with slot.lock:
@@ -327,7 +399,13 @@ class AgentRuntime:
                     type="session",
                     run_id=run_id,
                     session_id=sid,
-                    data={"name": context.session.meta_data.name, "is_new": is_new},
+                    data={
+                        "name": context.session.meta_data.name,
+                        "is_new": is_new,
+                        "workflow_id": message.workflow_id,
+                        "channel": message.channel,
+                        "session_category": resolve_session_category(message),
+                    },
                 )
                 async with asyncio.timeout(1000):
                     while True:

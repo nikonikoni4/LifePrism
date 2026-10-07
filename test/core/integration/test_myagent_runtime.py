@@ -545,3 +545,245 @@ def test_context_loads_agent_settings_and_guard(tmp_path, monkeypatch, retry_ena
             await runtime.close()
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "created_channel,resumed_channel", [("local", "wechat"), ("wechat", "local")]
+)
+def test_chat_sessions_use_unified_directory_and_resume_across_channels(
+    tmp_path, created_channel, resumed_channel
+):
+    """聊天统一落盘 chat/<session_id>.jsonl，关闭 Runtime 后可从另一渠道恢复。"""
+
+    async def scenario():
+        runtime = make_runtime(tmp_path, FakeClient())
+        first = await runtime.execute(
+            InboundMessage(type=MessageType.CHAT, channel=created_channel)
+        )
+        await runtime.close()
+        target = tmp_path / "sessions" / "chat" / f"{first.session_id}.jsonl"
+        assert target.is_file()
+        resumed = make_runtime(tmp_path, FakeClient())
+        try:
+            result = await resumed.execute(
+                InboundMessage(
+                    type=MessageType.CHAT,
+                    channel=resumed_channel,
+                    session_id=first.session_id,
+                )
+            )
+            assert result.session_id == first.session_id
+            assert resumed._slots[first.session_id].context.session.turn == 2
+        finally:
+            await resumed.close()
+
+    asyncio.run(scenario())
+
+
+def test_workflow_storage_is_independent_of_tools_and_token_type(tmp_path):
+    """同一工作流不同消息用途共享目录，其他工作流无法恢复其会话。"""
+
+    async def scenario():
+        runtime = make_runtime(tmp_path, FakeClient())
+        try:
+            first = await runtime.execute(
+                InboundMessage(
+                    type=MessageType.GENERAL_TASK,
+                    workflow_id="daily-memory",
+                    token_type="dream_task",
+                )
+            )
+            assert (
+                tmp_path / "sessions" / "workflows" / "daily-memory" / f"{first.session_id}.jsonl"
+            ).is_file()
+            await runtime.execute(
+                InboundMessage(
+                    type=MessageType.DREAM_TASK,
+                    workflow_id="daily-memory",
+                    session_id=first.session_id,
+                )
+            )
+            with pytest.raises(ValueError, match="不存在"):
+                await runtime.execute(
+                    InboundMessage(
+                        type=MessageType.GENERAL_TASK,
+                        workflow_id="other",
+                        session_id=first.session_id,
+                    )
+                )
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_cached_session_allows_channel_switch_but_not_workflow_owner(tmp_path):
+    """常驻聊天缓存可在同一 slot 内跨渠道继续，但不能改换工作流归属。"""
+
+    async def scenario():
+        runtime = make_runtime(tmp_path, FakeClient())
+        try:
+            first = await runtime.execute(InboundMessage(type=MessageType.CHAT, channel="local"))
+            same = await runtime.execute(
+                InboundMessage(
+                    type=MessageType.CHAT,
+                    channel="wechat",
+                    session_id=first.session_id,
+                )
+            )
+            assert same.session_id == first.session_id
+            with pytest.raises(ValueError, match="归属"):
+                await runtime.execute(
+                    InboundMessage(
+                        type=MessageType.CHAT,
+                        session_id=first.session_id,
+                        workflow_id="daily-memory",
+                    )
+                )
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "workflow_id", ["", "../escape", "a/b", "a\\b", "C:escape", "CON", "abc.", "a b", 123]
+)
+def test_invalid_workflow_id_is_rejected(workflow_id):
+    """工作流 ID 必须是跨平台安全的目录标识。"""
+    with pytest.raises(ValueError, match="workflow_id"):
+        InboundMessage(type=MessageType.GENERAL_TASK, workflow_id=workflow_id)
+
+
+def test_unassigned_background_session_uses_tasks_directory(tmp_path):
+    """兼容无归属的后台调用，不按工具用途或用量类型猜测目录。"""
+
+    async def scenario():
+        runtime = make_runtime(tmp_path, FakeClient())
+        try:
+            result = await runtime.execute(
+                InboundMessage(
+                    type=MessageType.GENERAL_TASK,
+                    token_type="dream_task",
+                )
+            )
+            assert (tmp_path / "sessions" / "tasks" / f"{result.session_id}.jsonl").is_file()
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_storage_directory_cannot_escape_root_via_symlink(tmp_path):
+    """目录中的符号链接不能把会话写到存储根目录之外。"""
+    from lifeprism.llm.runtime.session_storage import resolve_session_folder
+
+    root = tmp_path / "sessions"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    try:
+        (root / "workflows").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("当前 Windows 用户没有创建符号链接权限")
+    with pytest.raises(ValueError, match="逃出"):
+        resolve_session_folder(
+            root, InboundMessage(type=MessageType.GENERAL_TASK, workflow_id="test")
+        )
+
+
+def test_default_session_root_is_directly_under_data_path(tmp_path):
+    """默认根目录不重复嵌套 localData，数据根迁移不参与文件定位。"""
+
+    async def scenario():
+        runtime = make_runtime(tmp_path, FakeClient())
+        runtime._session_folder = None
+        try:
+            first = await runtime.execute(InboundMessage(type=MessageType.CHAT))
+        finally:
+            await runtime.close()
+        assert (tmp_path / "myagent_sessions" / "chat" / f"{first.session_id}.jsonl").is_file()
+        resumed = make_runtime(tmp_path / "new-data-root", FakeClient())
+        resumed._session_folder = tmp_path / "myagent_sessions"
+        try:
+            result = await resumed.execute(
+                InboundMessage(type=MessageType.CHAT, session_id=first.session_id)
+            )
+            assert result.session_id == first.session_id
+        finally:
+            await resumed.close()
+
+    asyncio.run(scenario())
+
+
+def test_workflow_chat_reports_storage_owner_without_changing_usage(tmp_path):
+    """有聊天工具的工作流仍按 workflow_id 存储，统计类型保持独立。"""
+
+    async def scenario():
+        usage = []
+        runtime = make_runtime(tmp_path, FakeClient(), usage)
+        try:
+            events = [
+                event
+                async for event in runtime.stream(
+                    InboundMessage(
+                        type=MessageType.CHAT,
+                        workflow_id="assistant-workflow",
+                        token_type="custom-usage",
+                    )
+                )
+            ]
+            head = events[0]
+            assert head.data["workflow_id"] == "assistant-workflow"
+            assert head.data["session_category"] == "workflow"
+            assert head.data["channel"] == "local"
+            assert (
+                tmp_path
+                / "sessions"
+                / "workflows"
+                / "assistant-workflow"
+                / f"{head.session_id}.jsonl"
+            ).is_file()
+            assert usage[0][2] == "custom-usage"
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_storage_directory_cannot_alias_another_workflow(tmp_path):
+    """根目录内的符号链接也不能让两个工作流共享存储归属。"""
+    from lifeprism.llm.runtime.session_storage import resolve_session_folder
+
+    root = tmp_path / "sessions"
+    target = root / "workflows" / "owner-a"
+    target.mkdir(parents=True)
+    try:
+        (root / "workflows" / "owner-b").symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("当前 Windows 用户没有创建符号链接权限")
+    with pytest.raises(ValueError, match="归属"):
+        resolve_session_folder(
+            root, InboundMessage(type=MessageType.GENERAL_TASK, workflow_id="owner-b")
+        )
+
+
+def test_missing_wechat_session_gives_new_command(tmp_path):
+    """旧引用无法恢复时，微信得到可执行的新会话指引。"""
+    from uuid import uuid4
+
+    async def scenario():
+        runtime = make_runtime(tmp_path, FakeClient())
+        try:
+            with pytest.raises(ValueError, match="/new"):
+                await runtime.execute(
+                    InboundMessage(
+                        type=MessageType.CHAT,
+                        channel="wechat",
+                        session_id=str(uuid4()),
+                    )
+                )
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())

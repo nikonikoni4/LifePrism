@@ -23,3 +23,8 @@
 16. **SettingsManager 单例在模块导入时即实例化，monkeypatch 类属性对已实例化对象无效**：lifeprism 的 SettingsManager 在 `from lifeprism.config import settings_manager` 时（模块底部 `settings = SettingsManager()`）就完成 _initialize()。想通过 `SettingsManager.lw_db_path = property(...)` 覆盖路径，必须在**任何 lifeprism 模块导入之前**执行（本方案通过 init_lifeprism() 先调用）。同理，开发环境 config_base_path 是相对路径 `Path("localData")`，从 mcp/ 目录运行时会在 mcp/ 下产生 localData 垃圾，需在导入前 os.chdir 到项目根让相对路径解析到项目根的 localData，再显式覆盖 settings._lifeprism_data_path。
 17. **MCP stdio server 的 stdout 是协议通道，必须把日志重定向到 stderr**：mcp SDK 通过 stdout 传 JSON-RPC，lifeprism logger 的 StreamHandler 写 sys.stdout 会污染协议流（表现为客户端解析 JSONRPCMessage 失败）。解决：在导入 lifeprism 之前先 `logging.basicConfig(handlers=[StreamHandler(sys.stderr)])`，利用 basicConfig 幂等特性（已有 handler 则跳过）阻止 lifeprism 添加 stdout handler。
 18. **myagent 重试通过 IoC 注册，不嵌套在 provider 请求内**：2026-10-03 用户纠正将重试写进 provider 的错误方案。应先参考 lifeprismevalue/llm/llm_retry.py，在 AgentContext.register_policy 挂载 REQUEST_ERROR waterfall；策略只返回 decision/policy，由 loop 负责预算、退避、请求重放和 llm/retry 记录。provider 保持单次请求与错误分类，避免双重重试和绕过事件生命周期。
+19. **聊天 Session 目录不要按渠道细分**：2026-10-07 用户纠正，原先把聊天存到 chat/<channel>（local/wechat 分开）是错的。channel 的职责只是消息收发路由与事件字段，不参与业务存储归属；业务存储归属只按 chat/workflow/task 分类。同一用户从不同渠道进入的是同一段聊天，必须能跨渠道在同一 session 继续。判定原则：当某个字段既用于"消息路由"又疑似用于"数据归属"时，先确认它是否真的是归属维度，不要顺手拿它当目录名。
+
+## 2026-10-07 Session 提取审查教训
+- 原生turn游标推进到已结束边界时，必须包含边界之前因崩溃缺少turn/end的用户消息；不能只枚举带turn/end的轮次，否则游标会越过未提取内容。末尾未结束轮次仍等待后续边界。
+- 日期Markdown的子标题查找必须同时限定起点和终点，终点为下一日期块，避免把内容写进未来同名章节。

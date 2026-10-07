@@ -166,23 +166,31 @@ class WechatChannel(BaseChannel):
         except OSError as e:
             logger.error("重命名 account.json 失败: error=%s", e, exc_info=True)
 
-    def _save_user_data_to_db(self) -> None:
+    def _save_user_data_to_db(self, wechat_user_id: str | None = None) -> None:
         """将 _user_data 中的所有用户数据保存到 DB
 
         使用 INSERT OR REPLACE 语义：已存在的记录会被覆盖。
         参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
+
+        Args:
+            wechat_user_id: 指定时只保存该用户，缺省保存全部用户。
         """
         if not self._user_data:
             return
-        for wechat_user_id, data in self._user_data.items():
+        users = (
+            {wechat_user_id: self._user_data[wechat_user_id]}
+            if wechat_user_id is not None
+            else self._user_data
+        )
+        for user_id, data in users.items():
             context_token = data.get("context_token")
             last_session_id = data.get("last_session_id")
             self._account_state_provider.save_state(
-                wechat_user_id=wechat_user_id,
+                wechat_user_id=user_id,
                 context_token=context_token,
                 last_session_id=last_session_id,
             )
-        logger.info("已保存 %s 个用户数据到 DB", len(self._user_data))
+        logger.info("已保存 %s 个用户数据到 DB", len(users))
 
     def _load_user_data_from_db(self) -> None:
         """从 DB 加载所有用户数据到 _user_data
@@ -401,6 +409,102 @@ class WechatChannel(BaseChannel):
                 logger.error("长轮询数据解析错误: error=%s", e, exc_info=True)
                 await asyncio.sleep(5)
 
+    async def _handle_session_command(self, content: str, wechat_user_id: str) -> bool:
+        """处理聊天会话命令；只切换渠道引用，不触发模型执行。
+
+        Args:
+            content: 微信文本内容。
+            wechat_user_id: 已通过白名单检查的微信用户 ID。
+
+        Returns:
+            是否识别并处理了会话命令。
+        """
+        parts = content.strip().split()
+        if not parts or parts[0] not in {"/new", "/continue", "/session-list"}:
+            return False
+        command = parts[0]
+        user_data = self._user_data.setdefault(wechat_user_id, {})
+        reply: str
+        try:
+            if command == "/session-list":
+                if len(parts) > 2 or (
+                    len(parts) == 2 and (not parts[1].isascii() or not parts[1].isdecimal())
+                ):
+                    reply = "用法：/session-list [正整数页码]"
+                else:
+                    page = int(parts[1]) if len(parts) == 2 else 1
+                    if page < 1:
+                        reply = "用法：/session-list [正整数页码]"
+                    else:
+                        listing = await agent_runtime.chat_sessions.list_sessions(
+                            page=page, page_size=10
+                        )
+                        total = listing["total"]
+                        pages = max(1, (total + 9) // 10)
+                        lines = [f"聊天会话：第 {page}/{pages} 页，共 {total} 个"]
+                        for item in listing["items"]:
+                            markers = []
+                            if item["id"] == user_data.get("last_session_id"):
+                                markers.append("当前")
+                            if item["is_running"]:
+                                markers.append("运行中")
+                            label = f" [{', '.join(markers)}]" if markers else ""
+                            name = " ".join(item["name"].split())[:80]
+                            lines.append(f"{name}{label}\n{item['id']}")
+                        if not listing["items"]:
+                            lines.append("暂无聊天会话。" if total == 0 else "此页没有会话。")
+                        lines.append("发送 /continue <完整 Session ID> 切换会话。")
+                        if page < pages:
+                            lines.append(f"下一页：/session-list {page + 1}")
+                        reply = "\n\n".join(lines)
+            elif command == "/continue":
+                if len(parts) != 2:
+                    reply = "用法：/continue <完整 Session ID>"
+                else:
+                    try:
+                        sid = str(UUID(parts[1]))
+                    except ValueError:
+                        reply = "Session ID 无效，请从 /session-list 复制完整 ID。"
+                    else:
+                        history = await agent_runtime.chat_sessions.get_history(sid)
+                        if history is None:
+                            reply = "聊天会话不存在，请通过 /session-list 查看可用会话。"
+                        else:
+                            self._persist_session_reference(wechat_user_id, sid)
+                            name = " ".join(history["session_name"].split())[:80]
+                            reply = f"已切换到会话：{name}\n{sid}\n下条消息将在此会话继续。"
+            elif len(parts) != 1:
+                reply = "用法：/new"
+            else:
+                self._persist_session_reference(wechat_user_id, "")
+                reply = "已清空当前会话，下条消息将开始新会话。"
+        except Exception:
+            # 文件系统、状态存储错误隔离在命令边界，避免终止微信轮询。
+            logger.exception("微信会话命令失败: command=%s", command)
+            reply = "会话命令执行失败，请稍后重试。"
+        await self.send(
+            OutboundMessage(
+                response=LLMResponse(content=reply),
+                extra={"wechat_user_id": wechat_user_id},
+            )
+        )
+        return True
+
+    def _persist_session_reference(self, wechat_user_id: str, session_id: str) -> None:
+        """持久化渠道会话引用，保存失败时恢复内存中的旧引用。"""
+        data = self._user_data.setdefault(wechat_user_id, {})
+        had_reference = "last_session_id" in data
+        previous = data.get("last_session_id")
+        data["last_session_id"] = session_id
+        try:
+            self._save_user_data_to_db(wechat_user_id)
+        except Exception:
+            if had_reference:
+                data["last_session_id"] = previous
+            else:
+                data.pop("last_session_id", None)
+            raise
+
     async def _handle_wechat_message(self, msg: dict[str, Any]) -> None:
         """处理微信消息
 
@@ -490,30 +594,15 @@ class WechatChannel(BaseChannel):
             # 使用 or None 确保空字符串被规范化为 None
             session_id = self._user_data.get(wechat_user_id, {}).get("last_session_id") or None
 
-            # Native new sessions only; old history and resume commands are deferred to P4.
+            if await self._handle_session_command(content, wechat_user_id):
+                return
+
+            # 旧会话不适配；首次普通消息使用原生新会话。
             if session_id:
                 try:
                     UUID(session_id)
                 except ValueError:
                     session_id = None
-            if content.strip() == "/new":
-                self._user_data.setdefault(wechat_user_id, {})["last_session_id"] = ""
-                self._save_user_data_to_db()
-                await self.send(
-                    OutboundMessage(
-                        response=LLMResponse(content="已清空当前会话，下条消息将开始新会话。"),
-                        extra={"wechat_user_id": wechat_user_id},
-                    )
-                )
-                return
-            if content.strip().startswith(("/continue", "/session-list")):
-                await self.send(
-                    OutboundMessage(
-                        response=LLMResponse(content="会话恢复和历史列表功能留到迁移 P4。"),
-                        extra={"wechat_user_id": wechat_user_id},
-                    )
-                )
-                return
 
             # 构造 InboundMessage
             inbound_msg = InboundMessage(

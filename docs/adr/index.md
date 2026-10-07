@@ -144,7 +144,7 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 - 触发规则：当需要理解密钥存储策略、Key 为什么从 config.yaml 迁移到 storage.yaml、storage.yaml 的命名原因、run_mode 隔离逻辑、或修改云端/本地的 Key 读取写入路径时读取
 - 内容摘要：v1.0 决策 keyring + config.yaml fallback，否决 .env 环境变量方案。v1.1 将 Key 从 config.yaml 分离到 storage.yaml（权限 600），
 ## myagent-runtime
-- updated_at: 2026-10-03
+- updated_at: 2026-10-07
 - path: `docs/adr/2026-10-03-myagent-runtime.md`
 - 触发规则：修改或查询迁移后的 Agent 运行、聊天事件及后台 bus 时阅读。
-- 内容摘要：替换内核、聊天事件与后台 bus 双入口、原生 Session 与 P3/P4 边界。
+- 内容摘要：替换内核、聊天事件与后台 bus 双入口、统一聊天与工作流归属、前端 chat 管理的运行中拒删和永久删除，以及 P3/P4 边界。

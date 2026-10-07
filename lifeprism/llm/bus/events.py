@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -37,6 +38,29 @@ MESSAGE_TYPE = [
     MessageType.CONFLICT_RESOLVE,
 ]
 CHANNEL_TYPE = [ChannelType.WECHAT, ChannelType.LOCAL]
+
+
+def validate_workflow_id(workflow_id: str | None) -> None:
+    """校验跨平台目录标识；None 表示未指定工作流归属。"""
+    if workflow_id is None:
+        return
+    reserved = {
+        "con",
+        "prn",
+        "aux",
+        "nul",
+        *(f"com{i}" for i in range(1, 10)),
+        *(f"lpt{i}" for i in range(1, 10)),
+    }
+    if (
+        not isinstance(workflow_id, str)
+        or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", workflow_id)
+        or workflow_id in reserved
+    ):
+        raise ValueError(
+            "workflow_id 必须是 1–64 位小写字母、数字、下划线或连字符，且不是保留目录名"
+        )
+
 
 MessageContentInput = str | dict[str, Any] | list[dict[str, Any]] | None
 
@@ -112,6 +136,7 @@ class InboundMessage:
     session_id: str | None = None  # 用户继续会话的id，未传入时会自动创建session
     token_type: str | None = None  # token 统计类型，为空时使用 type
     extra: dict | None = None
+    workflow_id: str | None = None  # 稳定的工作流归属 ID，仅控制 Session 存储位置
     _cancelled: bool = field(default=False, init=False, repr=False)
 
     # extra 说明
@@ -120,6 +145,7 @@ class InboundMessage:
     # 对于general_task，可以添加system_prompt
     # 对于dream_task,可以添加system_prompt
     def __post_init__(self):
+        validate_workflow_id(self.workflow_id)
         if self.type not in MESSAGE_TYPE:
             raise ValueError(f"无效的消息类型: {self.type!r}，合法值为 {MESSAGE_TYPE}")
         if self.channel not in CHANNEL_TYPE:

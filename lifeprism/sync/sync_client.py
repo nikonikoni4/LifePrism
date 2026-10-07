@@ -2332,6 +2332,7 @@ class SyncClient:
                                     extra={
                                         "conflict_file_path": _file_path,
                                     },
+                                    workflow_id="file-conflict-resolve",
                                 )
                                 future = asyncio.run_coroutine_threadsafe(
                                     bus.send(msg),

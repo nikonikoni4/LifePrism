@@ -1,4 +1,6 @@
+import os
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -53,6 +55,29 @@ def _sanitize_behavior_content(content: str) -> str:
     return re.sub(r"^#{1,6}\s+", "", content, flags=re.MULTILINE)
 
 
+def _atomic_write_text(file_path: Path, content: str) -> None:
+    """原子写入文本文件，失败时保留原文件。
+
+    在同一目录下创建带 uuid 后缀的临时文件，以 UTF-8 写入内容后
+    通过 ``os.replace`` 原子替换目标文件。无论成功与否都会在
+    ``finally`` 中清理临时文件；写入或替换失败时目标文件保持
+    原有内容不变，异常继续向上传播。
+
+    Args:
+        file_path (Path): 目标文件路径，其父目录必须已存在。
+        content (str): 要写入的完整文本内容。
+
+    Raises:
+        OSError: 写入临时文件或替换目标文件失败时抛出。
+    """
+    tmp_path = file_path.with_name(f"{file_path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp_path.write_text(content, encoding="utf-8")
+        os.replace(tmp_path, file_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 def write_date_md(
     file_path: Path | str, date: str, content: str, subheading: str, mode: str = "append"
 ) -> None:
@@ -99,7 +124,7 @@ def write_date_md(
 
     if not file_path.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(f"## {date}\n### {subheading}\n{content}\n", encoding="utf-8")
+        _atomic_write_text(file_path, f"## {date}\n### {subheading}\n{content}\n")
         return
 
     full_content = file_path.read_text(encoding="utf-8")
@@ -137,21 +162,22 @@ def write_date_md(
                 before += "\n"
             full_content = before + new_block + after
 
-        file_path.write_text(full_content, encoding="utf-8")
+        _atomic_write_text(file_path, full_content)
         return
 
-    # 日期标题存在，查找该日期下的指定子标题块
+    # 日期标题存在，先确定当前日期块的边界（下一个日期标题或文件末尾）
+    next_date_pattern = re.compile(r"^##\s+\d{4}-\d{2}-\d{2}\s*$", re.MULTILINE)
+    next_date_match = next_date_pattern.search(full_content, date_match.end())
+    date_block_end = next_date_match.start() if next_date_match else len(full_content)
+
+    # 在当前日期块范围内查找指定子标题块，避免命中后续日期块中的同名子标题
     # 子标题格式为 ### subheading
     subheading_pattern = re.compile(rf"^###\s+{re.escape(subheading)}\s*$", re.MULTILINE)
-    subheading_match = subheading_pattern.search(full_content, date_match.end())
+    subheading_match = subheading_pattern.search(full_content, date_match.end(), date_block_end)
 
     if not subheading_match:
         # 子标题不存在，在当前日期块下添加新的子标题块
-        # 找到下一个日期或文件结束的位置
-        next_date_pattern = re.compile(r"^##\s+\d{4}-\d{2}-\d{2}\s*$", re.MULTILINE)
-        next_date_match = next_date_pattern.search(full_content, date_match.end())
-
-        insert_pos = next_date_match.start() if next_date_match else len(full_content)
+        insert_pos = date_block_end
 
         # 确保在插入点前有空行分隔
         before = full_content[:insert_pos]
@@ -162,15 +188,16 @@ def write_date_md(
             before += "\n"
 
         new_block = f"### {subheading}\n{content}\n\n"
-        full_content = before + new_block + after
-        file_path.write_text(full_content, encoding="utf-8")
+        _atomic_write_text(file_path, before + new_block + after)
         return
 
-    # 子标题存在，找到紧接着的下一个子标题或日期
+    # 子标题存在，在当前日期块内找到紧接着的下一个子标题或日期块末尾
     next_subheading_pattern = re.compile(r"^#{1,3}\s+\S+.*$", re.MULTILINE)
-    next_match = next_subheading_pattern.search(full_content, subheading_match.end())
+    next_match = next_subheading_pattern.search(
+        full_content, subheading_match.end(), date_block_end
+    )
 
-    next_pos = next_match.start() if next_match else len(full_content)
+    next_pos = next_match.start() if next_match else date_block_end
 
     # 提取当前子标题的已有内容块
     existing_block = full_content[subheading_match.end() : next_pos]
@@ -191,8 +218,8 @@ def write_date_md(
     # 替换其中的内容
     new_full_content = full_content[: subheading_match.end()] + new_block + full_content[next_pos:]
 
-    # 写入文件
-    file_path.write_text(new_full_content, encoding="utf-8")
+    # 原子写入文件
+    _atomic_write_text(file_path, new_full_content)
 
 
 def extract_date_md(

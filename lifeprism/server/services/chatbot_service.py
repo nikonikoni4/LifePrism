@@ -1,16 +1,22 @@
 """Project myagent Runtime events into the existing local SSE contract."""
 
 import contextlib
-from collections.abc import AsyncGenerator
-from typing import Any
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from fastapi import HTTPException
 
 from lifeprism.llm.chat.chat_bot import ChatBot
+from lifeprism.llm.runtime import agent_runtime
 from lifeprism.server.schemas.chatbot_schemas import ChatStreamEvent, ModelConfig, SSEEventType
 from lifeprism.utils import LazySingleton, get_logger
 
+if TYPE_CHECKING:
+    from lifeprism.llm.runtime.chat_sessions import ChatSessionManager
+
 logger = get_logger(__name__)
+
+T = TypeVar("T")
 
 
 class ChatbotService:
@@ -28,20 +34,54 @@ class ChatbotService:
     def _session_deferred() -> None:
         raise HTTPException(
             status_code=501,
-            detail="会话管理与旧历史适配留到迁移 P4，当前可新建聊天并继续本次会话。",
+            detail="历史 Token 用量查询暂未适配 myagent Session。",
         )
 
-    async def get_sessions(self, page: int, page_size: int):
-        self._session_deferred()
+    @staticmethod
+    def _sessions() -> "ChatSessionManager":
+        """返回共享 Runtime 上只管理统一 chat 目录的会话接口。"""
+        return agent_runtime.chat_sessions
 
-    async def update_session(self, session_id: str, request):
-        self._session_deferred()
+    async def _guard(self, operation: Callable[[], Awaitable[T]], session_id: str = "") -> T:
+        """执行会话操作，并把管理器异常映射为 HTTP 状态码。
 
-    async def delete_session(self, session_id: str):
-        self._session_deferred()
+        ValueError 包含非法标识与已损坏的会话文件，其消息不含文件路径；
+        OSError 的原始消息会带绝对路径，因此只记日志、对外返回固定文案。
+        """
+        try:
+            return await operation()
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="会话不存在") from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except OSError as exc:
+            logger.error(
+                "会话存储访问失败: session_id=%s, error=%s", session_id, exc, exc_info=True
+            )
+            raise HTTPException(status_code=500, detail="会话存储访问失败") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    async def get_history(self, session_id: str):
-        self._session_deferred()
+    async def get_sessions(self, page: int, page_size: int) -> dict[str, Any]:
+        """按更新时间降序分页返回 chat 会话，条目带 is_running。"""
+        sessions = self._sessions()
+        return await self._guard(lambda: sessions.list_sessions(page=page, page_size=page_size))
+
+    async def update_session(self, session_id: str, request: Any) -> None:
+        """重命名 chat 会话，名称须为 1–200 个非空白字符。"""
+        name = request["name"] if isinstance(request, dict) else request.name
+        sessions = self._sessions()
+        await self._guard(lambda: sessions.rename(session_id, name), session_id)
+
+    async def delete_session(self, session_id: str) -> bool:
+        """永久删除空闲 chat 会话；会话不存在时返回 False。"""
+        sessions = self._sessions()
+        return await self._guard(lambda: sessions.delete(session_id), session_id)
+
+    async def get_history(self, session_id: str) -> dict[str, Any] | None:
+        """返回 chat 会话的 user/assistant 投影；会话不存在时返回 None。"""
+        sessions = self._sessions()
+        return await self._guard(lambda: sessions.get_history(session_id), session_id)
 
     async def get_model_config(self) -> ModelConfig:
         return self._model_config

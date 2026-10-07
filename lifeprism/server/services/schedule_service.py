@@ -133,14 +133,18 @@ class ScheduleService:
         self._system_jobs = []
 
         # 根据配置决定是否注册任务
-        # 会话信息提取（process_session_message）延后到 P4，此处不再注册 interval 定时任务。
-        # 注意：TEST_MODE 下原用于缩短该任务间隔的 TEST_INTERVAL_MINUTES 分支随之移除，
-        # 仅影响本任务；dreaming（TEST_MODE 用 TEST_CRON_AFTER_MINUTES）与备份任务不受影响。
-        # 包装函数 _process_session_message 与导入保留，便于 P4 恢复注册。
+        # 会话信息提取（process_session_message）：正常每 4 小时一次；
+        # TEST_MODE 下改用 TEST_INTERVAL_MINUTES 缩短间隔。仅影响本任务；
+        # dreaming（TEST_MODE 用 TEST_CRON_AFTER_MINUTES）与备份任务不受影响。
         if settings.auto_summary_session:
-            logger.info(
-                "auto_summary_session=True，但会话信息提取（process_session_message）"
-                "已延后至 P4，本次不注册 interval 定时任务"
+            interval_kwargs = {"minutes": TEST_INTERVAL_MINUTES} if TEST_MODE else {"hours": 4}
+            self._system_jobs.append(
+                {
+                    "func": _process_session_message,
+                    "trigger": "interval",
+                    "kwargs": interval_kwargs,
+                    "job_id": "process_session_message",
+                }
             )
 
         if settings.auto_update_memory or settings.auto_diary_summary:

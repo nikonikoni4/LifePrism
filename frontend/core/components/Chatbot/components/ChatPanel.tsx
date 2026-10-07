@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Search, Brain, Globe, ChevronUp, MessageCircle, BookOpen, Square, Loader2, Zap } from 'lucide-react';
-import { sendMessageStream, getSessions, deleteSession, getChatHistory, getModelConfig, updateModelConfig } from '../api';
+import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Pencil, Search, Brain, Globe, ChevronUp, MessageCircle, BookOpen, Square, Loader2, Zap } from 'lucide-react';
+import { sendMessageStream, getSessions, deleteSession, updateSessionName, getChatHistory, getModelConfig, updateModelConfig, ChatbotApiError } from '../api';
 import { ChatMessage, ChatSession, ChatDisplayMode, ModelConfig, SSEEvent, FeatureMode, TokenUsage } from '../types';
-import { MarkdownRenderer } from '../..';
+import { MarkdownRenderer, toast } from '../..';
+
+/** 新会话的欢迎语（新建、删除当前会话后重置时复用） */
+const INITIAL_GREETING = "你好！我是 LifePrism助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？";
 
 interface ChatPanelProps {
     displayMode: ChatDisplayMode;
@@ -13,16 +16,19 @@ interface ChatPanelProps {
 const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidthChange }) => {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'init', role: 'model', text: "你好！我是 LifePrism助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
+        { id: 'init', role: 'model', text: INITIAL_GREETING }
     ]);
     const [isTyping, setIsTyping] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historySearch, setHistorySearch] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    // 会话切换请求序号：丢弃过期的异步历史加载结果，避免快速点击时串会话
+    const selectRequestRef = useRef(0);
 
     // 新增状态：会话管理
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
+    const [sessionsTotal, setSessionsTotal] = useState(0);
     const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
     // 新增状态：模型配置
@@ -115,14 +121,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // 统一错误反馈：优先展示后端 detail，回退到操作名
+    const showError = (error: unknown, fallback: string) => {
+        console.error(`[Chatbot] ${fallback}`, error);
+        const message = error instanceof Error && error.message ? error.message : fallback;
+        toast.error(message);
+    };
+
     // 加载会话列表
-    const loadSessions = async () => {
+    const loadSessions = async (loadMore = false) => {
         setIsLoadingSessions(true);
         try {
-            const data = await getSessions();
-            setSessions(data.items);
+            const page = loadMore ? Math.floor(sessions.length / 20) + 1 : 1;
+            const data = await getSessions(page);
+            setSessions(prev => loadMore
+                ? [...prev, ...data.items.filter(item => !prev.some(existing => existing.id === item.id))]
+                : data.items);
+            setSessionsTotal(data.total);
         } catch (e) {
-            console.error('Failed to load sessions:', e);
+            showError(e, '加载会话列表失败');
         } finally {
             setIsLoadingSessions(false);
         }
@@ -134,13 +151,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
             const config = await getModelConfig();
             setModelConfig(config);
         } catch (e) {
-            console.error('Failed to load model config:', e);
+            showError(e, '加载模型配置失败');
         }
     };
 
-    // 初始化加载（会话历史暂不可用，不加载会话列表）
+    // 初始化加载：模型配置 + 会话列表
     useEffect(() => {
         loadModelConfig();
+        loadSessions();
     }, []);
 
     useEffect(() => {
@@ -149,7 +167,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
 
     // 发送消息
     const handleSend = async () => {
-        if (!input.trim()) return;
+        if (isTyping || !input.trim()) return;
+        // 发送或新建会话后，之前尚未完成的历史请求不能再切换当前会话。
+        ++selectRequestRef.current;
 
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -180,7 +200,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                 (event: SSEEvent) => {
                     switch (event.type) {
                         case 'session':
-                            // 更新会话信息（会话历史暂不可用，不刷新历史列表）
+                            // 更新会话信息（新建会话时后端返回新 id）
                             newSessionId = event.sessionId || null;
                             setCurrentSessionId(newSessionId);
                             break;
@@ -238,21 +258,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
             if (e instanceof Error && e.name === 'AbortError') {
                 console.log('Request aborted by user');
             } else {
-                console.error(e);
+                showError(e, '发送消息失败');
             }
         } finally {
+            // 流的 finally 是唯一清除 isTyping 的位置，保证停止后不会提前恢复输入
             setIsTyping(false);
+            setCurrentStatus(null);
+            setMessages(prev => prev.map(msg => msg.isLoading ? { ...msg, isLoading: false } : msg));
             setAbortController(null);
+            // 新对话完成或取消后刷新列表（同步 is_running、名称与排序）
+            loadSessions();
         }
     };
 
-    // 暂停输出
+    // 暂停输出：只中断请求，isTyping 交由 handleSend 的 finally 统一清理，
+    // 避免流尚未结束时恢复输入导致消息串流
     const handleStop = () => {
-        if (abortController) {
-            abortController.abort();
-            setAbortController(null);
-            setIsTyping(false);
-        }
+        abortController?.abort();
     };
 
     // 切换深度思考
@@ -261,7 +283,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
             const newConfig = await updateModelConfig({ enableThinking: !modelConfig.enableThinking });
             setModelConfig(newConfig);
         } catch (e) {
-            console.error('Failed to update thinking mode:', e);
+            showError(e, '切换深度思考失败');
         }
     };
 
@@ -271,55 +293,97 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
             const newConfig = await updateModelConfig({ enableSearch: !modelConfig.enableSearch });
             setModelConfig(newConfig);
         } catch (e) {
-            console.error('Failed to update search mode:', e);
+            showError(e, '切换联网搜索失败');
         }
     };
 
-    // 新建对话
+    // 会话是否运行中：后端列表 is_running，或本地正在流式输出当前会话
+    const isSessionRunning = (session: ChatSession) =>
+        session.isRunning || (isTyping && session.id === currentSessionId);
+
+    // 新建对话（发送中禁止，避免与进行中的流串消息）
     const handleNewChat = () => {
+        if (isTyping) {
+            toast.warning('正在生成回复，暂不能新建对话');
+            return;
+        }
+        ++selectRequestRef.current;
         setCurrentSessionId(null);
-        setMessages([
-            { id: 'init', role: 'model', text: "你好！我是 LifePrism助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
-        ]);
+        setMessages([{ id: 'init', role: 'model', text: INITIAL_GREETING }]);
         setShowHistory(false);
     };
 
-    // 删除会话
+    // 删除会话（永久删除；运行中禁用，后端返回 409 时提示并刷新）
     const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        const target = sessions.find(s => s.id === sessionId);
+        if (target && isSessionRunning(target)) {
+            toast.warning('会话正在运行，无法删除');
+            return;
+        }
         try {
             await deleteSession(sessionId);
+            ++selectRequestRef.current;
             setSessions(prev => prev.filter(s => s.id !== sessionId));
+            setSessionsTotal(prev => Math.max(0, prev - 1));
             if (currentSessionId === sessionId) {
                 handleNewChat();
             }
-        } catch (e) {
-            console.error('Failed to delete session:', e);
+        } catch (err) {
+            if (err instanceof ChatbotApiError && err.status === 409) {
+                toast.error('会话正在运行，无法删除');
+            } else {
+                showError(err, '删除会话失败');
+            }
+            // 无论何种失败都以服务端为准刷新列表（运行状态可能已变化）
+            loadSessions();
         }
     };
 
-    // 切换会话
-    const handleSelectSession = async (session: ChatSession) => {
-        setCurrentSessionId(session.id);
-        setShowHistory(false);
+    // 重命名会话
+    const handleRenameSession = async (session: ChatSession, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const input = window.prompt('重命名会话', session.name);
+        if (input === null) return; // 用户取消
+        const name = input.trim();
+        if (!name || name === session.name) return; // 空名称或未修改
 
-        // 加载会话历史
+        try {
+            await updateSessionName(session.id, name);
+            setSessions(prev => prev.map(s => (s.id === session.id ? { ...s, name } : s)));
+        } catch (err) {
+            showError(err, '重命名会话失败');
+        }
+    };
+
+    // 切换会话：先加载历史成功后再切换 id，并用请求序号丢弃过期结果
+    const handleSelectSession = async (session: ChatSession) => {
+        if (isTyping) {
+            toast.warning('正在生成回复，暂不能切换会话');
+            return;
+        }
+        if (session.id === currentSessionId) {
+            ++selectRequestRef.current;
+            setShowHistory(false);
+            return;
+        }
+
+        const requestId = ++selectRequestRef.current;
         try {
             const history = await getChatHistory(session.id);
+            // 期间用户又选择了其它会话，丢弃本次结果
+            if (requestId !== selectRequestRef.current) return;
 
-            if (history.length > 0) {
-                setMessages(history);
-            } else {
-                // 没有历史消息时显示提示
-                setMessages([
-                    { id: 'init', role: 'model', text: `已切换到会话：${session.name}（无历史消息）` }
-                ]);
-            }
-        } catch (e) {
-            console.error('Failed to load chat history:', e);
-            setMessages([
-                { id: 'init', role: 'model', text: `已切换到会话：${session.name}（加载历史失败）` }
-            ]);
+            setCurrentSessionId(session.id);
+            setMessages(history.length > 0
+                ? history
+                : [{ id: 'init', role: 'model', text: `已切换到会话：${session.name}（无历史消息）` }]
+            );
+            setShowHistory(false);
+        } catch (err) {
+            if (requestId !== selectRequestRef.current) return;
+            // 加载失败时保持当前会话与消息不变，避免 id 与内容不一致
+            showError(err, '加载会话历史失败');
         }
     };
 
@@ -475,16 +539,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                         {/* New Chat Button */}
                         <button
                             onClick={handleNewChat}
-                            className="p-2 hover:bg-white/80 rounded-lg text-gray-500 hover:text-indigo-600 transition-colors"
-                            title="新建对话"
+                            disabled={isTyping}
+                            className="p-2 rounded-lg transition-colors text-gray-500 hover:text-indigo-600 hover:bg-white/80 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                            title={isTyping ? '正在生成回复，暂不能新建对话' : '新建对话'}
                         >
                             <Plus size={18} />
                         </button>
-                        {/* History Button（会话历史暂不可用，禁用） */}
+                        {/* History Button */}
                         <button
-                            disabled
-                            className="p-2 rounded-lg text-gray-300 cursor-not-allowed"
-                            title="会话历史暂不可用"
+                            onClick={() => {
+                                setShowHistory(true);
+                                loadSessions();
+                            }}
+                            className="p-2 hover:bg-white/80 rounded-lg text-gray-500 hover:text-indigo-600 transition-colors"
+                            title="会话历史"
                         >
                             <History size={18} />
                         </button>
@@ -553,8 +621,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-gray-400 whitespace-nowrap">{formatTime(session.updatedAt)}</span>
                                                     <button
+                                                        onClick={(e) => handleRenameSession(session, e)}
+                                                        className="p-1 text-gray-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                        title="重命名"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
                                                         onClick={(e) => handleDeleteSession(session.id, e)}
-                                                        className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                        disabled={isSessionRunning(session)}
+                                                        className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:text-gray-300"
+                                                        title={isSessionRunning(session) ? '会话正在运行，无法删除' : '删除会话'}
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
@@ -580,8 +657,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-gray-400 whitespace-nowrap">{formatTime(session.updatedAt)}</span>
                                                     <button
+                                                        onClick={(e) => handleRenameSession(session, e)}
+                                                        className="p-1 text-gray-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                        title="重命名"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
                                                         onClick={(e) => handleDeleteSession(session.id, e)}
-                                                        className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                        disabled={isSessionRunning(session)}
+                                                        className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:text-gray-300"
+                                                        title={isSessionRunning(session) ? '会话正在运行，无法删除' : '删除会话'}
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
@@ -592,6 +678,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                             )}
                         </div>
                     </div>
+                )}
+
+                {showHistory && sessions.length < sessionsTotal && !isLoadingSessions && (
+                    <button
+                        onClick={() => loadSessions(true)}
+                        className="absolute bottom-0 left-0 right-0 z-20 py-3 bg-white text-sm text-indigo-600 hover:bg-gray-50"
+                    >
+                        加载更多会话
+                    </button>
                 )}
 
                 {/* Messages Area */}
@@ -638,8 +733,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                                         <span>输出: {formatTokens(turn.output_tokens)}</span>
                                         <span className="text-gray-300">|</span>
                                         <span>本轮: {formatTokens(turn.total_tokens)}</span>
-                                        <span className="text-gray-300">|</span>
-                                        <span className="text-indigo-400">会话: {formatTokens(session.total_tokens)}</span>
+                                        {session && <>
+                                            <span className="text-gray-300">|</span>
+                                            <span className="text-indigo-400">会话: {formatTokens(session.total_tokens)}</span>
+                                        </>}
                                     </div>
                                 );
                             })()}

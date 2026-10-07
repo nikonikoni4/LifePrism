@@ -50,6 +50,7 @@ class ClassifySimple:
             content=user_content,
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
+            workflow_id="classify-simple",
         )
         raw: OutboundMessage = await bus.send(msg)
         raw = raw.response.content

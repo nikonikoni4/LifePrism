@@ -86,6 +86,7 @@ class ClassifyGraph:
                     content=content,
                     type=MessageType.CLASSIFY,
                     extra={"system_prompt": system_prompt},
+                    workflow_id="classify-graph",
                 )
                 result: OutboundMessage = await bus.send(msg)
                 result = result.response.content
@@ -141,6 +142,7 @@ class ClassifyGraph:
             content=content,
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
+            workflow_id="classify-graph",
         )
         result: OutboundMessage = await bus.send(msg)
         raw_content = result.response.content
@@ -196,6 +198,7 @@ class ClassifyGraph:
             content=content,
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
+            workflow_id="classify-graph",
         )
         result: OutboundMessage = await bus.send(msg)
         raw_content = result.response.content
@@ -251,6 +254,7 @@ class ClassifyGraph:
                     content=f"搜索并分析 {item.title}",
                     type=MessageType.CLASSIFY,
                     extra={"system_prompt": system_prompt},
+                    workflow_id="classify-graph",
                 )
             )
             item.title_analysis = result.response.content
@@ -276,6 +280,7 @@ class ClassifyGraph:
             content=content,
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
+            workflow_id="classify-graph",
         )
         result: OutboundMessage = await bus.send(msg)
         raw_content = result.response.content

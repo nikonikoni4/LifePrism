@@ -11,6 +11,82 @@ import { createApiV2UrlGetter } from '../../services/apiConfig';
 const getApiBase = createApiV2UrlGetter('/chatbot');
 
 // ============================================================================
+// 后端原始响应类型与错误
+// ============================================================================
+
+/**
+ * Chatbot API 错误
+ *
+ * 保留 HTTP 状态码，便于调用方区分 409（会话运行中）等场景。
+ */
+export class ChatbotApiError extends Error {
+    readonly status: number;
+
+    constructor(status: number, message: string) {
+        super(message);
+        this.name = 'ChatbotApiError';
+        this.status = status;
+    }
+}
+
+/** 后端会话项（snake_case） */
+interface RawChatSession {
+    id: string;
+    name: string;
+    created_at: string;
+    updated_at: string;
+    message_count: number;
+    /** 会话是否正在执行；后端未提供时按 false 处理 */
+    is_running?: boolean;
+}
+
+/** 后端会话列表响应 */
+interface RawSessionListResponse {
+    items: RawChatSession[];
+    total: number;
+}
+
+/** 后端历史消息（snake_case） */
+interface RawChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp?: string | null;
+}
+
+/** 后端聊天历史响应 */
+interface RawChatHistoryResponse {
+    session_id: string;
+    session_name: string;
+    messages?: RawChatMessage[] | null;
+}
+
+/**
+ * 解析 FastAPI 错误体并抛出 ChatbotApiError。
+ *
+ * FastAPI 的错误体形如 {"detail": "..."}，校验错误时 detail 也可能是数组。
+ *
+ * @param response 失败响应
+ * @param fallback 无法解析 detail 时的操作名
+ */
+async function throwApiError(response: Response, fallback: string): Promise<never> {
+    let detail = '';
+    try {
+        const body: unknown = await response.json();
+        if (body && typeof body === 'object' && 'detail' in body) {
+            const raw = (body as { detail: unknown }).detail;
+            if (typeof raw === 'string') {
+                detail = raw;
+            } else if (raw != null) {
+                detail = JSON.stringify(raw);
+            }
+        }
+    } catch {
+        // 响应体非 JSON 时忽略，退回状态文本
+    }
+    throw new ChatbotApiError(response.status, detail || `${fallback}: ${response.statusText}`);
+}
+
+// ============================================================================
 // 会话管理
 // ============================================================================
 
@@ -18,21 +94,20 @@ const getApiBase = createApiV2UrlGetter('/chatbot');
  * 获取会话列表
  */
 export async function getSessions(page = 1, pageSize = 20): Promise<{ items: ChatSession[], total: number }> {
-    const apiUrl = getApiBase();
-    console.log(`[Chatbot API DEBUG] getSessions 正在调用 - API Base URL: ${apiUrl}`);
-    const response = await fetch(`${apiUrl}/sessions?page=${page}&page_size=${pageSize}`);
+    const response = await fetch(`${getApiBase()}/sessions?page=${page}&page_size=${pageSize}`);
     if (!response.ok) {
-        throw new Error(`Failed to get sessions: ${response.statusText}`);
+        await throwApiError(response, '获取会话列表失败');
     }
-    const data = await response.json();
+    const data = (await response.json()) as RawSessionListResponse;
     // 转换字段名（后端 snake_case -> 前端 camelCase）
     return {
-        items: data.items.map((item: any) => ({
+        items: data.items.map((item) => ({
             id: item.id,
             name: item.name,
             createdAt: item.created_at,
             updatedAt: item.updated_at,
             messageCount: item.message_count,
+            isRunning: item.is_running ?? false,
         })),
         total: data.total,
     };
@@ -40,24 +115,32 @@ export async function getSessions(page = 1, pageSize = 20): Promise<{ items: Cha
 
 /**
  * 更新会话名称
+ *
+ * @throws ChatbotApiError 失败时抛出（含 HTTP 状态码与后端 detail）
  */
-export async function updateSessionName(sessionId: string, name: string): Promise<boolean> {
+export async function updateSessionName(sessionId: string, name: string): Promise<void> {
     const response = await fetch(`${getApiBase()}/sessions/${sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
     });
-    return response.ok;
+    if (!response.ok) {
+        await throwApiError(response, '重命名会话失败');
+    }
 }
 
 /**
- * 删除会话
+ * 删除会话（永久删除，后端在会话运行中返回 409）
+ *
+ * @throws ChatbotApiError 失败时抛出（含 HTTP 状态码与后端 detail）
  */
-export async function deleteSession(sessionId: string): Promise<boolean> {
+export async function deleteSession(sessionId: string): Promise<void> {
     const response = await fetch(`${getApiBase()}/sessions/${sessionId}`, {
         method: 'DELETE',
     });
-    return response.ok;
+    if (!response.ok) {
+        await throwApiError(response, '删除会话失败');
+    }
 }
 
 /**
@@ -66,14 +149,15 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
 export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> {
     const response = await fetch(`${getApiBase()}/sessions/${sessionId}/history`);
     if (!response.ok) {
-        throw new Error(`Failed to get chat history: ${response.statusText}`);
+        await throwApiError(response, '获取会话历史失败');
     }
-    const data = await response.json();
-    return data.messages.map((msg: any) => ({
+    const data = (await response.json()) as RawChatHistoryResponse;
+    const messages = data.messages ?? [];
+    return messages.map((msg): ChatMessage => ({
         id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        role: msg.role === 'assistant' ? 'model' : msg.role,
+        role: msg.role === 'user' ? 'user' : 'model',
         text: msg.content,
-        timestamp: msg.timestamp,
+        timestamp: msg.timestamp ?? undefined,
     }));
 }
 
@@ -240,7 +324,11 @@ export async function sendMessageStream(
                             seq: eventData.seq,
                             data: eventData.data,
                             // done 事件的 usage 字段
-                            usage: eventData.usage,
+                            usage: eventData.usage
+                                ? ('turn_usage' in eventData.usage
+                                    ? eventData.usage
+                                    : { turn_usage: eventData.usage })
+                                : undefined,
                             // 兼容旧的 content 字段（如有）
                             content: eventData.content || eventData.message,
                         };
