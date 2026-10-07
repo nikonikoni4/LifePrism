@@ -12,11 +12,11 @@ from myagent.agent.agent_context import AgentContext, AgentPolicySpec
 from myagent.agent.core.agent.types import AgentConfig
 from myagent.agent.core.provider import Message
 from myagent.agent.core.session import SessionStore
-from myagent.agent.guard.tool_use_guard import ToolUseGuard
 from myagent.infra.events.eventspec import REQUEST_ERROR, SESSION_EVENT, TOOL_CALL
 
 from lifeprism.config import settings
 from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType, OutboundMessage
+from lifeprism.llm.guard import ToolUseGuard
 from lifeprism.llm.providers import LLMResponse, create_llm_client
 from lifeprism.llm.providers.llm_retry import LLMRetry
 from lifeprism.llm.runtime.limiter import ModelCallLimiter

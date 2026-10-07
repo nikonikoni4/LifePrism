@@ -1,7 +1,7 @@
 """文件系统工具
 
 访问范围校验已上移到 ToolUseGuard（订阅 tool/call，见
-``myagent.agent.guard.tool_use_guard``），由它在工具执行前按白名单逐条裁决。
+``lifeprism.llm.guard.tool_use_guard``），由它在工具执行前按白名单逐条裁决。
 本模块不再做路径校验，也不再限制可搜索的文件类型。
 """
 

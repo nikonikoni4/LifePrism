@@ -53,3 +53,10 @@
 - path: `docs/technical-debt/2026-08-19-llm-server-service-coupling.md`
 - 触发规则：修改 `lifeprism/llm/agent/tools/habit_tool.py`、新增 LLM 工具需复用 server.service 业务规则、或重构 HabitService 结构时阅读
 - 内容摘要：`llm/agent/tools/habit_tool.py` 反向依赖 `server/services/habit_service` 与 `server/schemas/habit_schemas`，通过延迟导入掩盖循环依赖，是 `lifeprism/llm/` 下唯一此类离群点。修复方向是将 Service 从 server 中剥离形成独立 application/service 层，同时服务于 LLM 和 HTTP API；分三阶段实施：schema 共享先行 → 抽应用服务层 → 完整领域模块。触发条件为出现第二个需复用 server.service 的 LLM 工具
+
+## guard-duplicated-lifeprism-myagent
+
+- updated_at: 2026-10-08
+- path: `docs/technical-debt/2026-10-08-guard-duplicated-lifeprism-myagent.md`
+- 触发规则：修改工具护栏（ToolUseGuard、tool/call 事件订阅、路径白名单检测）或 `lifeprism/llm/guard/` 下任意文件时阅读
+- 内容摘要：路径护栏 ToolUseGuard 在 `lifeprism/llm/guard/tool_use_guard.py` 与 `agent/src/myagent/agent/guard/tool_use_guard.py` 两份并存，lifeprism 那份生效。两份逻辑改动不会自动同步，护栏漂移的后果是"以为护住了其实没有"。收敛方案按成本排序：给 myagent 那份加 deprecated 标注 → 确认无消费方后删除 myagent 版 → 抽公共包

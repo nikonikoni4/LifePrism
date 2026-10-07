@@ -511,8 +511,7 @@ def test_context_loads_agent_settings_and_guard(tmp_path, monkeypatch, retry_ena
             slot = next(iter(runtime._slots.values()))
             assert slot.context.agent_loop.agent_config.step_limit == 8
             assert slot.context.agent_loop.agent_config.max_retry_count == 1
-            from myagent.agent.guard.tool_use_guard import ToolUseGuard
-
+            from lifeprism.llm.guard import ToolUseGuard
             from lifeprism.llm.providers.llm_retry import LLMRetry
 
             guards = [obj for obj in slot.context.policy_objects if isinstance(obj, ToolUseGuard)]
