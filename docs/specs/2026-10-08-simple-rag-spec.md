@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-10-08
 updated_at: 2026-10-08
-last_updated: 接入 Simple RAG 设置、检索与每日索引单向发布
+last_updated: 补齐 agent_only 实际接收入口，验证正常模式发送和云端接收流程
 abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和阿里云重排模型、默认 vec 检索、可选 BM25、每日记忆更新后独立单向同步完整 SQLite 快照。
 ---
 
@@ -13,6 +13,7 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 | 版本 | 更新内容 |
 |------|---------|
 | 1.0 | 设置、原生检索工具、每日完整构建与云端快照发布 |
+| 1.1 | 接通独立 agent_only 启动入口；验证实际 HTTP 上传、确认失败重试与 SSH 地址选择；补齐代理上传限制 |
 
 ## Overview
 
@@ -86,7 +87,9 @@ BM25 的 seen/query 临时表属于连接，不参与传输。上传使用 SQLit
 
 ### 单向同步 API
 
-仅 `agent_only` 接收，使用现有 `Authorization: Bearer {sync_api_key}`。
+仅 `agent_only` 接收，使用现有 `Authorization: Bearer {sync_api_key}`。独立云端入口 `lifeprism.server.main_agent_only._run_agent_and_api` 注册业务数据同步与 RAG 索引同步路由，默认监听 `127.0.0.1:8102`。正常入口 `lifeprism.server.main` 固定为 full，绑定应用 SyncClient 到每日 RAG 调度，负责发送；云端不注册构建/发送任务。
+
+经过 Nginx 的同步代理须显式配置 `client_max_body_size 512m`；模板同时关闭请求缓冲并设置 300 秒代理超时，详见 [云端 HTTPS 部署](../deployment/cloud-https-setup.md)。现有线上代理需部署者同步更新并重载。
 
 POST `/api/sync/rag-index` 请求体是原始 SQLite 二进制，`X-RAG-Manifest` 是 Base64 编码的 JSON（最多 8192 字符），大小最多 512 MiB。成功响应 `{version: string, sha256: string}`。摘要、结构或版本校验失败返回 422，超限返回 413，非云端模式返回 403；旧索引保持可用。相同版本与相同 manifest 重发幂等，拒绝不同内容重用版本或回退到更早版本。
 
@@ -131,6 +134,8 @@ IndexManifest 全部字段：
 - lifeprism/server/api/rag_sync_api.py
   - rag_sync_api.receive_index:22
   - rag_sync_api.get_index_manifest:52
+- lifeprism/server/main_agent_only.py
+  - main_agent_only._run_agent_and_api:286
 </key_function>
 
 ## Design Rationale

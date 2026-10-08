@@ -287,8 +287,8 @@ async def _run_agent_and_api() -> None:
     """Agent Only 主循环 + FastAPI 同步服务。
 
     启动流程：
-        1. 创建 FastAPI 实例（仅注册 sync_cloud_router）
-        2. 启动 uvicorn 服务（后台任务，端口 8101）
+        1. 创建 FastAPI 实例（注册业务数据同步与独立 RAG 索引同步路由）
+        2. 启动 uvicorn 服务（后台任务，端口 8102）
         3. 数据库初始化（建表 + 迁移 + 默认数据 + 资源文件）
         4. 启动 Agent Loop + WeChat Channel
         5. 等待终止信号或 Agent Loop 异常退出
@@ -297,6 +297,7 @@ async def _run_agent_and_api() -> None:
     from fastapi import FastAPI
 
     from lifeprism.server.api import sync_cloud_router
+    from lifeprism.server.api.rag_sync_api import router as rag_sync_router
 
     logger.info("=== LifePrism Agent Only 模式启动 ===")
 
@@ -310,6 +311,7 @@ async def _run_agent_and_api() -> None:
         redoc_url=None,
     )
     app.include_router(sync_cloud_router)
+    app.include_router(rag_sync_router)
 
     # 注册全局异常处理器（与 main.py 保持一致）
     # 确保 verify_sync_api_key 抛出的 ValidationError 等返回 422 而非默认 500

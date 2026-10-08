@@ -4,8 +4,8 @@ Agent Only FastAPI 服务集成测试
 验证 Issue #24: 云端 FastAPI 服务启动。
 测试 _run_agent_and_api() 函数的行为：
 1. 启动时创建 FastAPI 实例并注册 sync_cloud_router
-2. FastAPI 监听端口 8101
-3. 只注册 sync_cloud_router，不注册其他业务路由
+2. FastAPI 监听端口 8102
+3. 只注册同步路由，不注册业务路由
 4. Agent Loop 和 WeChat Channel 同时启动
 5. SIGINT/SIGTERM 正确停止所有任务
 
@@ -100,19 +100,20 @@ class TestAgentOnlyApi:
         assert "/api/sync/pull" in route_paths
         assert "/api/sync/push" in route_paths
         assert "/api/sync/heartbeat" in route_paths
+        assert "/api/sync/rag-index" in route_paths
 
     @patch("lifeprism.server.main_agent_only.stop_agent_and_channel", new_callable=AsyncMock)
     @patch("lifeprism.server.main_agent_only.start_agent_and_channel", new_callable=AsyncMock)
     @patch("lifeprism.server.main_agent_only.init_database_full")
     @patch("lifeprism.server.main_agent_only.uvicorn")
-    async def test_agent_only_fastapi_port_8101(
+    async def test_agent_only_fastapi_port_8102(
         self,
         mock_uvicorn,
         mock_init_db,
         mock_start_agent,
         mock_stop_agent,
     ):
-        """FastAPI 监听端口 8101"""
+        """FastAPI 监听端口 8102"""
         # Arrange
         await self._setup_standard_mocks(
             mock_uvicorn, mock_init_db, mock_start_agent, mock_stop_agent
@@ -121,12 +122,13 @@ class TestAgentOnlyApi:
         # Act
         from lifeprism.server.main_agent_only import _run_agent_and_api
 
-        await _run_agent_and_api()
+        with patch.dict("os.environ", {"LIFEPRISM_API_HOST": "127.0.0.1"}):
+            await _run_agent_and_api()
 
-        # Assert: uvicorn.Config 端口为 8101
+        # Assert: uvicorn.Config 端口为 8102
         config_kwargs = mock_uvicorn.Config.call_args.kwargs
-        assert config_kwargs.get("port") == 8101
-        assert config_kwargs.get("host") == "0.0.0.0"
+        assert config_kwargs.get("port") == 8102
+        assert config_kwargs.get("host") == "127.0.0.1"
 
     @patch("lifeprism.server.main_agent_only.stop_agent_and_channel", new_callable=AsyncMock)
     @patch("lifeprism.server.main_agent_only.start_agent_and_channel", new_callable=AsyncMock)
@@ -139,7 +141,7 @@ class TestAgentOnlyApi:
         mock_start_agent,
         mock_stop_agent,
     ):
-        """只注册 sync_cloud_router，不注册其他业务路由"""
+        """只注册同步路由，不注册业务路由"""
         # Arrange
         await self._setup_standard_mocks(
             mock_uvicorn, mock_init_db, mock_start_agent, mock_stop_agent
@@ -159,7 +161,7 @@ class TestAgentOnlyApi:
 
         # Assert: 所有 API 路由都在 /api/sync 下
         for path in api_paths:
-            assert path.startswith("/api/sync"), "非同步路由被注册: %s" % path
+            assert path.startswith("/api/sync"), f"非同步路由被注册: {path}"
 
         # Assert: sync 端点存在
         assert "/api/sync/pull" in api_paths
@@ -170,7 +172,7 @@ class TestAgentOnlyApi:
 
         # Assert: 业务路由不存在
         for bp in ["/api/goals", "/api/diary", "/api/mood", "/api/todos"]:
-            assert bp not in api_paths, "业务路由不应被注册: %s" % bp
+            assert bp not in api_paths, f"业务路由不应被注册: {bp}"
 
     @patch("lifeprism.server.main_agent_only.stop_agent_and_channel", new_callable=AsyncMock)
     @patch("lifeprism.server.main_agent_only.start_agent_and_channel", new_callable=AsyncMock)

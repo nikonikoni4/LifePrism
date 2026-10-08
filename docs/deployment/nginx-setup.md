@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-07-08
-updated_at: 2026-07-14
-last_updated: v1.1——HTTPS 从可选改为默认；新增同步端口 8102 代理配置
+updated_at: 2026-10-08
+last_updated: 同步端口代理支持完整 RAG 索引的大小与流式上传超时
 abstract: LifePrism 的 Nginx 反向代理配置指南，覆盖前端静态文件托管、Web Demo API（8101）代理、同步 API（8102）代理、HTTPS 默认配置、SSE 流式响应支持。
 ---
 
@@ -12,6 +12,7 @@ abstract: LifePrism 的 Nginx 反向代理配置指南，覆盖前端静态文�
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.2  | 同步代理配置 512 MiB 请求体上限、流式转发及 300 秒超时 |
 | 1.1  | HTTPS 从可选改为默认配置；新增同步端口 8102 代理（`/api/sync/` → `http://127.0.0.1:8102`） |
 | 1.0  | 创建文档初稿 |
 
@@ -89,6 +90,11 @@ server {
 
     # 本地 SyncClient 通过 HTTPS 访问同步 API
     location /api/sync/ {
+        # RAG 索引上传上限与后端保持一致；避免代理先缓冲整个索引。
+        client_max_body_size 512m;
+        proxy_request_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         proxy_pass http://127.0.0.1:8102;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-07-14
-updated_at: 2026-07-26
-last_updated: 新增"模式 C：SSH 隧道（无域名场景）"章节；标注模式 B 为"不推荐，仅测试用"（因 8102 默认绑定 127.0.0.1 后无法公网访问）
+updated_at: 2026-10-08
+last_updated: 为完整 RAG 索引上传配置 Nginx 请求体上限、流式转发及超时
 abstract: LifePrism 云端同步 API 的部署完整配置。覆盖三种连接模式——Nginx 反向代理（推荐）、uvicorn 直连 HTTPS（不推荐，仅测试用）、SSH 隧道（无域名场景）。所有代码仅供参考，云端 AI 在部署时应依据实际环境适配。
 ---
 
@@ -12,6 +12,7 @@ abstract: LifePrism 云端同步 API 的部署完整配置。覆盖三种连接�
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.2  | 同步代理支持最大 512 MiB RAG 索引请求体、关闭请求缓冲并设置 300 秒代理超时 |
 | 1.1  | 新增"模式 C：SSH 隧道（无域名场景）"章节；标注模式 B 为"不推荐，仅测试用"（因 8102 默认绑定 127.0.0.1 后无法公网访问）；更新防火墙表格、systemd 配置示例和部署检查清单 |
 | 1.0  | 创建文档初稿 |
 
@@ -158,6 +159,11 @@ server {
 
     # 同步 API 反向代理 → uvicorn:8102
     location /api/sync/ {
+        # RAG 为原始 SQLite 二进制上传，对齐后端 512 MiB 上限。
+        client_max_body_size 512m;
+        proxy_request_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         proxy_pass http://127.0.0.1:8102;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -168,6 +174,8 @@ server {
 ```
 
 ### A.3 启用配置
+
+已有部署接入 RAG 时也需更新上述代理配置并重载 Nginx；其默认请求体上限可能使较大索引返回 413。实际云端应用使用 `python -m lifeprism.server.main_agent_only`，注册 `/api/sync/rag-index` 的 POST/GET；正常 `main.py` 启动负责本地发送，不提供此接收入口。
 
 ```bash
 # Debian/Ubuntu（仅供参考）

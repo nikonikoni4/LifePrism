@@ -29,3 +29,11 @@
 自动审批拒绝递归删除本次 .scratch/rag-linux 与 rag-frozen 临时探针产物（仅返回 blocked by policy，无更具体原因）；未删除，改为加入本地 .git/info/exclude，不影响代码提交范围。
 
 定时任务移除测试已修正为允许既已提交的回调结束，再验证后续周期停止；独立复测 1 passed。未修改 APScheduler 或生产 remove_job 行为。
+
+## 实际云端入口与两端同步验证（2026-10-08）
+
+真实云端入口为 lifeprism/server/main_agent_only.py 的 `_run_agent_and_api`，独立创建端口 8102 应用；原实现仅在正常 main.py 条件注册 RAG 路由，无法覆盖此入口。新增真实入口回归先复现路由缺失，再注册 RAG POST/GET 接收路由。
+
+真实 ScheduleService、RagService、RagSyncSender 与云端入口应用通过 TCP/HTTP 跑通。验证直连/SSH 地址选择、隧道未就绪不发送、发布成功但确认失败后的幂等重试、当天复用索引且成功后不再上传、本地云端字节和 SHA 一致、云端 vec/BM25 查询、认证及 full/agent_only/web_demo 模式隔离。相关回归 54 passed；Ruff 和 diff 检查通过。嵌入为合成数据，Agent/数据库启动隔离，SSH 只验证地址选择与连接状态，未建立真实隧道。
+
+Nginx 默认请求体上限可能返回 413，已更新部署模板为 512 MiB、关闭请求缓冲并设置 300 秒代理超时；现有部署需更新并重载。生产云端、真实模型与代理环境尚未实测。本轮修复尚未提交，保留开始时已有的其他工作区改动。

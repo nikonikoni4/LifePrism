@@ -154,4 +154,4 @@
 - updated_at: 2026-10-08
 - path: `docs/specs/2026-10-08-simple-rag-spec.md`
 - 触发规则：修改 RAG 设置、模型密钥、检索工具、索引构建或每日单向索引同步时阅读。
-- 内容摘要：默认 vec、可选 own_bm25 和 rerank；固定模型；每日记忆更新后完整重建，独立上传 SQLite 快照；版本发布与失败重试契约。
+- 内容摘要：默认 vec、可选 own_bm25 和 rerank；固定模型；正常模式每日构建并发送，独立 agent_only 入口接收完整 SQLite 快照；版本发布、失败重试与代理上传限制契约。
