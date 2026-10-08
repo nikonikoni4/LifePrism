@@ -11,6 +11,9 @@ from myagent.agent.hitl.types import HITLMessage, HumanReturn
 from lifeprism.llm.bus import ChannelType, OutboundMessage
 from lifeprism.llm.conversation.types import ConversationRoute
 from lifeprism.llm.providers import LLMResponse
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 Sender = Callable[[OutboundMessage], Awaitable[None]]
 
@@ -44,6 +47,18 @@ class PendingInteraction:
     request_id: str
     question: HITLMessage
     answer_future: asyncio.Future[HumanReturn]
+
+
+# 原生 HITL 的枚举裁决；其余选项内容不写入日志。
+_SAFE_CHOICE_IDS = frozenset({"continue", "break"})
+
+
+def _choice_tag(result: HumanReturn) -> str:
+    """只暴露可枚举的 continue/break，其余仅暴露类型，避免泄露自定义选项内容。"""
+    choice_id = result.choice_id
+    if isinstance(choice_id, str) and choice_id in _SAFE_CHOICE_IDS:
+        return choice_id
+    return f"<{type(choice_id).__name__}>"
 
 
 class RunClient:
@@ -88,6 +103,13 @@ class RunClient:
             uuid4().hex, message, asyncio.get_running_loop().create_future()
         )
         self.pending = pending
+        logger.info(
+            "人工待答创建: session_id=%s, run_id=%s, request_id=%s, channel=%s",
+            self.session_id,
+            self.run_id,
+            pending.request_id,
+            self.client.route.channel,
+        )
         lines = [f"[需要你的选择] {message.content}"]
         for index, choice in enumerate(message.choices, 1):
             description = f"：{choice.description}" if choice.description else ""
@@ -95,16 +117,44 @@ class RunClient:
         if message.choices:
             lines.append("请回复选项编号或名称。")
         try:
-            await self.send_text(
-                "\n".join(lines), kind="interaction", request_id=pending.request_id
+            try:
+                await self.send_text(
+                    "\n".join(lines), kind="interaction", request_id=pending.request_id
+                )
+            except Exception as exc:
+                # 异常原样传播；只记类型，不落问题正文与回复凭据。
+                logger.error(
+                    "人工提示发送失败: session_id=%s, run_id=%s, request_id=%s, error_type=%s",
+                    self.session_id,
+                    self.run_id,
+                    pending.request_id,
+                    type(exc).__name__,
+                )
+                raise
+            logger.info("人工提示发送完成: request_id=%s", pending.request_id)
+            result = await pending.answer_future
+            logger.info(
+                "人工返回成功: request_id=%s, return_type=%s, choice=%s",
+                pending.request_id,
+                message.human_return_type,
+                _choice_tag(result),
             )
-            return await pending.answer_future
+            return result
         finally:
             # 快速回答可能已摘除 pending；旧 finally 不清理后来的问题。
             if self.pending is pending:
                 self.pending = None
             if not pending.answer_future.done():
                 pending.answer_future.cancel()
+            if pending.answer_future.cancelled():
+                # 取消来源多样（外部取消、原生等待超时、关闭清理），不能标成确定超时。
+                logger.info(
+                    "人工等待取消: session_id=%s, run_id=%s, request_id=%s",
+                    self.session_id,
+                    self.run_id,
+                    pending.request_id,
+                )
+            logger.info("人工等待结束: request_id=%s", pending.request_id)
 
     def answer(self, text: str, request_id: str | None = None) -> bool:
         """同步完成当前 Future；无效或过期选择保持原等待不变。"""
