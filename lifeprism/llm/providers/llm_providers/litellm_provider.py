@@ -344,7 +344,7 @@ class LiteLLMProvider(LLMProvider):
             messages, tools, model, max_tokens, temperature, reasoning_effort, tool_choice
         )
         request_model = kwargs["model"]
-        response = await self._call_once(acompletion(**kwargs), model=request_model)
+        response = await self._call_once(acompletion(**kwargs), model=request_model, payload=kwargs)
         return self._parse_response(response, model=request_model)
 
     async def stream_chat(
@@ -371,8 +371,8 @@ class LiteLLMProvider(LLMProvider):
         kwargs["stream"] = True
         kwargs["stream_options"] = {"include_usage": True}
         request_model = kwargs["model"]
-        stream = await self._call_once(acompletion(**kwargs), model=request_model)
-        wrapped = self._stream_once(stream, model=request_model)
+        stream = await self._call_once(acompletion(**kwargs), model=request_model, payload=kwargs)
+        wrapped = self._stream_once(stream, model=request_model, payload=kwargs)
         try:
             async for chunk in wrapped:
                 yield chunk
