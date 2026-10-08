@@ -15,6 +15,7 @@ from . import (
     s004_add_monitor_config,
     s005_add_screen_analysis_ignore,
     s006_add_llm_call_logger_enabled,
+    s007_add_missing_fields,
 )
 
 # settings.yaml 迁移列表（按 VERSION 升序）
@@ -25,6 +26,7 @@ SETTINGS_MIGRATIONS = [
     s004_add_monitor_config,
     s005_add_screen_analysis_ignore,
     s006_add_llm_call_logger_enabled,
+    s007_add_missing_fields,
 ]
 
 # providers.yaml 迁移列表（按 VERSION 升序）
