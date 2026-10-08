@@ -1,7 +1,7 @@
 {
   "total_files": 252,
-  "total_definitions": 2302,
-  "total_calls": 7151,
+  "total_definitions": 2303,
+  "total_calls": 7152,
   "definitions": {
     "config.agent_config._ConfigModel": {
       "line": 8,
@@ -9094,12 +9094,12 @@
       "name": "BaseChannel.is_allowed"
     },
     "llm.channel.wire_wechat_channel": {
-      "line": 12,
+      "line": 20,
       "module": "llm.channel",
       "name": "wire_wechat_channel"
     },
     "llm.channel._create_wechat_channel": {
-      "line": 39,
+      "line": 51,
       "module": "llm.channel",
       "name": "_create_wechat_channel"
     },
@@ -9284,67 +9284,67 @@
       "name": "RunClient.close"
     },
     "llm.conversation.commands._ChatSessions": {
-      "line": 40,
+      "line": 38,
       "module": "llm.conversation.commands",
       "name": "_ChatSessions"
     },
     "llm.conversation.commands._ChatSessions.list_sessions": {
-      "line": 43,
+      "line": 41,
       "module": "llm.conversation.commands",
       "name": "_ChatSessions.list_sessions"
     },
     "llm.conversation.commands._ChatSessions.get_history": {
-      "line": 45,
+      "line": 43,
       "module": "llm.conversation.commands",
       "name": "_ChatSessions.get_history"
     },
     "llm.conversation.commands._ChatSessions.create": {
-      "line": 47,
+      "line": 45,
       "module": "llm.conversation.commands",
       "name": "_ChatSessions.create"
     },
     "llm.conversation.commands._ChatSessions.delete": {
-      "line": 49,
+      "line": 47,
       "module": "llm.conversation.commands",
       "name": "_ChatSessions.delete"
     },
     "llm.conversation.commands.SessionCommandService": {
-      "line": 52,
+      "line": 50,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService"
     },
     "llm.conversation.commands.SessionCommandService.__init__": {
-      "line": 55,
+      "line": 53,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService.__init__"
     },
     "llm.conversation.commands.SessionCommandService.matches": {
-      "line": 66,
+      "line": 64,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService.matches"
     },
     "llm.conversation.commands.SessionCommandService.is_readonly": {
-      "line": 71,
+      "line": 69,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService.is_readonly"
     },
     "llm.conversation.commands.SessionCommandService.handle": {
-      "line": 76,
+      "line": 74,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService.handle"
     },
     "llm.conversation.commands.SessionCommandService._handle_list": {
-      "line": 116,
+      "line": 114,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService._handle_list"
     },
     "llm.conversation.commands.SessionCommandService._handle_continue": {
-      "line": 150,
+      "line": 148,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService._handle_continue"
     },
     "llm.conversation.commands.SessionCommandService._handle_new": {
-      "line": 179,
+      "line": 177,
       "module": "llm.conversation.commands",
       "name": "SessionCommandService._handle_new"
     },
@@ -9399,77 +9399,82 @@
       "name": "WechatSessionReferences.set"
     },
     "llm.conversation.service.ConversationService": {
-      "line": 27,
+      "line": 32,
       "module": "llm.conversation.service",
       "name": "ConversationService"
     },
     "llm.conversation.service.ConversationService.__init__": {
-      "line": 30,
+      "line": 35,
       "module": "llm.conversation.service",
       "name": "ConversationService.__init__"
     },
     "llm.conversation.service.ConversationService.start": {
-      "line": 57,
+      "line": 62,
       "module": "llm.conversation.service",
       "name": "ConversationService.start"
     },
     "llm.conversation.service.ConversationService.can_receive": {
-      "line": 65,
+      "line": 70,
       "module": "llm.conversation.service",
       "name": "ConversationService.can_receive"
     },
     "llm.conversation.service.ConversationService.is_busy": {
-      "line": 74,
+      "line": 82,
       "module": "llm.conversation.service",
       "name": "ConversationService.is_busy"
     },
     "llm.conversation.service.ConversationService._client": {
-      "line": 78,
+      "line": 86,
       "module": "llm.conversation.service",
       "name": "ConversationService._client"
     },
     "llm.conversation.service.ConversationService._spawn": {
-      "line": 83,
+      "line": 91,
       "module": "llm.conversation.service",
       "name": "ConversationService._spawn"
     },
     "llm.conversation.service.ConversationService._task_done": {
-      "line": 89,
+      "line": 97,
       "module": "llm.conversation.service",
       "name": "ConversationService._task_done"
     },
     "llm.conversation.service.ConversationService._notice": {
-      "line": 94,
+      "line": 102,
       "module": "llm.conversation.service",
       "name": "ConversationService._notice"
     },
     "llm.conversation.service.ConversationService.submit": {
-      "line": 102,
+      "line": 110,
       "module": "llm.conversation.service",
       "name": "ConversationService.submit"
     },
+    "llm.conversation.service.ConversationService._operation_done": {
+      "line": 168,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._operation_done"
+    },
     "llm.conversation.service.ConversationService._release": {
-      "line": 154,
+      "line": 174,
       "module": "llm.conversation.service",
       "name": "ConversationService._release"
     },
     "llm.conversation.service.ConversationService._command": {
-      "line": 158,
+      "line": 178,
       "module": "llm.conversation.service",
       "name": "ConversationService._command"
     },
     "llm.conversation.service.ConversationService._run": {
-      "line": 177,
+      "line": 198,
       "module": "llm.conversation.service",
       "name": "ConversationService._run"
     },
     "llm.conversation.service.ConversationService.drain": {
-      "line": 246,
+      "line": 272,
       "module": "llm.conversation.service",
       "name": "ConversationService.drain"
     },
     "llm.conversation.service.ConversationService.close": {
-      "line": 251,
+      "line": 280,
       "module": "llm.conversation.service",
       "name": "ConversationService.close"
     },
@@ -11259,7 +11264,7 @@
       "name": "WechatChannel._poll_loop"
     },
     "llm.channel.wechat.channel.WechatChannel._handle_wechat_message": {
-      "line": 163,
+      "line": 165,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel._handle_wechat_message"
     },
@@ -14304,7 +14309,7 @@
       },
       {
         "from": "llm.conversation.service._spawn",
-        "line": 84
+        "line": 92
       },
       {
         "from": "llm.function.agent_schedule_job.main",
@@ -16254,11 +16259,11 @@
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 158
+        "line": 160
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 161
+        "line": 163
       }
     ],
     "sync.ssh_tunnel.min": [
@@ -18338,7 +18343,7 @@
       },
       {
         "from": "llm.conversation.service._run",
-        "line": 197
+        "line": 218
       },
       {
         "from": "llm.runtime.service.stream",
@@ -37507,40 +37512,46 @@
         "line": 79
       }
     ],
+    "llm.channel.get_logger": [
+      {
+        "from": "llm.channel.<module>",
+        "line": 17
+      }
+    ],
     "llm.channel.ConversationService": [
       {
         "from": "llm.channel.wire_wechat_channel",
-        "line": 26
+        "line": 38
       }
     ],
     "llm.channel.WechatChannel": [
       {
         "from": "llm.channel._create_wechat_channel",
-        "line": 40
+        "line": 52
       }
     ],
     "llm.channel.wire_wechat_channel": [
       {
         "from": "llm.channel._create_wechat_channel",
-        "line": 41
+        "line": 53
       }
     ],
     "llm.channel.WechatSessionReferences": [
       {
         "from": "llm.channel._create_wechat_channel",
-        "line": 41
+        "line": 53
       }
     ],
     "llm.channel.LazySingleton": [
       {
         "from": "llm.channel.<module>",
-        "line": 45
+        "line": 57
       }
     ],
     "llm.channel.WechatConfig": [
       {
         "from": "llm.channel.<module>",
-        "line": 46
+        "line": 58
       }
     ],
     "llm.chat.chat_bot.InboundMessage": [
@@ -37646,11 +37657,11 @@
       },
       {
         "from": "llm.conversation.service.drain",
-        "line": 249
+        "line": 276
       },
       {
         "from": "llm.conversation.service.close",
-        "line": 261
+        "line": 290
       },
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
@@ -38046,99 +38057,99 @@
     "llm.conversation.commands.bool": [
       {
         "from": "llm.conversation.commands.matches",
-        "line": 69
+        "line": 67
       },
       {
         "from": "llm.conversation.commands.is_readonly",
-        "line": 74
+        "line": 72
       }
     ],
     "llm.conversation.commands.OutboundMessage": [
       {
         "from": "llm.conversation.commands.handle",
-        "line": 111
+        "line": 109
       }
     ],
     "llm.conversation.commands.LLMResponse": [
       {
         "from": "llm.conversation.commands.handle",
-        "line": 112
+        "line": 110
       }
     ],
     "llm.conversation.commands.max": [
       {
         "from": "llm.conversation.commands._handle_list",
-        "line": 127
+        "line": 125
       }
     ],
     "llm.conversation.commands.len": [
       {
         "from": "llm.conversation.commands._handle_continue",
-        "line": 154
+        "line": 152
       },
       {
         "from": "llm.conversation.commands._handle_new",
-        "line": 183
+        "line": 181
       },
       {
         "from": "llm.conversation.commands._session_list_arguments",
-        "line": 204
+        "line": 202
       },
       {
         "from": "llm.conversation.commands._session_list_arguments",
-        "line": 211
+        "line": 209
       },
       {
         "from": "llm.conversation.commands._session_list_arguments",
-        "line": 212
+        "line": 210
       }
     ],
     "llm.conversation.commands.str": [
       {
         "from": "llm.conversation.commands._handle_continue",
-        "line": 157
+        "line": 155
       }
     ],
     "llm.conversation.commands.UUID": [
       {
         "from": "llm.conversation.commands._handle_continue",
-        "line": 157
+        "line": 155
       }
     ],
     "llm.conversation.commands.reversed": [
       {
         "from": "llm.conversation.commands._handle_continue",
-        "line": 167
+        "line": 165
       }
     ],
     "llm.conversation.commands.any": [
       {
         "from": "llm.conversation.commands._handle_continue",
-        "line": 171
+        "line": 169
       }
     ],
     "llm.conversation.commands.ValueError": [
       {
         "from": "llm.conversation.commands._session_list_arguments",
-        "line": 205
+        "line": 203
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 213
       },
       {
         "from": "llm.conversation.commands._session_list_arguments",
         "line": 215
-      },
-      {
-        "from": "llm.conversation.commands._session_list_arguments",
-        "line": 217
       }
     ],
     "llm.conversation.commands.int": [
       {
         "from": "llm.conversation.commands._session_list_arguments",
-        "line": 216
+        "line": 214
       },
       {
         "from": "llm.conversation.commands._session_list_arguments",
-        "line": 218
+        "line": 216
       }
     ],
     "llm.conversation.references.get_logger": [
@@ -38156,139 +38167,139 @@
     "llm.conversation.service.get_logger": [
       {
         "from": "llm.conversation.service.<module>",
-        "line": 16
+        "line": 18
       }
     ],
     "llm.conversation.service.ValueError": [
       {
         "from": "llm.conversation.service.__init__",
-        "line": 43
+        "line": 48
       }
     ],
     "llm.conversation.service.SessionCommandService": [
       {
         "from": "llm.conversation.service.__init__",
-        "line": 46
+        "line": 51
       }
     ],
     "llm.conversation.service.set": [
       {
         "from": "llm.conversation.service.__init__",
-        "line": 53
+        "line": 58
       }
     ],
     "llm.conversation.service.OrderedDict": [
       {
         "from": "llm.conversation.service.__init__",
-        "line": 54
+        "line": 59
       }
     ],
     "llm.conversation.service.RuntimeError": [
       {
         "from": "llm.conversation.service.start",
-        "line": 61
+        "line": 66
       },
       {
         "from": "llm.conversation.service._run",
-        "line": 212
+        "line": 233
       }
     ],
     "llm.conversation.service.ConversationClient": [
       {
         "from": "llm.conversation.service._client",
-        "line": 80
+        "line": 88
       }
     ],
     "llm.conversation.service.OutboundMessage": [
       {
         "from": "llm.conversation.service._notice",
-        "line": 97
+        "line": 105
       }
     ],
     "llm.conversation.service.LLMResponse": [
       {
         "from": "llm.conversation.service._notice",
-        "line": 97
+        "line": 105
       }
     ],
     "llm.conversation.service.len": [
       {
         "from": "llm.conversation.service.submit",
-        "line": 118
+        "line": 126
       }
     ],
     "llm.conversation.service.str": [
       {
         "from": "llm.conversation.service.submit",
-        "line": 126
+        "line": 134
       }
     ],
     "llm.conversation.service._Operation": [
       {
         "from": "llm.conversation.service.submit",
-        "line": 135
+        "line": 143
       },
       {
         "from": "llm.conversation.service.submit",
-        "line": 144
+        "line": 157
       }
     ],
     "llm.conversation.service.uuid4": [
       {
         "from": "llm.conversation.service.submit",
-        "line": 135
+        "line": 143
       },
       {
         "from": "llm.conversation.service.submit",
-        "line": 144
+        "line": 157
       }
     ],
     "llm.conversation.service.RunClient": [
       {
         "from": "llm.conversation.service.submit",
-        "line": 149
+        "line": 162
       }
     ],
     "llm.conversation.service.replace": [
       {
         "from": "llm.conversation.service._command",
-        "line": 167
+        "line": 185
       },
       {
         "from": "llm.conversation.service._run",
-        "line": 224
+        "line": 245
       }
     ],
     "llm.conversation.service.UUID": [
       {
         "from": "llm.conversation.service._run",
-        "line": 186
+        "line": 207
       }
     ],
     "llm.conversation.service.InboundMessage": [
       {
         "from": "llm.conversation.service._run",
-        "line": 189
+        "line": 210
       }
     ],
     "llm.conversation.service.dict": [
       {
         "from": "llm.conversation.service._run",
-        "line": 195
+        "line": 216
       }
     ],
     "llm.conversation.service.tuple": [
       {
         "from": "llm.conversation.service.drain",
-        "line": 249
+        "line": 275
       },
       {
         "from": "llm.conversation.service.close",
-        "line": 254
+        "line": 283
       },
       {
         "from": "llm.conversation.service.close",
-        "line": 258
+        "line": 287
       }
     ],
     "llm.conversation.types.dataclass": [
@@ -44526,7 +44537,7 @@
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 190
+        "line": 192
       }
     ],
     "llm.channel.wechat.channel.WechatMedia": [
@@ -44552,35 +44563,35 @@
     "llm.channel.wechat.channel.ConversationRoute": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 170
+        "line": 172
       }
     ],
     "llm.channel.wechat.channel.ConversationInput": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 183
+        "line": 185
       }
     ],
     "llm.channel.wechat.channel.str": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 186
+        "line": 188
       }
     ],
     "llm.channel.wechat.channel.uuid4": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 186
+        "line": 188
       }
     ],
     "llm.channel.wechat.channel.WechatMessageError": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 193
+        "line": 195
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 195
+        "line": 197
       }
     ],
     "llm.channel.wechat.client.get_logger": [
@@ -49588,7 +49599,7 @@
     "llm.conversation.service._spawn": [
       {
         "to": "asyncio.create_task",
-        "line": 84
+        "line": 92
       }
     ],
     "llm.function.agent_schedule_job.main": [
@@ -51582,11 +51593,11 @@
     "llm.channel.wechat.channel._poll_loop": [
       {
         "to": "asyncio.sleep",
-        "line": 158
+        "line": 160
       },
       {
         "to": "asyncio.sleep",
-        "line": 161
+        "line": 163
       }
     ],
     "sync.sync_client.<module>": [
@@ -53860,27 +53871,27 @@
     "llm.conversation.service._run": [
       {
         "to": "contextlib.aclosing",
-        "line": 197
+        "line": 218
       },
       {
         "to": "llm.conversation.service.RuntimeError",
-        "line": 212
+        "line": 233
       },
       {
         "to": "llm.conversation.service.replace",
-        "line": 224
+        "line": 245
       },
       {
         "to": "llm.conversation.service.UUID",
-        "line": 186
+        "line": 207
       },
       {
         "to": "llm.conversation.service.InboundMessage",
-        "line": 189
+        "line": 210
       },
       {
         "to": "llm.conversation.service.dict",
-        "line": 195
+        "line": 216
       }
     ],
     "llm.runtime.service.stream": [
@@ -71953,34 +71964,38 @@
         "line": 79
       }
     ],
+    "llm.channel.<module>": [
+      {
+        "to": "llm.channel.get_logger",
+        "line": 17
+      },
+      {
+        "to": "llm.channel.LazySingleton",
+        "line": 57
+      },
+      {
+        "to": "llm.channel.WechatConfig",
+        "line": 58
+      }
+    ],
     "llm.channel.wire_wechat_channel": [
       {
         "to": "llm.channel.ConversationService",
-        "line": 26
+        "line": 38
       }
     ],
     "llm.channel._create_wechat_channel": [
       {
         "to": "llm.channel.WechatChannel",
-        "line": 40
+        "line": 52
       },
       {
         "to": "llm.channel.wire_wechat_channel",
-        "line": 41
+        "line": 53
       },
       {
         "to": "llm.channel.WechatSessionReferences",
-        "line": 41
-      }
-    ],
-    "llm.channel.<module>": [
-      {
-        "to": "llm.channel.LazySingleton",
-        "line": 45
-      },
-      {
-        "to": "llm.channel.WechatConfig",
-        "line": 46
+        "line": 53
       }
     ],
     "llm.chat.chat_bot.stream": [
@@ -72192,25 +72207,25 @@
     "llm.conversation.service.drain": [
       {
         "to": "asyncio.gather",
-        "line": 249
+        "line": 276
       },
       {
         "to": "llm.conversation.service.tuple",
-        "line": 249
+        "line": 275
       }
     ],
     "llm.conversation.service.close": [
       {
         "to": "asyncio.gather",
-        "line": 261
+        "line": 290
       },
       {
         "to": "llm.conversation.service.tuple",
-        "line": 254
+        "line": 283
       },
       {
         "to": "llm.conversation.service.tuple",
-        "line": 258
+        "line": 287
       }
     ],
     "llm.function.agent_schedule_job.process_session_message": [
@@ -72446,91 +72461,91 @@
     "llm.conversation.commands.matches": [
       {
         "to": "llm.conversation.commands.bool",
-        "line": 69
+        "line": 67
       }
     ],
     "llm.conversation.commands.is_readonly": [
       {
         "to": "llm.conversation.commands.bool",
-        "line": 74
+        "line": 72
       }
     ],
     "llm.conversation.commands.handle": [
       {
         "to": "llm.conversation.commands.OutboundMessage",
-        "line": 111
+        "line": 109
       },
       {
         "to": "llm.conversation.commands.LLMResponse",
-        "line": 112
+        "line": 110
       }
     ],
     "llm.conversation.commands._handle_list": [
       {
         "to": "llm.conversation.commands.max",
-        "line": 127
+        "line": 125
       }
     ],
     "llm.conversation.commands._handle_continue": [
       {
         "to": "llm.conversation.commands.len",
-        "line": 154
+        "line": 152
       },
       {
         "to": "llm.conversation.commands.str",
-        "line": 157
+        "line": 155
       },
       {
         "to": "llm.conversation.commands.UUID",
-        "line": 157
+        "line": 155
       },
       {
         "to": "llm.conversation.commands.reversed",
-        "line": 167
+        "line": 165
       },
       {
         "to": "llm.conversation.commands.any",
-        "line": 171
+        "line": 169
       }
     ],
     "llm.conversation.commands._handle_new": [
       {
         "to": "llm.conversation.commands.len",
-        "line": 183
+        "line": 181
       }
     ],
     "llm.conversation.commands._session_list_arguments": [
       {
         "to": "llm.conversation.commands.len",
-        "line": 204
+        "line": 202
       },
       {
         "to": "llm.conversation.commands.len",
-        "line": 211
+        "line": 209
       },
       {
         "to": "llm.conversation.commands.len",
-        "line": 212
+        "line": 210
       },
       {
         "to": "llm.conversation.commands.ValueError",
-        "line": 205
+        "line": 203
+      },
+      {
+        "to": "llm.conversation.commands.ValueError",
+        "line": 213
       },
       {
         "to": "llm.conversation.commands.ValueError",
         "line": 215
       },
       {
-        "to": "llm.conversation.commands.ValueError",
-        "line": 217
+        "to": "llm.conversation.commands.int",
+        "line": 214
       },
       {
         "to": "llm.conversation.commands.int",
         "line": 216
-      },
-      {
-        "to": "llm.conversation.commands.int",
-        "line": 218
       }
     ],
     "llm.conversation.references.<module>": [
@@ -72548,83 +72563,83 @@
     "llm.conversation.service.<module>": [
       {
         "to": "llm.conversation.service.get_logger",
-        "line": 16
+        "line": 18
       }
     ],
     "llm.conversation.service.__init__": [
       {
         "to": "llm.conversation.service.ValueError",
-        "line": 43
+        "line": 48
       },
       {
         "to": "llm.conversation.service.SessionCommandService",
-        "line": 46
+        "line": 51
       },
       {
         "to": "llm.conversation.service.set",
-        "line": 53
+        "line": 58
       },
       {
         "to": "llm.conversation.service.OrderedDict",
-        "line": 54
+        "line": 59
       }
     ],
     "llm.conversation.service.start": [
       {
         "to": "llm.conversation.service.RuntimeError",
-        "line": 61
+        "line": 66
       }
     ],
     "llm.conversation.service._client": [
       {
         "to": "llm.conversation.service.ConversationClient",
-        "line": 80
+        "line": 88
       }
     ],
     "llm.conversation.service._notice": [
       {
         "to": "llm.conversation.service.OutboundMessage",
-        "line": 97
+        "line": 105
       },
       {
         "to": "llm.conversation.service.LLMResponse",
-        "line": 97
+        "line": 105
       }
     ],
     "llm.conversation.service.submit": [
       {
         "to": "llm.conversation.service.len",
-        "line": 118
-      },
-      {
-        "to": "llm.conversation.service.str",
         "line": 126
       },
       {
-        "to": "llm.conversation.service._Operation",
-        "line": 135
+        "to": "llm.conversation.service.str",
+        "line": 134
       },
       {
         "to": "llm.conversation.service._Operation",
-        "line": 144
+        "line": 143
+      },
+      {
+        "to": "llm.conversation.service._Operation",
+        "line": 157
       },
       {
         "to": "llm.conversation.service.uuid4",
-        "line": 135
+        "line": 143
       },
       {
         "to": "llm.conversation.service.uuid4",
-        "line": 144
+        "line": 157
       },
       {
         "to": "llm.conversation.service.RunClient",
-        "line": 149
+        "line": 162
       }
     ],
     "llm.conversation.service._command": [
       {
         "to": "llm.conversation.service.replace",
-        "line": 167
+        "line": 185
       }
     ],
     "llm.conversation.types.<module>": [
@@ -76686,31 +76701,31 @@
     "llm.channel.wechat.channel._handle_wechat_message": [
       {
         "to": "llm.channel.wechat.channel.RuntimeError",
-        "line": 190
+        "line": 192
       },
       {
         "to": "llm.channel.wechat.channel.ConversationRoute",
-        "line": 170
+        "line": 172
       },
       {
         "to": "llm.channel.wechat.channel.ConversationInput",
-        "line": 183
+        "line": 185
       },
       {
         "to": "llm.channel.wechat.channel.str",
-        "line": 186
+        "line": 188
       },
       {
         "to": "llm.channel.wechat.channel.uuid4",
-        "line": 186
-      },
-      {
-        "to": "llm.channel.wechat.channel.WechatMessageError",
-        "line": 193
+        "line": 188
       },
       {
         "to": "llm.channel.wechat.channel.WechatMessageError",
         "line": 195
+      },
+      {
+        "to": "llm.channel.wechat.channel.WechatMessageError",
+        "line": 197
       }
     ],
     "llm.channel.wechat.channel.send": [
