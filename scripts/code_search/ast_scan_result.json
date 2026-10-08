@@ -1,7 +1,7 @@
 {
-  "total_files": 245,
-  "total_definitions": 2235,
-  "total_calls": 7060,
+  "total_files": 252,
+  "total_definitions": 2302,
+  "total_calls": 7151,
   "definitions": {
     "config.agent_config._ConfigModel": {
       "line": 8,
@@ -8248,6 +8248,16 @@
       "module": "repository.providers.wechat_account_state_provider",
       "name": "WechatAccountStateProvider.save_state"
     },
+    "repository.providers.wechat_account_state_provider.WechatAccountStateProvider.save_context_token": {
+      "line": 147,
+      "module": "repository.providers.wechat_account_state_provider",
+      "name": "WechatAccountStateProvider.save_context_token"
+    },
+    "repository.providers.wechat_account_state_provider.WechatAccountStateProvider.save_session_reference": {
+      "line": 182,
+      "module": "repository.providers.wechat_account_state_provider",
+      "name": "WechatAccountStateProvider.save_session_reference"
+    },
     "repository.migrations.scripts.m001_baseline.check_if_applied": {
       "line": 12,
       "module": "repository.migrations.scripts.m001_baseline",
@@ -9083,6 +9093,16 @@
       "module": "llm.channel.base",
       "name": "BaseChannel.is_allowed"
     },
+    "llm.channel.wire_wechat_channel": {
+      "line": 12,
+      "module": "llm.channel",
+      "name": "wire_wechat_channel"
+    },
+    "llm.channel._create_wechat_channel": {
+      "line": 39,
+      "module": "llm.channel",
+      "name": "_create_wechat_channel"
+    },
     "llm.chat.chat_bot.ChatBot": {
       "line": 11,
       "module": "llm.chat.chat_bot",
@@ -9208,6 +9228,251 @@
       "module": "llm.classify.main_classify",
       "name": "LLMClassify.classify"
     },
+    "llm.conversation.client.ConversationClient": {
+      "line": 18,
+      "module": "llm.conversation.client",
+      "name": "ConversationClient"
+    },
+    "llm.conversation.client.ConversationClient.__init__": {
+      "line": 21,
+      "module": "llm.conversation.client",
+      "name": "ConversationClient.__init__"
+    },
+    "llm.conversation.client.ConversationClient.send": {
+      "line": 26,
+      "module": "llm.conversation.client",
+      "name": "ConversationClient.send"
+    },
+    "llm.conversation.client.RunClient": {
+      "line": 49,
+      "module": "llm.conversation.client",
+      "name": "RunClient"
+    },
+    "llm.conversation.client.RunClient.__init__": {
+      "line": 52,
+      "module": "llm.conversation.client",
+      "name": "RunClient.__init__"
+    },
+    "llm.conversation.client.RunClient.bind": {
+      "line": 60,
+      "module": "llm.conversation.client",
+      "name": "RunClient.bind"
+    },
+    "llm.conversation.client.RunClient.send_text": {
+      "line": 66,
+      "module": "llm.conversation.client",
+      "name": "RunClient.send_text"
+    },
+    "llm.conversation.client.RunClient.ask_human": {
+      "line": 81,
+      "module": "llm.conversation.client",
+      "name": "RunClient.ask_human"
+    },
+    "llm.conversation.client.RunClient.answer": {
+      "line": 109,
+      "module": "llm.conversation.client",
+      "name": "RunClient.answer"
+    },
+    "llm.conversation.client.RunClient.cancel_pending": {
+      "line": 147,
+      "module": "llm.conversation.client",
+      "name": "RunClient.cancel_pending"
+    },
+    "llm.conversation.client.RunClient.close": {
+      "line": 153,
+      "module": "llm.conversation.client",
+      "name": "RunClient.close"
+    },
+    "llm.conversation.commands._ChatSessions": {
+      "line": 40,
+      "module": "llm.conversation.commands",
+      "name": "_ChatSessions"
+    },
+    "llm.conversation.commands._ChatSessions.list_sessions": {
+      "line": 43,
+      "module": "llm.conversation.commands",
+      "name": "_ChatSessions.list_sessions"
+    },
+    "llm.conversation.commands._ChatSessions.get_history": {
+      "line": 45,
+      "module": "llm.conversation.commands",
+      "name": "_ChatSessions.get_history"
+    },
+    "llm.conversation.commands._ChatSessions.create": {
+      "line": 47,
+      "module": "llm.conversation.commands",
+      "name": "_ChatSessions.create"
+    },
+    "llm.conversation.commands._ChatSessions.delete": {
+      "line": 49,
+      "module": "llm.conversation.commands",
+      "name": "_ChatSessions.delete"
+    },
+    "llm.conversation.commands.SessionCommandService": {
+      "line": 52,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService"
+    },
+    "llm.conversation.commands.SessionCommandService.__init__": {
+      "line": 55,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService.__init__"
+    },
+    "llm.conversation.commands.SessionCommandService.matches": {
+      "line": 66,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService.matches"
+    },
+    "llm.conversation.commands.SessionCommandService.is_readonly": {
+      "line": 71,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService.is_readonly"
+    },
+    "llm.conversation.commands.SessionCommandService.handle": {
+      "line": 76,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService.handle"
+    },
+    "llm.conversation.commands.SessionCommandService._handle_list": {
+      "line": 116,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService._handle_list"
+    },
+    "llm.conversation.commands.SessionCommandService._handle_continue": {
+      "line": 150,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService._handle_continue"
+    },
+    "llm.conversation.commands.SessionCommandService._handle_new": {
+      "line": 179,
+      "module": "llm.conversation.commands",
+      "name": "SessionCommandService._handle_new"
+    },
+    "llm.conversation.references._AccountStateRepository": {
+      "line": 23,
+      "module": "llm.conversation.references",
+      "name": "_AccountStateRepository"
+    },
+    "llm.conversation.references._AccountStateRepository.get_state": {
+      "line": 26,
+      "module": "llm.conversation.references",
+      "name": "_AccountStateRepository.get_state"
+    },
+    "llm.conversation.references._AccountStateRepository.save_session_reference": {
+      "line": 28,
+      "module": "llm.conversation.references",
+      "name": "_AccountStateRepository.save_session_reference"
+    },
+    "llm.conversation.references.SessionReferences": {
+      "line": 31,
+      "module": "llm.conversation.references",
+      "name": "SessionReferences"
+    },
+    "llm.conversation.references.SessionReferences.get": {
+      "line": 34,
+      "module": "llm.conversation.references",
+      "name": "SessionReferences.get"
+    },
+    "llm.conversation.references.SessionReferences.set": {
+      "line": 36,
+      "module": "llm.conversation.references",
+      "name": "SessionReferences.set"
+    },
+    "llm.conversation.references.WechatSessionReferences": {
+      "line": 39,
+      "module": "llm.conversation.references",
+      "name": "WechatSessionReferences"
+    },
+    "llm.conversation.references.WechatSessionReferences.__init__": {
+      "line": 42,
+      "module": "llm.conversation.references",
+      "name": "WechatSessionReferences.__init__"
+    },
+    "llm.conversation.references.WechatSessionReferences.get": {
+      "line": 57,
+      "module": "llm.conversation.references",
+      "name": "WechatSessionReferences.get"
+    },
+    "llm.conversation.references.WechatSessionReferences.set": {
+      "line": 72,
+      "module": "llm.conversation.references",
+      "name": "WechatSessionReferences.set"
+    },
+    "llm.conversation.service.ConversationService": {
+      "line": 27,
+      "module": "llm.conversation.service",
+      "name": "ConversationService"
+    },
+    "llm.conversation.service.ConversationService.__init__": {
+      "line": 30,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.__init__"
+    },
+    "llm.conversation.service.ConversationService.start": {
+      "line": 57,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.start"
+    },
+    "llm.conversation.service.ConversationService.can_receive": {
+      "line": 65,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.can_receive"
+    },
+    "llm.conversation.service.ConversationService.is_busy": {
+      "line": 74,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.is_busy"
+    },
+    "llm.conversation.service.ConversationService._client": {
+      "line": 78,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._client"
+    },
+    "llm.conversation.service.ConversationService._spawn": {
+      "line": 83,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._spawn"
+    },
+    "llm.conversation.service.ConversationService._task_done": {
+      "line": 89,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._task_done"
+    },
+    "llm.conversation.service.ConversationService._notice": {
+      "line": 94,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._notice"
+    },
+    "llm.conversation.service.ConversationService.submit": {
+      "line": 102,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.submit"
+    },
+    "llm.conversation.service.ConversationService._release": {
+      "line": 154,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._release"
+    },
+    "llm.conversation.service.ConversationService._command": {
+      "line": 158,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._command"
+    },
+    "llm.conversation.service.ConversationService._run": {
+      "line": 177,
+      "module": "llm.conversation.service",
+      "name": "ConversationService._run"
+    },
+    "llm.conversation.service.ConversationService.drain": {
+      "line": 246,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.drain"
+    },
+    "llm.conversation.service.ConversationService.close": {
+      "line": 251,
+      "module": "llm.conversation.service",
+      "name": "ConversationService.close"
+    },
     "llm.function.agent_schedule_job._normalize_activity_summary_format": {
       "line": 42,
       "module": "llm.function.agent_schedule_job",
@@ -9234,22 +9499,22 @@
       "name": "update_memory"
     },
     "llm.function.agent_schedule_job.dreaming": {
-      "line": 295,
+      "line": 299,
       "module": "llm.function.agent_schedule_job",
       "name": "dreaming"
     },
     "llm.function.agent_schedule_job.extract_from_chat_messages": {
-      "line": 378,
+      "line": 382,
       "module": "llm.function.agent_schedule_job",
       "name": "extract_from_chat_messages"
     },
     "llm.function.agent_schedule_job.format_chat_history": {
-      "line": 409,
+      "line": 413,
       "module": "llm.function.agent_schedule_job",
       "name": "format_chat_history"
     },
     "llm.function.agent_schedule_job.process_session_message": {
-      "line": 434,
+      "line": 438,
       "module": "llm.function.agent_schedule_job",
       "name": "process_session_message"
     },
@@ -9489,49 +9754,104 @@
       "name": "LLMRetry.request_error_event"
     },
     "llm.runtime.chat_sessions.ChatSessionManager": {
-      "line": 19,
+      "line": 22,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager"
     },
     "llm.runtime.chat_sessions.ChatSessionManager.__init__": {
-      "line": 22,
+      "line": 25,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager.__init__"
     },
+    "llm.runtime.chat_sessions.ChatSessionManager.create": {
+      "line": 28,
+      "module": "llm.runtime.chat_sessions",
+      "name": "ChatSessionManager.create"
+    },
     "llm.runtime.chat_sessions.ChatSessionManager.process_pending": {
-      "line": 25,
+      "line": 49,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager.process_pending"
     },
     "llm.runtime.chat_sessions.ChatSessionManager._path": {
-      "line": 84,
+      "line": 108,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager._path"
     },
     "llm.runtime.chat_sessions.ChatSessionManager._read": {
-      "line": 93,
+      "line": 117,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager._read"
     },
     "llm.runtime.chat_sessions.ChatSessionManager.list_sessions": {
-      "line": 144,
+      "line": 168,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager.list_sessions"
     },
     "llm.runtime.chat_sessions.ChatSessionManager.get_history": {
-      "line": 177,
+      "line": 219,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager.get_history"
     },
     "llm.runtime.chat_sessions.ChatSessionManager.rename": {
-      "line": 189,
+      "line": 231,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager.rename"
     },
     "llm.runtime.chat_sessions.ChatSessionManager.delete": {
-      "line": 214,
+      "line": 256,
       "module": "llm.runtime.chat_sessions",
       "name": "ChatSessionManager.delete"
+    },
+    "llm.runtime.hitl.InteractionClient": {
+      "line": 9,
+      "module": "llm.runtime.hitl",
+      "name": "InteractionClient"
+    },
+    "llm.runtime.hitl.InteractionClient.bind": {
+      "line": 12,
+      "module": "llm.runtime.hitl",
+      "name": "InteractionClient.bind"
+    },
+    "llm.runtime.hitl.InteractionClient.ask_human": {
+      "line": 14,
+      "module": "llm.runtime.hitl",
+      "name": "InteractionClient.ask_human"
+    },
+    "llm.runtime.hitl.HITLPolicy": {
+      "line": 17,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy"
+    },
+    "llm.runtime.hitl.HITLPolicy.__init__": {
+      "line": 20,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy.__init__"
+    },
+    "llm.runtime.hitl.HITLPolicy.bind": {
+      "line": 24,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy.bind"
+    },
+    "llm.runtime.hitl.HITLPolicy.clear": {
+      "line": 32,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy.clear"
+    },
+    "llm.runtime.hitl.HITLPolicy.ask_human": {
+      "line": 37,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy.ask_human"
+    },
+    "llm.runtime.hitl.HITLPolicy.maxstep_continue": {
+      "line": 44,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy.maxstep_continue"
+    },
+    "llm.runtime.hitl.HITLPolicy.tool_breaker_continue": {
+      "line": 50,
+      "module": "llm.runtime.hitl",
+      "name": "HITLPolicy.tool_breaker_continue"
     },
     "llm.runtime.limiter.ModelCallLimiter": {
       "line": 7,
@@ -9604,67 +9924,67 @@
       "name": "ProviderAdapter.stream_chat"
     },
     "llm.runtime.service._AgentSlot": {
-      "line": 63,
+      "line": 64,
       "module": "llm.runtime.service",
       "name": "_AgentSlot"
     },
     "llm.runtime.service._AgentSlot.__init__": {
-      "line": 71,
+      "line": 72,
       "module": "llm.runtime.service",
       "name": "_AgentSlot.__init__"
     },
     "llm.runtime.service._AgentSlot.on_record": {
-      "line": 91,
+      "line": 100,
       "module": "llm.runtime.service",
       "name": "_AgentSlot.on_record"
     },
     "llm.runtime.service.AgentRuntime": {
-      "line": 130,
+      "line": 139,
       "module": "llm.runtime.service",
       "name": "AgentRuntime"
     },
     "llm.runtime.service.AgentRuntime.__init__": {
-      "line": 139,
+      "line": 148,
       "module": "llm.runtime.service",
       "name": "AgentRuntime.__init__"
     },
     "llm.runtime.service.AgentRuntime.is_session_running": {
-      "line": 196,
+      "line": 214,
       "module": "llm.runtime.service",
       "name": "AgentRuntime.is_session_running"
     },
     "llm.runtime.service.AgentRuntime.start": {
-      "line": 226,
+      "line": 244,
       "module": "llm.runtime.service",
       "name": "AgentRuntime.start"
     },
     "llm.runtime.service.AgentRuntime._get_slot": {
-      "line": 241,
+      "line": 259,
       "module": "llm.runtime.service",
       "name": "AgentRuntime._get_slot"
     },
     "llm.runtime.service.AgentRuntime.stream": {
-      "line": 320,
+      "line": 338,
       "module": "llm.runtime.service",
       "name": "AgentRuntime.stream"
     },
     "llm.runtime.service.AgentRuntime._stream": {
-      "line": 352,
+      "line": 384,
       "module": "llm.runtime.service",
       "name": "AgentRuntime._stream"
     },
     "llm.runtime.service.AgentRuntime._prepare_slot": {
-      "line": 457,
+      "line": 509,
       "module": "llm.runtime.service",
       "name": "AgentRuntime._prepare_slot"
     },
     "llm.runtime.service.AgentRuntime.execute": {
-      "line": 483,
+      "line": 535,
       "module": "llm.runtime.service",
       "name": "AgentRuntime.execute"
     },
     "llm.runtime.service.AgentRuntime.close": {
-      "line": 558,
+      "line": 610,
       "module": "llm.runtime.service",
       "name": "AgentRuntime.close"
     },
@@ -10909,72 +11229,37 @@
       "name": "WechatAuth.qr_login"
     },
     "llm.channel.wechat.channel.WechatChannel": {
-      "line": 34,
+      "line": 31,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel"
     },
     "llm.channel.wechat.channel.WechatChannel.__init__": {
-      "line": 52,
+      "line": 40,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel.__init__"
     },
-    "llm.channel.wechat.channel.WechatChannel._migrate_account_json_to_db": {
-      "line": 88,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._migrate_account_json_to_db"
-    },
-    "llm.channel.wechat.channel.WechatChannel._rename_account_json_to_bak": {
-      "line": 160,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._rename_account_json_to_bak"
-    },
-    "llm.channel.wechat.channel.WechatChannel._save_user_data_to_db": {
-      "line": 169,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._save_user_data_to_db"
-    },
-    "llm.channel.wechat.channel.WechatChannel._load_user_data_from_db": {
-      "line": 195,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._load_user_data_from_db"
-    },
-    "llm.channel.wechat.channel.WechatChannel._refresh_user_data_from_db": {
-      "line": 210,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._refresh_user_data_from_db"
-    },
     "llm.channel.wechat.channel.WechatChannel.start": {
-      "line": 249,
+      "line": 66,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel.start"
     },
     "llm.channel.wechat.channel.WechatChannel.stop": {
-      "line": 303,
+      "line": 102,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel.stop"
     },
     "llm.channel.wechat.channel.WechatChannel.send": {
-      "line": 327,
+      "line": 125,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel.send"
     },
     "llm.channel.wechat.channel.WechatChannel._poll_loop": {
-      "line": 368,
+      "line": 142,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel._poll_loop"
     },
-    "llm.channel.wechat.channel.WechatChannel._handle_session_command": {
-      "line": 412,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._handle_session_command"
-    },
-    "llm.channel.wechat.channel.WechatChannel._persist_session_reference": {
-      "line": 493,
-      "module": "llm.channel.wechat.channel",
-      "name": "WechatChannel._persist_session_reference"
-    },
     "llm.channel.wechat.channel.WechatChannel._handle_wechat_message": {
-      "line": 508,
+      "line": 163,
       "module": "llm.channel.wechat.channel",
       "name": "WechatChannel._handle_wechat_message"
     },
@@ -11057,6 +11342,56 @@
       "line": 20,
       "module": "llm.channel.wechat.message",
       "name": "WechatMessage"
+    },
+    "llm.channel.wechat.reply_store._AccountStateRepository": {
+      "line": 21,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "_AccountStateRepository"
+    },
+    "llm.channel.wechat.reply_store._AccountStateRepository.get_state": {
+      "line": 24,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "_AccountStateRepository.get_state"
+    },
+    "llm.channel.wechat.reply_store._AccountStateRepository.save_context_token": {
+      "line": 26,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "_AccountStateRepository.save_context_token"
+    },
+    "llm.channel.wechat.reply_store._AccountStateRepository.save_session_reference": {
+      "line": 28,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "_AccountStateRepository.save_session_reference"
+    },
+    "llm.channel.wechat.reply_store._AccountStateRepository.save_state": {
+      "line": 30,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "_AccountStateRepository.save_state"
+    },
+    "llm.channel.wechat.reply_store.WechatReplyStore": {
+      "line": 38,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "WechatReplyStore"
+    },
+    "llm.channel.wechat.reply_store.WechatReplyStore.__init__": {
+      "line": 41,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "WechatReplyStore.__init__"
+    },
+    "llm.channel.wechat.reply_store.WechatReplyStore.get_token": {
+      "line": 53,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "WechatReplyStore.get_token"
+    },
+    "llm.channel.wechat.reply_store.WechatReplyStore.remember": {
+      "line": 73,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "WechatReplyStore.remember"
+    },
+    "llm.channel.wechat.reply_store.WechatReplyStore.migrate_legacy": {
+      "line": 95,
+      "module": "llm.channel.wechat.reply_store",
+      "name": "WechatReplyStore.migrate_legacy"
     },
     "config.migrations.config_migrator.run_config_migrations": {
       "line": 22,
@@ -11847,15 +12182,19 @@
       },
       {
         "from": "llm.function.agent_schedule_job.save_history",
-        "line": 456
+        "line": 460
+      },
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 44
       },
       {
         "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 79
+        "line": 103
       },
       {
         "from": "llm.runtime.chat_sessions.rename",
-        "line": 210
+        "line": 252
       },
       {
         "from": "llm.utils.md_os._atomic_write_text",
@@ -13430,6 +13769,10 @@
         "line": 42
       },
       {
+        "from": "llm.conversation.commands.<module>",
+        "line": 31
+      },
+      {
         "from": "llm.runtime_tools.filesystem._search_string_py",
         "line": 945
       },
@@ -13960,8 +14303,12 @@
         "line": 71
       },
       {
+        "from": "llm.conversation.service._spawn",
+        "line": 84
+      },
+      {
         "from": "llm.function.agent_schedule_job.main",
-        "line": 542
+        "line": 546
       },
       {
         "from": "llm.function.screenshot_analysis.test_single_chunk",
@@ -13969,7 +14316,7 @@
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 390
+        "line": 434
       },
       {
         "from": "llm.runtime.worker.loop",
@@ -13977,7 +14324,7 @@
       },
       {
         "from": "llm.channel.wechat.channel.start",
-        "line": 301
+        "line": 91
       }
     ],
     "time.perf_counter": [
@@ -14647,11 +14994,11 @@
       },
       {
         "from": "llm.runtime.service._log_chat",
-        "line": 521
+        "line": 573
       },
       {
         "from": "llm.runtime.service._save_usage",
-        "line": 556
+        "line": 608
       },
       {
         "from": "llm.runtime_tools.filesystem.execute",
@@ -14756,6 +15103,10 @@
       {
         "from": "llm.bus.queue.send",
         "line": 96
+      },
+      {
+        "from": "llm.conversation.client.ask_human",
+        "line": 88
       }
     ],
     "server.main._start_sync_on_startup": [
@@ -14925,7 +15276,7 @@
       },
       {
         "from": "llm.function.agent_schedule_job.<module>",
-        "line": 550
+        "line": 554
       },
       {
         "from": "llm.function.screenshot_analysis.<module>",
@@ -15147,7 +15498,7 @@
       },
       {
         "from": "llm.channel.wechat.channel.stop",
-        "line": 321
+        "line": 109
       }
     ],
     "server.main_agent_only.stop_agent_and_channel": [
@@ -15903,11 +16254,11 @@
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 407
+        "line": 158
       },
       {
         "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 410
+        "line": 161
       }
     ],
     "sync.ssh_tunnel.min": [
@@ -17986,12 +18337,16 @@
         "line": 101
       },
       {
+        "from": "llm.conversation.service._run",
+        "line": 197
+      },
+      {
         "from": "llm.runtime.service.stream",
-        "line": 340
+        "line": 368
       },
       {
         "from": "llm.runtime.service.execute",
-        "line": 496
+        "line": 548
       }
     ],
     "json.dumps": [
@@ -18045,15 +18400,19 @@
       },
       {
         "from": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 391
+        "line": 395
+      },
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 43
       },
       {
         "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 77
+        "line": 101
       },
       {
         "from": "llm.runtime.chat_sessions.rename",
-        "line": 208
+        "line": 250
       },
       {
         "from": "llm.runtime_tools.base.wrapper",
@@ -20827,11 +21186,11 @@
       },
       {
         "from": "llm.runtime.chat_sessions._read",
-        "line": 107
+        "line": 131
       },
       {
         "from": "llm.runtime.chat_sessions._read",
-        "line": 110
+        "line": 134
       },
       {
         "from": "llm.runtime.prompts._expand_dirs",
@@ -20870,8 +21229,8 @@
         "line": 157
       },
       {
-        "from": "llm.channel.wechat.channel._migrate_account_json_to_db",
-        "line": 118
+        "from": "llm.channel.wechat.reply_store.migrate_legacy",
+        "line": 114
       }
     ],
     "server.providers.report_provider.get_utc_now_iso": [
@@ -30182,8 +30541,12 @@
         "line": 89
       },
       {
+        "from": "llm.conversation.client.__init__",
+        "line": 24
+      },
+      {
         "from": "llm.function.agent_schedule_job.<module>",
-        "line": 533
+        "line": 537
       },
       {
         "from": "llm.runtime.limiter.__init__",
@@ -30191,7 +30554,7 @@
       },
       {
         "from": "llm.runtime.service.__init__",
-        "line": 82
+        "line": 83
       }
     ],
     "server.services.sync_service.DataProcessingService": [
@@ -35816,6 +36179,22 @@
       {
         "from": "repository.providers.wechat_account_state_provider.save_state",
         "line": 145
+      },
+      {
+        "from": "repository.providers.wechat_account_state_provider.save_context_token",
+        "line": 171
+      },
+      {
+        "from": "repository.providers.wechat_account_state_provider.save_context_token",
+        "line": 178
+      },
+      {
+        "from": "repository.providers.wechat_account_state_provider.save_session_reference",
+        "line": 206
+      },
+      {
+        "from": "repository.providers.wechat_account_state_provider.save_session_reference",
+        "line": 213
       }
     ],
     "repository.providers.LazySingleton": [
@@ -37079,7 +37458,7 @@
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 385
+        "line": 429
       }
     ],
     "llm.bus.queue.isinstance": [
@@ -37128,16 +37507,40 @@
         "line": 79
       }
     ],
+    "llm.channel.ConversationService": [
+      {
+        "from": "llm.channel.wire_wechat_channel",
+        "line": 26
+      }
+    ],
+    "llm.channel.WechatChannel": [
+      {
+        "from": "llm.channel._create_wechat_channel",
+        "line": 40
+      }
+    ],
+    "llm.channel.wire_wechat_channel": [
+      {
+        "from": "llm.channel._create_wechat_channel",
+        "line": 41
+      }
+    ],
+    "llm.channel.WechatSessionReferences": [
+      {
+        "from": "llm.channel._create_wechat_channel",
+        "line": 41
+      }
+    ],
     "llm.channel.LazySingleton": [
       {
         "from": "llm.channel.<module>",
-        "line": 8
+        "line": 45
       }
     ],
     "llm.channel.WechatConfig": [
       {
         "from": "llm.channel.<module>",
-        "line": 10
+        "line": 46
       }
     ],
     "llm.chat.chat_bot.InboundMessage": [
@@ -37242,8 +37645,16 @@
         "line": 95
       },
       {
+        "from": "llm.conversation.service.drain",
+        "line": 249
+      },
+      {
+        "from": "llm.conversation.service.close",
+        "line": 261
+      },
+      {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 510
+        "line": 514
       },
       {
         "from": "llm.function.screenshot_analysis.screenshot_analysis",
@@ -37255,15 +37666,15 @@
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 433
+        "line": 484
       },
       {
         "from": "llm.runtime.service.close",
-        "line": 564
+        "line": 616
       },
       {
         "from": "llm.runtime.service.close",
-        "line": 568
+        "line": 620
       },
       {
         "from": "llm.runtime.worker.loop",
@@ -37500,6 +37911,420 @@
         "line": 42
       }
     ],
+    "llm.conversation.client.dict": [
+      {
+        "from": "llm.conversation.client.send",
+        "line": 28
+      }
+    ],
+    "llm.conversation.client.replace": [
+      {
+        "from": "llm.conversation.client.send",
+        "line": 37
+      }
+    ],
+    "llm.conversation.client.RuntimeError": [
+      {
+        "from": "llm.conversation.client.bind",
+        "line": 63
+      },
+      {
+        "from": "llm.conversation.client.ask_human",
+        "line": 84
+      },
+      {
+        "from": "llm.conversation.client.ask_human",
+        "line": 86
+      }
+    ],
+    "llm.conversation.client.OutboundMessage": [
+      {
+        "from": "llm.conversation.client.send_text",
+        "line": 69
+      }
+    ],
+    "llm.conversation.client.LLMResponse": [
+      {
+        "from": "llm.conversation.client.send_text",
+        "line": 70
+      }
+    ],
+    "llm.conversation.client.PendingInteraction": [
+      {
+        "from": "llm.conversation.client.ask_human",
+        "line": 87
+      }
+    ],
+    "llm.conversation.client.uuid4": [
+      {
+        "from": "llm.conversation.client.ask_human",
+        "line": 88
+      }
+    ],
+    "llm.conversation.client.enumerate": [
+      {
+        "from": "llm.conversation.client.ask_human",
+        "line": 92
+      }
+    ],
+    "llm.conversation.client.ValueError": [
+      {
+        "from": "llm.conversation.client.answer",
+        "line": 115
+      },
+      {
+        "from": "llm.conversation.client.answer",
+        "line": 119
+      },
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 132
+      },
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 141
+      }
+    ],
+    "llm.conversation.client.HumanReturn": [
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 129
+      },
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 145
+      }
+    ],
+    "re.split": [
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 130
+      },
+      {
+        "from": "llm.utils.md_os.prompts_md_load",
+        "line": 493
+      }
+    ],
+    "llm.conversation.client.len": [
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 131
+      },
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 138
+      }
+    ],
+    "llm.conversation.client.next": [
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 135
+      }
+    ],
+    "llm.conversation.client.int": [
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 138
+      },
+      {
+        "from": "llm.conversation.client._parse_answer",
+        "line": 139
+      }
+    ],
+    "llm.conversation.commands.get_logger": [
+      {
+        "from": "llm.conversation.commands.<module>",
+        "line": 28
+      }
+    ],
+    "llm.conversation.commands.frozenset": [
+      {
+        "from": "llm.conversation.commands.<module>",
+        "line": 30
+      }
+    ],
+    "llm.conversation.commands.bool": [
+      {
+        "from": "llm.conversation.commands.matches",
+        "line": 69
+      },
+      {
+        "from": "llm.conversation.commands.is_readonly",
+        "line": 74
+      }
+    ],
+    "llm.conversation.commands.OutboundMessage": [
+      {
+        "from": "llm.conversation.commands.handle",
+        "line": 111
+      }
+    ],
+    "llm.conversation.commands.LLMResponse": [
+      {
+        "from": "llm.conversation.commands.handle",
+        "line": 112
+      }
+    ],
+    "llm.conversation.commands.max": [
+      {
+        "from": "llm.conversation.commands._handle_list",
+        "line": 127
+      }
+    ],
+    "llm.conversation.commands.len": [
+      {
+        "from": "llm.conversation.commands._handle_continue",
+        "line": 154
+      },
+      {
+        "from": "llm.conversation.commands._handle_new",
+        "line": 183
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 204
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 211
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 212
+      }
+    ],
+    "llm.conversation.commands.str": [
+      {
+        "from": "llm.conversation.commands._handle_continue",
+        "line": 157
+      }
+    ],
+    "llm.conversation.commands.UUID": [
+      {
+        "from": "llm.conversation.commands._handle_continue",
+        "line": 157
+      }
+    ],
+    "llm.conversation.commands.reversed": [
+      {
+        "from": "llm.conversation.commands._handle_continue",
+        "line": 167
+      }
+    ],
+    "llm.conversation.commands.any": [
+      {
+        "from": "llm.conversation.commands._handle_continue",
+        "line": 171
+      }
+    ],
+    "llm.conversation.commands.ValueError": [
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 205
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 215
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 217
+      }
+    ],
+    "llm.conversation.commands.int": [
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 216
+      },
+      {
+        "from": "llm.conversation.commands._session_list_arguments",
+        "line": 218
+      }
+    ],
+    "llm.conversation.references.get_logger": [
+      {
+        "from": "llm.conversation.references.<module>",
+        "line": 20
+      }
+    ],
+    "llm.conversation.references.RuntimeError": [
+      {
+        "from": "llm.conversation.references.set",
+        "line": 89
+      }
+    ],
+    "llm.conversation.service.get_logger": [
+      {
+        "from": "llm.conversation.service.<module>",
+        "line": 16
+      }
+    ],
+    "llm.conversation.service.ValueError": [
+      {
+        "from": "llm.conversation.service.__init__",
+        "line": 43
+      }
+    ],
+    "llm.conversation.service.SessionCommandService": [
+      {
+        "from": "llm.conversation.service.__init__",
+        "line": 46
+      }
+    ],
+    "llm.conversation.service.set": [
+      {
+        "from": "llm.conversation.service.__init__",
+        "line": 53
+      }
+    ],
+    "llm.conversation.service.OrderedDict": [
+      {
+        "from": "llm.conversation.service.__init__",
+        "line": 54
+      }
+    ],
+    "llm.conversation.service.RuntimeError": [
+      {
+        "from": "llm.conversation.service.start",
+        "line": 61
+      },
+      {
+        "from": "llm.conversation.service._run",
+        "line": 212
+      }
+    ],
+    "llm.conversation.service.ConversationClient": [
+      {
+        "from": "llm.conversation.service._client",
+        "line": 80
+      }
+    ],
+    "llm.conversation.service.OutboundMessage": [
+      {
+        "from": "llm.conversation.service._notice",
+        "line": 97
+      }
+    ],
+    "llm.conversation.service.LLMResponse": [
+      {
+        "from": "llm.conversation.service._notice",
+        "line": 97
+      }
+    ],
+    "llm.conversation.service.len": [
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 118
+      }
+    ],
+    "llm.conversation.service.str": [
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 126
+      }
+    ],
+    "llm.conversation.service._Operation": [
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 135
+      },
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 144
+      }
+    ],
+    "llm.conversation.service.uuid4": [
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 135
+      },
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 144
+      }
+    ],
+    "llm.conversation.service.RunClient": [
+      {
+        "from": "llm.conversation.service.submit",
+        "line": 149
+      }
+    ],
+    "llm.conversation.service.replace": [
+      {
+        "from": "llm.conversation.service._command",
+        "line": 167
+      },
+      {
+        "from": "llm.conversation.service._run",
+        "line": 224
+      }
+    ],
+    "llm.conversation.service.UUID": [
+      {
+        "from": "llm.conversation.service._run",
+        "line": 186
+      }
+    ],
+    "llm.conversation.service.InboundMessage": [
+      {
+        "from": "llm.conversation.service._run",
+        "line": 189
+      }
+    ],
+    "llm.conversation.service.dict": [
+      {
+        "from": "llm.conversation.service._run",
+        "line": 195
+      }
+    ],
+    "llm.conversation.service.tuple": [
+      {
+        "from": "llm.conversation.service.drain",
+        "line": 249
+      },
+      {
+        "from": "llm.conversation.service.close",
+        "line": 254
+      },
+      {
+        "from": "llm.conversation.service.close",
+        "line": 258
+      }
+    ],
+    "llm.conversation.types.dataclass": [
+      {
+        "from": "llm.conversation.types.<module>",
+        "line": 9
+      }
+    ],
+    "llm.conversation.types.ValueError": [
+      {
+        "from": "llm.conversation.types.__post_init__",
+        "line": 19
+      }
+    ],
+    "llm.conversation.types.field": [
+      {
+        "from": "llm.conversation.types.<module>",
+        "line": 28
+      },
+      {
+        "from": "llm.conversation.types.<module>",
+        "line": 29
+      }
+    ],
+    "llm.conversation.types.uuid4": [
+      {
+        "from": "llm.conversation.types.<module>",
+        "line": 28
+      }
+    ],
+    "llm.conversation.types.MessageContent": [
+      {
+        "from": "llm.conversation.types.__post_init__",
+        "line": 33
+      }
+    ],
     "llm.function.agent_schedule_job.get_logger": [
       {
         "from": "llm.function.agent_schedule_job.<module>",
@@ -37553,27 +38378,27 @@
       },
       {
         "from": "llm.function.agent_schedule_job.update_memory",
-        "line": 274
+        "line": 278
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 324
+        "line": 328
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 332
+        "line": 336
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 342
+        "line": 346
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 350
+        "line": 354
       },
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 509
+        "line": 513
       }
     ],
     "llm.function.agent_schedule_job.InboundMessage": [
@@ -37587,11 +38412,11 @@
       },
       {
         "from": "llm.function.agent_schedule_job.update_memory",
-        "line": 277
+        "line": 281
       },
       {
         "from": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 386
+        "line": 390
       }
     ],
     "llm.function.agent_schedule_job._normalize_activity_summary_format": [
@@ -37633,7 +38458,7 @@
       },
       {
         "from": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 398
+        "line": 402
       }
     ],
     "llm.function.agent_schedule_job.query_user_mood": [
@@ -37661,11 +38486,11 @@
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 321
+        "line": 325
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 322
+        "line": 326
       }
     ],
     "llm.function.agent_schedule_job.timedelta": [
@@ -37675,11 +38500,11 @@
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 308
+        "line": 312
       },
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 462
+        "line": 466
       }
     ],
     "llm.function.agent_schedule_job.extract_date_logs_from_file": [
@@ -37701,7 +38526,7 @@
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 319
+        "line": 323
       }
     ],
     "llm.function.agent_schedule_job.set": [
@@ -37711,7 +38536,7 @@
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 315
+        "line": 319
       }
     ],
     "llm.function.agent_schedule_job.build_local_datetime": [
@@ -37725,153 +38550,153 @@
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 309
+        "line": 313
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 310
+        "line": 314
       }
     ],
     "llm.function.agent_schedule_job.summary_activities": [
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 329
+        "line": 333
       }
     ],
     "llm.function.agent_schedule_job.get_mood_data": [
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 341
+        "line": 345
       }
     ],
     "llm.function.agent_schedule_job.summary_moods": [
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 347
+        "line": 351
       }
     ],
     "llm.function.agent_schedule_job.write_date_md": [
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 362
+        "line": 366
       },
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 365
+        "line": 369
       },
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 522
+        "line": 526
       }
     ],
     "llm.function.agent_schedule_job.update_memory": [
       {
         "from": "llm.function.agent_schedule_job.dreaming",
-        "line": 370
+        "line": 374
       }
     ],
     "llm.function.agent_schedule_job.utc_to_local_display": [
       {
         "from": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 384
+        "line": 388
       }
     ],
     "llm.function.agent_schedule_job.get_user_timezone": [
       {
         "from": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 390
+        "line": 394
       }
     ],
     "llm.function.agent_schedule_job.RuntimeError": [
       {
         "from": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 396
+        "line": 400
       }
     ],
     "llm.function.agent_schedule_job.type": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 439
+        "line": 443
       }
     ],
     "llm.function.agent_schedule_job.ValueError": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 440
+        "line": 444
       },
       {
         "from": "llm.function.agent_schedule_job.process_one",
-        "line": 502
+        "line": 506
       }
     ],
     "llm.function.agent_schedule_job.ChatHistoryManager": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 448
+        "line": 452
       }
     ],
     "llm.function.agent_schedule_job.uuid4": [
       {
         "from": "llm.function.agent_schedule_job.save_history",
-        "line": 452
+        "line": 456
       }
     ],
     "llm.function.agent_schedule_job.max": [
       {
         "from": "llm.function.agent_schedule_job.save_window",
-        "line": 468
+        "line": 472
       }
     ],
     "llm.function.agent_schedule_job.extract_from_chat_messages": [
       {
         "from": "llm.function.agent_schedule_job.save_window",
-        "line": 481
+        "line": 485
       }
     ],
     "llm.function.agent_schedule_job.save_history": [
       {
         "from": "llm.function.agent_schedule_job.save_window",
-        "line": 491
+        "line": 495
       },
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 530
+        "line": 534
       }
     ],
     "llm.function.agent_schedule_job.range": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 509
+        "line": 513
       }
     ],
     "llm.function.agent_schedule_job.process_one": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 511
+        "line": 515
       }
     ],
     "llm.function.agent_schedule_job.get_local_today": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 514
+        "line": 518
       }
     ],
     "llm.function.agent_schedule_job.format_chat_history": [
       {
         "from": "llm.function.agent_schedule_job.process_session_message",
-        "line": 518
+        "line": 522
       }
     ],
     "llm.function.agent_schedule_job.dreaming": [
       {
         "from": "llm.function.agent_schedule_job.main",
-        "line": 546
+        "line": 550
       }
     ],
     "llm.function.agent_schedule_job.main": [
       {
         "from": "llm.function.agent_schedule_job.<module>",
-        "line": 550
+        "line": 554
       }
     ],
     "llm.function.diary_summary.get_logger": [
@@ -39017,141 +39842,223 @@
     "llm.runtime.chat_sessions.get_logger": [
       {
         "from": "llm.runtime.chat_sessions.<module>",
-        "line": 16
+        "line": 19
+      }
+    ],
+    "llm.runtime.chat_sessions.RuntimeError": [
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 31
       }
     ],
     "llm.runtime.chat_sessions.isinstance": [
       {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 32
+      },
+      {
         "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 44
+        "line": 68
       },
       {
         "from": "llm.runtime.chat_sessions._messages",
-        "line": 125
+        "line": 149
       },
       {
         "from": "llm.runtime.chat_sessions.rename",
-        "line": 192
+        "line": 234
+      }
+    ],
+    "llm.runtime.chat_sessions.len": [
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 32
+      },
+      {
+        "from": "llm.runtime.chat_sessions._messages",
+        "line": 164
+      },
+      {
+        "from": "llm.runtime.chat_sessions.list_sessions",
+        "line": 204
+      },
+      {
+        "from": "llm.runtime.chat_sessions.list_sessions",
+        "line": 217
+      },
+      {
+        "from": "llm.runtime.chat_sessions.rename",
+        "line": 234
       }
     ],
     "llm.runtime.chat_sessions.ValueError": [
       {
-        "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 45
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 33
       },
       {
         "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 48
+        "line": 69
+      },
+      {
+        "from": "llm.runtime.chat_sessions.process_pending",
+        "line": 72
       },
       {
         "from": "llm.runtime.chat_sessions._path",
-        "line": 87
+        "line": 111
       },
       {
         "from": "llm.runtime.chat_sessions._path",
-        "line": 90
+        "line": 114
       },
       {
         "from": "llm.runtime.chat_sessions._read",
-        "line": 106
+        "line": 130
       },
       {
         "from": "llm.runtime.chat_sessions._read",
-        "line": 109
+        "line": 133
       },
       {
         "from": "llm.runtime.chat_sessions.list_sessions",
-        "line": 147
+        "line": 178
+      },
+      {
+        "from": "llm.runtime.chat_sessions.list_sessions",
+        "line": 180
       },
       {
         "from": "llm.runtime.chat_sessions.rename",
-        "line": 193
+        "line": 235
+      }
+    ],
+    "llm.runtime.chat_sessions.SessionStore": [
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 35
+      }
+    ],
+    "llm.runtime.chat_sessions.uuid4": [
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 39
+      },
+      {
+        "from": "llm.runtime.chat_sessions.process_pending",
+        "line": 98
+      },
+      {
+        "from": "llm.runtime.chat_sessions.rename",
+        "line": 247
+      }
+    ],
+    "llm.runtime.chat_sessions.FileExistsError": [
+      {
+        "from": "llm.runtime.chat_sessions.create",
+        "line": 42
       }
     ],
     "llm.runtime.chat_sessions.type": [
       {
         "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 47
+        "line": 71
       },
-      {
-        "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 50
-      },
-      {
-        "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 61
-      }
-    ],
-    "llm.runtime.chat_sessions.max": [
-      {
-        "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 52
-      },
-      {
-        "from": "llm.runtime.chat_sessions.list_sessions",
-        "line": 166
-      }
-    ],
-    "llm.runtime.chat_sessions.sorted": [
-      {
-        "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 63
-      }
-    ],
-    "llm.runtime.chat_sessions.handler": [
-      {
-        "from": "llm.runtime.chat_sessions.process_pending",
-        "line": 69
-      }
-    ],
-    "llm.runtime.chat_sessions.uuid4": [
       {
         "from": "llm.runtime.chat_sessions.process_pending",
         "line": 74
       },
       {
-        "from": "llm.runtime.chat_sessions.rename",
-        "line": 205
+        "from": "llm.runtime.chat_sessions.process_pending",
+        "line": 85
+      }
+    ],
+    "llm.runtime.chat_sessions.max": [
+      {
+        "from": "llm.runtime.chat_sessions.process_pending",
+        "line": 76
+      },
+      {
+        "from": "llm.runtime.chat_sessions.list_sessions",
+        "line": 194
+      }
+    ],
+    "llm.runtime.chat_sessions.sorted": [
+      {
+        "from": "llm.runtime.chat_sessions.process_pending",
+        "line": 87
+      }
+    ],
+    "llm.runtime.chat_sessions.handler": [
+      {
+        "from": "llm.runtime.chat_sessions.process_pending",
+        "line": 93
       }
     ],
     "llm.runtime.chat_sessions.str": [
       {
         "from": "llm.runtime.chat_sessions._path",
-        "line": 86
+        "line": 110
       }
     ],
     "llm.runtime.chat_sessions.UUID": [
       {
         "from": "llm.runtime.chat_sessions._path",
-        "line": 86
+        "line": 110
       }
     ],
-    "llm.runtime.chat_sessions.len": [
-      {
-        "from": "llm.runtime.chat_sessions._messages",
-        "line": 140
-      },
+    "llm.runtime.chat_sessions.utc_to_local": [
       {
         "from": "llm.runtime.chat_sessions.list_sessions",
-        "line": 167
-      },
+        "line": 195
+      }
+    ],
+    "llm.runtime.chat_sessions.next": [
       {
         "from": "llm.runtime.chat_sessions.list_sessions",
-        "line": 175
-      },
+        "line": 209
+      }
+    ],
+    "llm.runtime.chat_sessions.reversed": [
       {
-        "from": "llm.runtime.chat_sessions.rename",
-        "line": 192
+        "from": "llm.runtime.chat_sessions.list_sessions",
+        "line": 210
       }
     ],
     "llm.runtime.chat_sessions.FileNotFoundError": [
       {
         "from": "llm.runtime.chat_sessions.rename",
-        "line": 195
+        "line": 237
       },
       {
         "from": "llm.runtime.chat_sessions.rename",
-        "line": 199
+        "line": 241
+      }
+    ],
+    "llm.runtime.hitl.HITL": [
+      {
+        "from": "llm.runtime.hitl.__init__",
+        "line": 22
+      }
+    ],
+    "llm.runtime.hitl.RuntimeError": [
+      {
+        "from": "llm.runtime.hitl.bind",
+        "line": 27
+      },
+      {
+        "from": "llm.runtime.hitl.ask_human",
+        "line": 41
+      }
+    ],
+    "llm.runtime.hitl.next_handler": [
+      {
+        "from": "llm.runtime.hitl.maxstep_continue",
+        "line": 47
+      },
+      {
+        "from": "llm.runtime.hitl.tool_breaker_continue",
+        "line": 53
       }
     ],
     "llm.runtime.prompts.get_logger": [
@@ -39435,281 +40342,291 @@
     "llm.runtime.service.get_logger": [
       {
         "from": "llm.runtime.service.<module>",
-        "line": 28
+        "line": 29
       }
     ],
     "llm.runtime.service.field": [
       {
         "from": "llm.runtime.service.<module>",
-        "line": 59
+        "line": 60
       }
     ],
     "llm.runtime.service.LLMResponse": [
       {
         "from": "llm.runtime.service.__init__",
-        "line": 86
+        "line": 87
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 388
+        "line": 432
+      }
+    ],
+    "llm.runtime.service.HITLPolicy": [
+      {
+        "from": "llm.runtime.service.__init__",
+        "line": 91
+      }
+    ],
+    "llm.runtime.service.AgentPolicySpec": [
+      {
+        "from": "llm.runtime.service.__init__",
+        "line": 93
+      },
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 328
+      },
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 332
       }
     ],
     "llm.runtime.service.RuntimeEvent": [
       {
         "from": "llm.runtime.service.on_record",
-        "line": 103
+        "line": 112
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 398
+        "line": 442
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 425
+        "line": 469
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 429
+        "line": 478
       }
     ],
     "llm.runtime.service.getattr": [
       {
         "from": "llm.runtime.service.on_record",
-        "line": 121
+        "line": 130
       },
       {
         "from": "llm.runtime.service._close_slot",
-        "line": 588
+        "line": 640
       }
     ],
     "llm.runtime.service.set": [
       {
         "from": "llm.runtime.service.__init__",
-        "line": 174
+        "line": 183
       },
       {
         "from": "llm.runtime.service.__init__",
-        "line": 175
+        "line": 184
       },
       {
         "from": "llm.runtime.service.__init__",
-        "line": 179
+        "line": 188
       }
     ],
     "llm.runtime.service.ModelCallLimiter": [
       {
         "from": "llm.runtime.service.__init__",
-        "line": 176
+        "line": 185
       },
       {
         "from": "llm.runtime.service.start",
-        "line": 238
+        "line": 256
       }
     ],
     "llm.runtime.service.ChatSessionManager": [
       {
         "from": "llm.runtime.service.chat_sessions",
-        "line": 186
+        "line": 195
       }
     ],
     "llm.runtime.service.resolve_session_folder": [
       {
         "from": "llm.runtime.service.chat_session_folder",
-        "line": 191
-      },
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 265
-      }
-    ],
-    "llm.runtime.service.InboundMessage": [
-      {
-        "from": "llm.runtime.service.chat_session_folder",
-        "line": 193
-      }
-    ],
-    "llm.runtime.service.RuntimeError": [
-      {
-        "from": "llm.runtime.service.manage_chat_session",
-        "line": 204
-      },
-      {
-        "from": "llm.runtime.service.manage_chat_session",
-        "line": 206
-      },
-      {
-        "from": "llm.runtime.service.manage_chat_session",
-        "line": 208
-      },
-      {
-        "from": "llm.runtime.service.start",
-        "line": 237
-      },
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 260
-      },
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 263
-      },
-      {
-        "from": "llm.runtime.service._stream",
-        "line": 376
-      },
-      {
-        "from": "llm.runtime.service._stream",
-        "line": 418
-      },
-      {
-        "from": "llm.runtime.service._stream",
-        "line": 420
-      },
-      {
-        "from": "llm.runtime.service.execute",
-        "line": 501
-      },
-      {
-        "from": "llm.runtime.service.execute",
-        "line": 503
-      }
-    ],
-    "llm.runtime.service.ValueError": [
-      {
-        "from": "llm.runtime.service.manage_chat_session",
-        "line": 211
-      },
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 270
-      },
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 273
+        "line": 209
       },
       {
         "from": "llm.runtime.service._get_slot",
         "line": 283
       }
     ],
-    "llm.runtime.service.UUID": [
+    "llm.runtime.service.InboundMessage": [
       {
-        "from": "llm.runtime.service._get_slot",
-        "line": 268
+        "from": "llm.runtime.service.chat_session_folder",
+        "line": 211
       }
     ],
-    "llm.runtime.service.SessionStore": [
+    "llm.runtime.service.RuntimeError": [
       {
-        "from": "llm.runtime.service._get_slot",
-        "line": 275
-      }
-    ],
-    "llm.runtime.service.ProviderAdapter": [
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 296
-      }
-    ],
-    "llm.runtime.service.create_llm_client": [
-      {
-        "from": "llm.runtime.service._get_slot",
-        "line": 296
+        "from": "llm.runtime.service.manage_chat_session",
+        "line": 222
       },
       {
-        "from": "llm.runtime.service._prepare_slot",
-        "line": 472
-      }
-    ],
-    "llm.runtime.service.AgentContext": [
+        "from": "llm.runtime.service.manage_chat_session",
+        "line": 224
+      },
+      {
+        "from": "llm.runtime.service.manage_chat_session",
+        "line": 226
+      },
+      {
+        "from": "llm.runtime.service.start",
+        "line": 255
+      },
       {
         "from": "llm.runtime.service._get_slot",
-        "line": 298
-      }
-    ],
-    "llm.runtime.service.uuid4": [
+        "line": 278
+      },
       {
         "from": "llm.runtime.service._get_slot",
-        "line": 299
+        "line": 281
       },
       {
         "from": "llm.runtime.service._stream",
-        "line": 373
+        "line": 414
+      },
+      {
+        "from": "llm.runtime.service._stream",
+        "line": 462
+      },
+      {
+        "from": "llm.runtime.service._stream",
+        "line": 464
+      },
+      {
+        "from": "llm.runtime.service.execute",
+        "line": 553
+      },
+      {
+        "from": "llm.runtime.service.execute",
+        "line": 555
       }
     ],
-    "llm.runtime.service.AgentConfig": [
+    "llm.runtime.service.ValueError": [
+      {
+        "from": "llm.runtime.service.manage_chat_session",
+        "line": 229
+      },
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 288
+      },
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 291
+      },
       {
         "from": "llm.runtime.service._get_slot",
         "line": 301
       }
     ],
-    "llm.runtime.service.LLMRetry": [
+    "llm.runtime.service.UUID": [
       {
         "from": "llm.runtime.service._get_slot",
-        "line": 308
+        "line": 286
       }
     ],
-    "llm.runtime.service.AgentPolicySpec": [
+    "llm.runtime.service.SessionStore": [
       {
         "from": "llm.runtime.service._get_slot",
-        "line": 310
-      },
+        "line": 293
+      }
+    ],
+    "llm.runtime.service.ProviderAdapter": [
       {
         "from": "llm.runtime.service._get_slot",
         "line": 314
       }
     ],
-    "llm.runtime.service.ToolUseGuard": [
+    "llm.runtime.service.create_llm_client": [
       {
         "from": "llm.runtime.service._get_slot",
-        "line": 312
+        "line": 314
+      },
+      {
+        "from": "llm.runtime.service._prepare_slot",
+        "line": 524
       }
     ],
-    "llm.runtime.service._AgentSlot": [
+    "llm.runtime.service.AgentContext": [
       {
         "from": "llm.runtime.service._get_slot",
         "line": 316
       }
     ],
+    "llm.runtime.service.uuid4": [
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 317
+      },
+      {
+        "from": "llm.runtime.service._stream",
+        "line": 411
+      }
+    ],
+    "llm.runtime.service.AgentConfig": [
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 319
+      }
+    ],
+    "llm.runtime.service.LLMRetry": [
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 326
+      }
+    ],
+    "llm.runtime.service.ToolUseGuard": [
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 330
+      }
+    ],
+    "llm.runtime.service._AgentSlot": [
+      {
+        "from": "llm.runtime.service._get_slot",
+        "line": 334
+      }
+    ],
     "asyncio.current_task": [
       {
         "from": "llm.runtime.service.stream",
-        "line": 333
+        "line": 361
       },
       {
         "from": "llm.runtime.service.close",
-        "line": 561
+        "line": 613
       }
     ],
     "llm.runtime.service.Message": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 391
+        "line": 435
       }
     ],
     "llm.runtime.service.list": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 391
+        "line": 435
       },
       {
         "from": "llm.runtime.service.close",
-        "line": 565
+        "line": 617
       },
       {
         "from": "llm.runtime.service.close",
-        "line": 569
+        "line": 621
       }
     ],
     "llm.runtime.service.resolve_session_category": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 407
+        "line": 451
       }
     ],
     "asyncio.timeout": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 410
+        "line": 454
       },
       {
         "from": "llm.runtime_tools.filesystem.execute",
@@ -39723,37 +40640,37 @@
     "llm.runtime.service.OutboundMessage": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 422
+        "line": 466
       }
     ],
     "llm.runtime.service.str": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 427
+        "line": 471
       }
     ],
     "llm.runtime.service.replace": [
       {
         "from": "llm.runtime.service._stream",
-        "line": 449
+        "line": 501
       }
     ],
     "llm.runtime.service.register_prompts": [
       {
         "from": "llm.runtime.service._prepare_slot",
-        "line": 473
+        "line": 525
       }
     ],
     "llm.runtime.service.close": [
       {
         "from": "llm.runtime.service._close_slot",
-        "line": 590
+        "line": 642
       }
     ],
     "llm.runtime.service.LazySingleton": [
       {
         "from": "llm.runtime.service.<module>",
-        "line": 593
+        "line": 645
       }
     ],
     "llm.runtime.session_storage.validate_workflow_id": [
@@ -42430,12 +43347,6 @@
         "line": 475
       }
     ],
-    "re.split": [
-      {
-        "from": "llm.utils.md_os.prompts_md_load",
-        "line": 493
-      }
-    ],
     "llm.utils.md_os.print": [
       {
         "from": "llm.utils.md_os.<module>",
@@ -43581,199 +44492,95 @@
     "llm.channel.wechat.channel.get_logger": [
       {
         "from": "llm.channel.wechat.channel.<module>",
-        "line": 31
+        "line": 28
       }
     ],
     "llm.channel.wechat.channel.super": [
       {
         "from": "llm.channel.wechat.channel.__init__",
-        "line": 59
+        "line": 51
       }
     ],
-    "llm.channel.wechat.channel.WechatAccountStateProvider": [
+    "llm.channel.wechat.channel.WechatReplyStore": [
       {
         "from": "llm.channel.wechat.channel.__init__",
-        "line": 85
-      }
-    ],
-    "llm.channel.wechat.channel.len": [
-      {
-        "from": "llm.channel.wechat.channel._migrate_account_json_to_db",
-        "line": 154
-      },
-      {
-        "from": "llm.channel.wechat.channel._save_user_data_to_db",
-        "line": 193
-      },
-      {
-        "from": "llm.channel.wechat.channel._load_user_data_from_db",
-        "line": 208
-      },
-      {
-        "from": "llm.channel.wechat.channel.start",
-        "line": 281
-      },
-      {
-        "from": "llm.channel.wechat.channel.stop",
-        "line": 315
-      },
-      {
-        "from": "llm.channel.wechat.channel.send",
-        "line": 361
-      },
-      {
-        "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 396
-      },
-      {
-        "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 400
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 430
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 431
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 435
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 461
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 476
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 551
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 552
+        "line": 59
       }
     ],
     "llm.channel.wechat.channel.WechatClient": [
       {
         "from": "llm.channel.wechat.channel.start",
-        "line": 261
+        "line": 70
       }
     ],
     "llm.channel.wechat.channel.WechatAuth": [
       {
         "from": "llm.channel.wechat.channel.start",
-        "line": 265
+        "line": 74
+      }
+    ],
+    "llm.channel.wechat.channel.RuntimeError": [
+      {
+        "from": "llm.channel.wechat.channel.start",
+        "line": 84
+      },
+      {
+        "from": "llm.channel.wechat.channel._handle_wechat_message",
+        "line": 190
       }
     ],
     "llm.channel.wechat.channel.WechatMedia": [
       {
         "from": "llm.channel.wechat.channel.start",
-        "line": 298
-      }
-    ],
-    "llm.channel.wechat.channel.hasattr": [
-      {
-        "from": "llm.channel.wechat.channel.send",
-        "line": 349
+        "line": 86
       }
     ],
     "llm.channel.wechat.channel.WechatAPIError": [
       {
         "from": "llm.channel.wechat.channel.send",
-        "line": 366
+        "line": 128
+      },
+      {
+        "from": "llm.channel.wechat.channel.send",
+        "line": 131
+      },
+      {
+        "from": "llm.channel.wechat.channel.send",
+        "line": 140
       }
     ],
-    "llm.channel.wechat.channel.enumerate": [
+    "llm.channel.wechat.channel.ConversationRoute": [
       {
-        "from": "llm.channel.wechat.channel._poll_loop",
-        "line": 401
+        "from": "llm.channel.wechat.channel._handle_wechat_message",
+        "line": 170
       }
     ],
-    "llm.channel.wechat.channel.int": [
+    "llm.channel.wechat.channel.ConversationInput": [
       {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 435
-      }
-    ],
-    "llm.channel.wechat.channel.max": [
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 443
+        "from": "llm.channel.wechat.channel._handle_wechat_message",
+        "line": 183
       }
     ],
     "llm.channel.wechat.channel.str": [
       {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 465
-      },
-      {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 533
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 541
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 654
+        "line": 186
       }
     ],
-    "llm.channel.wechat.channel.UUID": [
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 465
-      },
+    "llm.channel.wechat.channel.uuid4": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 603
-      }
-    ],
-    "llm.channel.wechat.channel.OutboundMessage": [
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 486
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 651
-      }
-    ],
-    "llm.channel.wechat.channel.LLMResponse": [
-      {
-        "from": "llm.channel.wechat.channel._handle_session_command",
-        "line": 487
-      },
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 653
-      }
-    ],
-    "llm.channel.wechat.channel.InboundMessage": [
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 608
-      }
-    ],
-    "llm.channel.wechat.channel.getattr": [
-      {
-        "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 654
+        "line": 186
       }
     ],
     "llm.channel.wechat.channel.WechatMessageError": [
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 667
+        "line": 193
       },
       {
         "from": "llm.channel.wechat.channel._handle_wechat_message",
-        "line": 670
+        "line": 195
       }
     ],
     "llm.channel.wechat.client.get_logger": [
@@ -43856,6 +44663,22 @@
       {
         "from": "llm.channel.wechat.media.download_media",
         "line": 121
+      }
+    ],
+    "llm.channel.wechat.reply_store.get_logger": [
+      {
+        "from": "llm.channel.wechat.reply_store.<module>",
+        "line": 18
+      }
+    ],
+    "llm.channel.wechat.reply_store.RuntimeError": [
+      {
+        "from": "llm.channel.wechat.reply_store.remember",
+        "line": 92
+      },
+      {
+        "from": "llm.channel.wechat.reply_store.migrate_legacy",
+        "line": 131
       }
     ],
     "config.migrations.config_migrator.get_logger": [
@@ -44350,6 +45173,10 @@
         "line": 525
       },
       {
+        "to": "re.split",
+        "line": 493
+      },
+      {
         "to": "llm.utils.md_os.isinstance",
         "line": 471
       },
@@ -44388,10 +45215,6 @@
       {
         "to": "llm.utils.md_os.FileNotFoundError",
         "line": 475
-      },
-      {
-        "to": "re.split",
-        "line": 493
       }
     ],
     "config.migrations.config_migrator._load_yaml": [
@@ -44877,95 +45700,133 @@
     "llm.function.agent_schedule_job.save_history": [
       {
         "to": "os.replace",
-        "line": 456
+        "line": 460
       },
       {
         "to": "llm.function.agent_schedule_job.uuid4",
-        "line": 452
+        "line": 456
+      }
+    ],
+    "llm.runtime.chat_sessions.create": [
+      {
+        "to": "os.replace",
+        "line": 44
+      },
+      {
+        "to": "json.dumps",
+        "line": 43
+      },
+      {
+        "to": "llm.runtime.chat_sessions.RuntimeError",
+        "line": 31
+      },
+      {
+        "to": "llm.runtime.chat_sessions.isinstance",
+        "line": 32
+      },
+      {
+        "to": "llm.runtime.chat_sessions.len",
+        "line": 32
+      },
+      {
+        "to": "llm.runtime.chat_sessions.ValueError",
+        "line": 33
+      },
+      {
+        "to": "llm.runtime.chat_sessions.SessionStore",
+        "line": 35
+      },
+      {
+        "to": "llm.runtime.chat_sessions.uuid4",
+        "line": 39
+      },
+      {
+        "to": "llm.runtime.chat_sessions.FileExistsError",
+        "line": 42
       }
     ],
     "llm.runtime.chat_sessions.process_pending": [
       {
         "to": "os.replace",
-        "line": 79
+        "line": 103
       },
       {
         "to": "json.dumps",
-        "line": 77
+        "line": 101
       },
       {
         "to": "llm.runtime.chat_sessions.isinstance",
-        "line": 44
+        "line": 68
       },
       {
         "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 45
-      },
-      {
-        "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 48
-      },
-      {
-        "to": "llm.runtime.chat_sessions.type",
-        "line": 47
-      },
-      {
-        "to": "llm.runtime.chat_sessions.type",
-        "line": 50
-      },
-      {
-        "to": "llm.runtime.chat_sessions.type",
-        "line": 61
-      },
-      {
-        "to": "llm.runtime.chat_sessions.max",
-        "line": 52
-      },
-      {
-        "to": "llm.runtime.chat_sessions.sorted",
-        "line": 63
-      },
-      {
-        "to": "llm.runtime.chat_sessions.handler",
         "line": 69
       },
       {
+        "to": "llm.runtime.chat_sessions.ValueError",
+        "line": 72
+      },
+      {
         "to": "llm.runtime.chat_sessions.uuid4",
+        "line": 98
+      },
+      {
+        "to": "llm.runtime.chat_sessions.type",
+        "line": 71
+      },
+      {
+        "to": "llm.runtime.chat_sessions.type",
         "line": 74
+      },
+      {
+        "to": "llm.runtime.chat_sessions.type",
+        "line": 85
+      },
+      {
+        "to": "llm.runtime.chat_sessions.max",
+        "line": 76
+      },
+      {
+        "to": "llm.runtime.chat_sessions.sorted",
+        "line": 87
+      },
+      {
+        "to": "llm.runtime.chat_sessions.handler",
+        "line": 93
       }
     ],
     "llm.runtime.chat_sessions.rename": [
       {
         "to": "os.replace",
-        "line": 210
+        "line": 252
       },
       {
         "to": "json.dumps",
-        "line": 208
+        "line": 250
       },
       {
         "to": "llm.runtime.chat_sessions.isinstance",
-        "line": 192
-      },
-      {
-        "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 193
-      },
-      {
-        "to": "llm.runtime.chat_sessions.uuid4",
-        "line": 205
+        "line": 234
       },
       {
         "to": "llm.runtime.chat_sessions.len",
-        "line": 192
+        "line": 234
+      },
+      {
+        "to": "llm.runtime.chat_sessions.ValueError",
+        "line": 235
+      },
+      {
+        "to": "llm.runtime.chat_sessions.uuid4",
+        "line": 247
       },
       {
         "to": "llm.runtime.chat_sessions.FileNotFoundError",
-        "line": 195
+        "line": 237
       },
       {
         "to": "llm.runtime.chat_sessions.FileNotFoundError",
-        "line": 199
+        "line": 241
       }
     ],
     "llm.utils.md_os._atomic_write_text": [
@@ -47704,6 +48565,20 @@
         "line": 42
       }
     ],
+    "llm.conversation.commands.<module>": [
+      {
+        "to": "re.compile",
+        "line": 31
+      },
+      {
+        "to": "llm.conversation.commands.get_logger",
+        "line": 28
+      },
+      {
+        "to": "llm.conversation.commands.frozenset",
+        "line": 30
+      }
+    ],
     "llm.runtime_tools.filesystem._search_string_py": [
       {
         "to": "re.compile",
@@ -48710,14 +49585,20 @@
         "line": 71
       }
     ],
+    "llm.conversation.service._spawn": [
+      {
+        "to": "asyncio.create_task",
+        "line": 84
+      }
+    ],
     "llm.function.agent_schedule_job.main": [
       {
         "to": "asyncio.create_task",
-        "line": 542
+        "line": 546
       },
       {
         "to": "llm.function.agent_schedule_job.dreaming",
-        "line": 546
+        "line": 550
       }
     ],
     "llm.function.screenshot_analysis.test_single_chunk": [
@@ -48765,75 +49646,75 @@
     "llm.runtime.service._stream": [
       {
         "to": "asyncio.create_task",
-        "line": 390
+        "line": 434
       },
       {
         "to": "asyncio.Queue",
-        "line": 385
-      },
-      {
-        "to": "asyncio.gather",
-        "line": 433
-      },
-      {
-        "to": "llm.runtime.service.LLMResponse",
-        "line": 388
-      },
-      {
-        "to": "llm.runtime.service.RuntimeEvent",
-        "line": 398
-      },
-      {
-        "to": "llm.runtime.service.RuntimeEvent",
-        "line": 425
-      },
-      {
-        "to": "llm.runtime.service.RuntimeEvent",
         "line": 429
       },
       {
-        "to": "llm.runtime.service.RuntimeError",
-        "line": 376
+        "to": "asyncio.gather",
+        "line": 484
+      },
+      {
+        "to": "llm.runtime.service.LLMResponse",
+        "line": 432
+      },
+      {
+        "to": "llm.runtime.service.RuntimeEvent",
+        "line": 442
+      },
+      {
+        "to": "llm.runtime.service.RuntimeEvent",
+        "line": 469
+      },
+      {
+        "to": "llm.runtime.service.RuntimeEvent",
+        "line": 478
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 418
+        "line": 414
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 420
+        "line": 462
+      },
+      {
+        "to": "llm.runtime.service.RuntimeError",
+        "line": 464
       },
       {
         "to": "llm.runtime.service.uuid4",
-        "line": 373
+        "line": 411
       },
       {
         "to": "llm.runtime.service.Message",
-        "line": 391
+        "line": 435
       },
       {
         "to": "llm.runtime.service.list",
-        "line": 391
+        "line": 435
       },
       {
         "to": "llm.runtime.service.resolve_session_category",
-        "line": 407
+        "line": 451
       },
       {
         "to": "asyncio.timeout",
-        "line": 410
+        "line": 454
       },
       {
         "to": "llm.runtime.service.OutboundMessage",
-        "line": 422
+        "line": 466
       },
       {
         "to": "llm.runtime.service.str",
-        "line": 427
+        "line": 471
       },
       {
         "to": "llm.runtime.service.replace",
-        "line": 449
+        "line": 501
       }
     ],
     "llm.runtime.worker.loop": [
@@ -48857,23 +49738,23 @@
     "llm.channel.wechat.channel.start": [
       {
         "to": "asyncio.create_task",
-        "line": 301
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 281
+        "line": 91
       },
       {
         "to": "llm.channel.wechat.channel.WechatClient",
-        "line": 261
+        "line": 70
       },
       {
         "to": "llm.channel.wechat.channel.WechatAuth",
-        "line": 265
+        "line": 74
+      },
+      {
+        "to": "llm.channel.wechat.channel.RuntimeError",
+        "line": 84
       },
       {
         "to": "llm.channel.wechat.channel.WechatMedia",
-        "line": 298
+        "line": 86
       }
     ],
     "server.main._log_startup_time": [
@@ -49441,13 +50322,13 @@
     "llm.runtime.service._log_chat": [
       {
         "to": "asyncio.to_thread",
-        "line": 521
+        "line": 573
       }
     ],
     "llm.runtime.service._save_usage": [
       {
         "to": "asyncio.to_thread",
-        "line": 556
+        "line": 608
       }
     ],
     "llm.runtime_tools.filesystem.execute": [
@@ -49540,6 +50421,32 @@
       {
         "to": "llm.bus.queue.ValueError",
         "line": 99
+      }
+    ],
+    "llm.conversation.client.ask_human": [
+      {
+        "to": "asyncio.get_running_loop",
+        "line": 88
+      },
+      {
+        "to": "llm.conversation.client.RuntimeError",
+        "line": 84
+      },
+      {
+        "to": "llm.conversation.client.RuntimeError",
+        "line": 86
+      },
+      {
+        "to": "llm.conversation.client.PendingInteraction",
+        "line": 87
+      },
+      {
+        "to": "llm.conversation.client.uuid4",
+        "line": 88
+      },
+      {
+        "to": "llm.conversation.client.enumerate",
+        "line": 92
       }
     ],
     "server.main.restrict_shutdown_endpoints": [
@@ -49737,11 +50644,11 @@
     "llm.function.agent_schedule_job.<module>": [
       {
         "to": "asyncio.run",
-        "line": 550
+        "line": 554
       },
       {
         "to": "asyncio.Lock",
-        "line": 533
+        "line": 537
       },
       {
         "to": "llm.function.agent_schedule_job.get_logger",
@@ -49749,7 +50656,7 @@
       },
       {
         "to": "llm.function.agent_schedule_job.main",
-        "line": 550
+        "line": 554
       }
     ],
     "llm.function.screenshot_analysis.<module>": [
@@ -49865,11 +50772,7 @@
     "llm.channel.wechat.channel.stop": [
       {
         "to": "contextlib.suppress",
-        "line": 321
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 315
+        "line": 109
       }
     ],
     "server.main_agent_only._run_agent_loop": [
@@ -50679,23 +51582,11 @@
     "llm.channel.wechat.channel._poll_loop": [
       {
         "to": "asyncio.sleep",
-        "line": 407
+        "line": 158
       },
       {
         "to": "asyncio.sleep",
-        "line": 410
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 396
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 400
-      },
-      {
-        "to": "llm.channel.wechat.channel.enumerate",
-        "line": 401
+        "line": 161
       }
     ],
     "sync.sync_client.<module>": [
@@ -52966,28 +53857,54 @@
         "line": 145
       }
     ],
+    "llm.conversation.service._run": [
+      {
+        "to": "contextlib.aclosing",
+        "line": 197
+      },
+      {
+        "to": "llm.conversation.service.RuntimeError",
+        "line": 212
+      },
+      {
+        "to": "llm.conversation.service.replace",
+        "line": 224
+      },
+      {
+        "to": "llm.conversation.service.UUID",
+        "line": 186
+      },
+      {
+        "to": "llm.conversation.service.InboundMessage",
+        "line": 189
+      },
+      {
+        "to": "llm.conversation.service.dict",
+        "line": 195
+      }
+    ],
     "llm.runtime.service.stream": [
       {
         "to": "contextlib.aclosing",
-        "line": 340
+        "line": 368
       },
       {
         "to": "asyncio.current_task",
-        "line": 333
+        "line": 361
       }
     ],
     "llm.runtime.service.execute": [
       {
         "to": "contextlib.aclosing",
-        "line": 496
+        "line": 548
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 501
+        "line": 553
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 503
+        "line": 555
       }
     ],
     "server.providers.report_provider._serialize_json_fields": [
@@ -53127,27 +54044,27 @@
     "llm.function.agent_schedule_job.extract_from_chat_messages": [
       {
         "to": "json.dumps",
-        "line": 391
+        "line": 395
       },
       {
         "to": "llm.function.agent_schedule_job.InboundMessage",
-        "line": 386
-      },
-      {
-        "to": "llm.function.agent_schedule_job.LLMResponseError",
-        "line": 398
-      },
-      {
-        "to": "llm.function.agent_schedule_job.utc_to_local_display",
-        "line": 384
-      },
-      {
-        "to": "llm.function.agent_schedule_job.get_user_timezone",
         "line": 390
       },
       {
+        "to": "llm.function.agent_schedule_job.LLMResponseError",
+        "line": 402
+      },
+      {
+        "to": "llm.function.agent_schedule_job.utc_to_local_display",
+        "line": 388
+      },
+      {
+        "to": "llm.function.agent_schedule_job.get_user_timezone",
+        "line": 394
+      },
+      {
         "to": "llm.function.agent_schedule_job.RuntimeError",
-        "line": 396
+        "line": 400
       }
     ],
     "llm.runtime_tools.base.wrapper": [
@@ -55989,19 +56906,19 @@
     "llm.runtime.chat_sessions._read": [
       {
         "to": "json.loads",
-        "line": 107
+        "line": 131
       },
       {
         "to": "json.loads",
-        "line": 110
+        "line": 134
       },
       {
         "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 106
+        "line": 130
       },
       {
         "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 109
+        "line": 133
       }
     ],
     "llm.runtime.prompts._expand_dirs": [
@@ -56146,14 +57063,14 @@
         "line": 157
       }
     ],
-    "llm.channel.wechat.channel._migrate_account_json_to_db": [
+    "llm.channel.wechat.reply_store.migrate_legacy": [
       {
         "to": "json.loads",
-        "line": 118
+        "line": 114
       },
       {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 154
+        "to": "llm.channel.wechat.reply_store.RuntimeError",
+        "line": 131
       }
     ],
     "server.providers.report_provider.upsert_daily_report": [
@@ -65272,6 +66189,12 @@
         "line": 76
       }
     ],
+    "llm.conversation.client.__init__": [
+      {
+        "to": "asyncio.Lock",
+        "line": 24
+      }
+    ],
     "llm.runtime.limiter.__init__": [
       {
         "to": "asyncio.Lock",
@@ -65281,27 +66204,35 @@
     "llm.runtime.service.__init__": [
       {
         "to": "asyncio.Lock",
-        "line": 82
+        "line": 83
       },
       {
         "to": "llm.runtime.service.LLMResponse",
-        "line": 86
+        "line": 87
+      },
+      {
+        "to": "llm.runtime.service.HITLPolicy",
+        "line": 91
+      },
+      {
+        "to": "llm.runtime.service.AgentPolicySpec",
+        "line": 93
       },
       {
         "to": "llm.runtime.service.set",
-        "line": 174
+        "line": 183
       },
       {
         "to": "llm.runtime.service.set",
-        "line": 175
+        "line": 184
       },
       {
         "to": "llm.runtime.service.set",
-        "line": 179
+        "line": 188
       },
       {
         "to": "llm.runtime.service.ModelCallLimiter",
-        "line": 176
+        "line": 185
       }
     ],
     "server.services.sync_service.__init__": [
@@ -69996,6 +70927,26 @@
         "line": 145
       }
     ],
+    "repository.providers.wechat_account_state_provider.save_context_token": [
+      {
+        "to": "repository.providers.wechat_account_state_provider.DataAccessError",
+        "line": 171
+      },
+      {
+        "to": "repository.providers.wechat_account_state_provider.DataAccessError",
+        "line": 178
+      }
+    ],
+    "repository.providers.wechat_account_state_provider.save_session_reference": [
+      {
+        "to": "repository.providers.wechat_account_state_provider.DataAccessError",
+        "line": 206
+      },
+      {
+        "to": "repository.providers.wechat_account_state_provider.DataAccessError",
+        "line": 213
+      }
+    ],
     "repository.providers.<module>": [
       {
         "to": "repository.providers.LazySingleton",
@@ -71002,14 +71953,34 @@
         "line": 79
       }
     ],
+    "llm.channel.wire_wechat_channel": [
+      {
+        "to": "llm.channel.ConversationService",
+        "line": 26
+      }
+    ],
+    "llm.channel._create_wechat_channel": [
+      {
+        "to": "llm.channel.WechatChannel",
+        "line": 40
+      },
+      {
+        "to": "llm.channel.wire_wechat_channel",
+        "line": 41
+      },
+      {
+        "to": "llm.channel.WechatSessionReferences",
+        "line": 41
+      }
+    ],
     "llm.channel.<module>": [
       {
         "to": "llm.channel.LazySingleton",
-        "line": 8
+        "line": 45
       },
       {
         "to": "llm.channel.WechatConfig",
-        "line": 10
+        "line": 46
       }
     ],
     "llm.chat.chat_bot.stream": [
@@ -71218,54 +72189,78 @@
         "line": 100
       }
     ],
+    "llm.conversation.service.drain": [
+      {
+        "to": "asyncio.gather",
+        "line": 249
+      },
+      {
+        "to": "llm.conversation.service.tuple",
+        "line": 249
+      }
+    ],
+    "llm.conversation.service.close": [
+      {
+        "to": "asyncio.gather",
+        "line": 261
+      },
+      {
+        "to": "llm.conversation.service.tuple",
+        "line": 254
+      },
+      {
+        "to": "llm.conversation.service.tuple",
+        "line": 258
+      }
+    ],
     "llm.function.agent_schedule_job.process_session_message": [
       {
         "to": "asyncio.gather",
-        "line": 510
-      },
-      {
-        "to": "llm.function.agent_schedule_job.len",
-        "line": 509
-      },
-      {
-        "to": "llm.function.agent_schedule_job.timedelta",
-        "line": 462
-      },
-      {
-        "to": "llm.function.agent_schedule_job.write_date_md",
-        "line": 522
-      },
-      {
-        "to": "llm.function.agent_schedule_job.type",
-        "line": 439
-      },
-      {
-        "to": "llm.function.agent_schedule_job.ValueError",
-        "line": 440
-      },
-      {
-        "to": "llm.function.agent_schedule_job.ChatHistoryManager",
-        "line": 448
-      },
-      {
-        "to": "llm.function.agent_schedule_job.save_history",
-        "line": 530
-      },
-      {
-        "to": "llm.function.agent_schedule_job.range",
-        "line": 509
-      },
-      {
-        "to": "llm.function.agent_schedule_job.process_one",
-        "line": 511
-      },
-      {
-        "to": "llm.function.agent_schedule_job.get_local_today",
         "line": 514
       },
       {
-        "to": "llm.function.agent_schedule_job.format_chat_history",
+        "to": "llm.function.agent_schedule_job.len",
+        "line": 513
+      },
+      {
+        "to": "llm.function.agent_schedule_job.timedelta",
+        "line": 466
+      },
+      {
+        "to": "llm.function.agent_schedule_job.write_date_md",
+        "line": 526
+      },
+      {
+        "to": "llm.function.agent_schedule_job.type",
+        "line": 443
+      },
+      {
+        "to": "llm.function.agent_schedule_job.ValueError",
+        "line": 444
+      },
+      {
+        "to": "llm.function.agent_schedule_job.ChatHistoryManager",
+        "line": 452
+      },
+      {
+        "to": "llm.function.agent_schedule_job.save_history",
+        "line": 534
+      },
+      {
+        "to": "llm.function.agent_schedule_job.range",
+        "line": 513
+      },
+      {
+        "to": "llm.function.agent_schedule_job.process_one",
+        "line": 515
+      },
+      {
+        "to": "llm.function.agent_schedule_job.get_local_today",
         "line": 518
+      },
+      {
+        "to": "llm.function.agent_schedule_job.format_chat_history",
+        "line": 522
       }
     ],
     "llm.function.screenshot_analysis.screenshot_analysis": [
@@ -71335,23 +72330,23 @@
     "llm.runtime.service.close": [
       {
         "to": "asyncio.gather",
-        "line": 564
+        "line": 616
       },
       {
         "to": "asyncio.gather",
-        "line": 568
+        "line": 620
       },
       {
         "to": "asyncio.current_task",
-        "line": 561
+        "line": 613
       },
       {
         "to": "llm.runtime.service.list",
-        "line": 565
+        "line": 617
       },
       {
         "to": "llm.runtime.service.list",
-        "line": 569
+        "line": 621
       }
     ],
     "llm.classify.classify_graph._fetch_one_title": [
@@ -71368,6 +72363,296 @@
       {
         "to": "llm.classify.main_classify.classifier_class",
         "line": 42
+      }
+    ],
+    "llm.conversation.client.send": [
+      {
+        "to": "llm.conversation.client.dict",
+        "line": 28
+      },
+      {
+        "to": "llm.conversation.client.replace",
+        "line": 37
+      }
+    ],
+    "llm.conversation.client.bind": [
+      {
+        "to": "llm.conversation.client.RuntimeError",
+        "line": 63
+      }
+    ],
+    "llm.conversation.client.send_text": [
+      {
+        "to": "llm.conversation.client.OutboundMessage",
+        "line": 69
+      },
+      {
+        "to": "llm.conversation.client.LLMResponse",
+        "line": 70
+      }
+    ],
+    "llm.conversation.client.answer": [
+      {
+        "to": "llm.conversation.client.ValueError",
+        "line": 115
+      },
+      {
+        "to": "llm.conversation.client.ValueError",
+        "line": 119
+      }
+    ],
+    "llm.conversation.client._parse_answer": [
+      {
+        "to": "llm.conversation.client.ValueError",
+        "line": 132
+      },
+      {
+        "to": "llm.conversation.client.ValueError",
+        "line": 141
+      },
+      {
+        "to": "llm.conversation.client.HumanReturn",
+        "line": 129
+      },
+      {
+        "to": "llm.conversation.client.HumanReturn",
+        "line": 145
+      },
+      {
+        "to": "re.split",
+        "line": 130
+      },
+      {
+        "to": "llm.conversation.client.len",
+        "line": 131
+      },
+      {
+        "to": "llm.conversation.client.len",
+        "line": 138
+      },
+      {
+        "to": "llm.conversation.client.next",
+        "line": 135
+      },
+      {
+        "to": "llm.conversation.client.int",
+        "line": 138
+      },
+      {
+        "to": "llm.conversation.client.int",
+        "line": 139
+      }
+    ],
+    "llm.conversation.commands.matches": [
+      {
+        "to": "llm.conversation.commands.bool",
+        "line": 69
+      }
+    ],
+    "llm.conversation.commands.is_readonly": [
+      {
+        "to": "llm.conversation.commands.bool",
+        "line": 74
+      }
+    ],
+    "llm.conversation.commands.handle": [
+      {
+        "to": "llm.conversation.commands.OutboundMessage",
+        "line": 111
+      },
+      {
+        "to": "llm.conversation.commands.LLMResponse",
+        "line": 112
+      }
+    ],
+    "llm.conversation.commands._handle_list": [
+      {
+        "to": "llm.conversation.commands.max",
+        "line": 127
+      }
+    ],
+    "llm.conversation.commands._handle_continue": [
+      {
+        "to": "llm.conversation.commands.len",
+        "line": 154
+      },
+      {
+        "to": "llm.conversation.commands.str",
+        "line": 157
+      },
+      {
+        "to": "llm.conversation.commands.UUID",
+        "line": 157
+      },
+      {
+        "to": "llm.conversation.commands.reversed",
+        "line": 167
+      },
+      {
+        "to": "llm.conversation.commands.any",
+        "line": 171
+      }
+    ],
+    "llm.conversation.commands._handle_new": [
+      {
+        "to": "llm.conversation.commands.len",
+        "line": 183
+      }
+    ],
+    "llm.conversation.commands._session_list_arguments": [
+      {
+        "to": "llm.conversation.commands.len",
+        "line": 204
+      },
+      {
+        "to": "llm.conversation.commands.len",
+        "line": 211
+      },
+      {
+        "to": "llm.conversation.commands.len",
+        "line": 212
+      },
+      {
+        "to": "llm.conversation.commands.ValueError",
+        "line": 205
+      },
+      {
+        "to": "llm.conversation.commands.ValueError",
+        "line": 215
+      },
+      {
+        "to": "llm.conversation.commands.ValueError",
+        "line": 217
+      },
+      {
+        "to": "llm.conversation.commands.int",
+        "line": 216
+      },
+      {
+        "to": "llm.conversation.commands.int",
+        "line": 218
+      }
+    ],
+    "llm.conversation.references.<module>": [
+      {
+        "to": "llm.conversation.references.get_logger",
+        "line": 20
+      }
+    ],
+    "llm.conversation.references.set": [
+      {
+        "to": "llm.conversation.references.RuntimeError",
+        "line": 89
+      }
+    ],
+    "llm.conversation.service.<module>": [
+      {
+        "to": "llm.conversation.service.get_logger",
+        "line": 16
+      }
+    ],
+    "llm.conversation.service.__init__": [
+      {
+        "to": "llm.conversation.service.ValueError",
+        "line": 43
+      },
+      {
+        "to": "llm.conversation.service.SessionCommandService",
+        "line": 46
+      },
+      {
+        "to": "llm.conversation.service.set",
+        "line": 53
+      },
+      {
+        "to": "llm.conversation.service.OrderedDict",
+        "line": 54
+      }
+    ],
+    "llm.conversation.service.start": [
+      {
+        "to": "llm.conversation.service.RuntimeError",
+        "line": 61
+      }
+    ],
+    "llm.conversation.service._client": [
+      {
+        "to": "llm.conversation.service.ConversationClient",
+        "line": 80
+      }
+    ],
+    "llm.conversation.service._notice": [
+      {
+        "to": "llm.conversation.service.OutboundMessage",
+        "line": 97
+      },
+      {
+        "to": "llm.conversation.service.LLMResponse",
+        "line": 97
+      }
+    ],
+    "llm.conversation.service.submit": [
+      {
+        "to": "llm.conversation.service.len",
+        "line": 118
+      },
+      {
+        "to": "llm.conversation.service.str",
+        "line": 126
+      },
+      {
+        "to": "llm.conversation.service._Operation",
+        "line": 135
+      },
+      {
+        "to": "llm.conversation.service._Operation",
+        "line": 144
+      },
+      {
+        "to": "llm.conversation.service.uuid4",
+        "line": 135
+      },
+      {
+        "to": "llm.conversation.service.uuid4",
+        "line": 144
+      },
+      {
+        "to": "llm.conversation.service.RunClient",
+        "line": 149
+      }
+    ],
+    "llm.conversation.service._command": [
+      {
+        "to": "llm.conversation.service.replace",
+        "line": 167
+      }
+    ],
+    "llm.conversation.types.<module>": [
+      {
+        "to": "llm.conversation.types.dataclass",
+        "line": 9
+      },
+      {
+        "to": "llm.conversation.types.field",
+        "line": 28
+      },
+      {
+        "to": "llm.conversation.types.field",
+        "line": 29
+      },
+      {
+        "to": "llm.conversation.types.uuid4",
+        "line": 28
+      }
+    ],
+    "llm.conversation.types.__post_init__": [
+      {
+        "to": "llm.conversation.types.ValueError",
+        "line": 19
+      },
+      {
+        "to": "llm.conversation.types.MessageContent",
+        "line": 33
       }
     ],
     "llm.function.agent_schedule_job.summary_activities": [
@@ -71471,11 +72756,11 @@
       },
       {
         "to": "llm.function.agent_schedule_job.len",
-        "line": 274
+        "line": 278
       },
       {
         "to": "llm.function.agent_schedule_job.InboundMessage",
-        "line": 277
+        "line": 281
       },
       {
         "to": "llm.function.agent_schedule_job.str",
@@ -71521,91 +72806,91 @@
     "llm.function.agent_schedule_job.dreaming": [
       {
         "to": "llm.function.agent_schedule_job.len",
-        "line": 324
+        "line": 328
       },
       {
         "to": "llm.function.agent_schedule_job.len",
-        "line": 332
+        "line": 336
       },
       {
         "to": "llm.function.agent_schedule_job.len",
-        "line": 342
+        "line": 346
       },
       {
         "to": "llm.function.agent_schedule_job.len",
-        "line": 350
+        "line": 354
       },
       {
         "to": "llm.function.agent_schedule_job.local_to_utc_iso",
-        "line": 321
+        "line": 325
       },
       {
         "to": "llm.function.agent_schedule_job.local_to_utc_iso",
-        "line": 322
+        "line": 326
       },
       {
         "to": "llm.function.agent_schedule_job.timedelta",
-        "line": 308
+        "line": 312
       },
       {
         "to": "llm.function.agent_schedule_job.query_user_activity_summary",
-        "line": 319
+        "line": 323
       },
       {
         "to": "llm.function.agent_schedule_job.set",
-        "line": 315
+        "line": 319
       },
       {
         "to": "llm.function.agent_schedule_job.build_local_datetime",
-        "line": 309
+        "line": 313
       },
       {
         "to": "llm.function.agent_schedule_job.build_local_datetime",
-        "line": 310
+        "line": 314
       },
       {
         "to": "llm.function.agent_schedule_job.summary_activities",
-        "line": 329
+        "line": 333
       },
       {
         "to": "llm.function.agent_schedule_job.get_mood_data",
-        "line": 341
+        "line": 345
       },
       {
         "to": "llm.function.agent_schedule_job.summary_moods",
-        "line": 347
+        "line": 351
       },
       {
         "to": "llm.function.agent_schedule_job.write_date_md",
-        "line": 362
+        "line": 366
       },
       {
         "to": "llm.function.agent_schedule_job.write_date_md",
-        "line": 365
+        "line": 369
       },
       {
         "to": "llm.function.agent_schedule_job.update_memory",
-        "line": 370
+        "line": 374
       }
     ],
     "llm.function.agent_schedule_job.process_one": [
       {
         "to": "llm.function.agent_schedule_job.ValueError",
-        "line": 502
+        "line": 506
       }
     ],
     "llm.function.agent_schedule_job.save_window": [
       {
         "to": "llm.function.agent_schedule_job.max",
-        "line": 468
+        "line": 472
       },
       {
         "to": "llm.function.agent_schedule_job.extract_from_chat_messages",
-        "line": 481
+        "line": 485
       },
       {
         "to": "llm.function.agent_schedule_job.save_history",
-        "line": 491
+        "line": 495
       }
     ],
     "llm.function.diary_summary.<module>": [
@@ -72407,53 +73692,99 @@
     "llm.runtime.chat_sessions.<module>": [
       {
         "to": "llm.runtime.chat_sessions.get_logger",
-        "line": 16
+        "line": 19
       }
     ],
     "llm.runtime.chat_sessions._messages": [
       {
         "to": "llm.runtime.chat_sessions.isinstance",
-        "line": 125
+        "line": 149
       },
       {
         "to": "llm.runtime.chat_sessions.len",
-        "line": 140
+        "line": 164
+      }
+    ],
+    "llm.runtime.chat_sessions.list_sessions": [
+      {
+        "to": "llm.runtime.chat_sessions.len",
+        "line": 204
+      },
+      {
+        "to": "llm.runtime.chat_sessions.len",
+        "line": 217
+      },
+      {
+        "to": "llm.runtime.chat_sessions.ValueError",
+        "line": 178
+      },
+      {
+        "to": "llm.runtime.chat_sessions.ValueError",
+        "line": 180
+      },
+      {
+        "to": "llm.runtime.chat_sessions.max",
+        "line": 194
+      },
+      {
+        "to": "llm.runtime.chat_sessions.utc_to_local",
+        "line": 195
+      },
+      {
+        "to": "llm.runtime.chat_sessions.next",
+        "line": 209
+      },
+      {
+        "to": "llm.runtime.chat_sessions.reversed",
+        "line": 210
       }
     ],
     "llm.runtime.chat_sessions._path": [
       {
         "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 87
+        "line": 111
       },
       {
         "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 90
+        "line": 114
       },
       {
         "to": "llm.runtime.chat_sessions.str",
-        "line": 86
+        "line": 110
       },
       {
         "to": "llm.runtime.chat_sessions.UUID",
-        "line": 86
+        "line": 110
       }
     ],
-    "llm.runtime.chat_sessions.list_sessions": [
+    "llm.runtime.hitl.__init__": [
       {
-        "to": "llm.runtime.chat_sessions.ValueError",
-        "line": 147
-      },
+        "to": "llm.runtime.hitl.HITL",
+        "line": 22
+      }
+    ],
+    "llm.runtime.hitl.bind": [
       {
-        "to": "llm.runtime.chat_sessions.max",
-        "line": 166
-      },
+        "to": "llm.runtime.hitl.RuntimeError",
+        "line": 27
+      }
+    ],
+    "llm.runtime.hitl.ask_human": [
       {
-        "to": "llm.runtime.chat_sessions.len",
-        "line": 167
-      },
+        "to": "llm.runtime.hitl.RuntimeError",
+        "line": 41
+      }
+    ],
+    "llm.runtime.hitl.maxstep_continue": [
       {
-        "to": "llm.runtime.chat_sessions.len",
-        "line": 175
+        "to": "llm.runtime.hitl.next_handler",
+        "line": 47
+      }
+    ],
+    "llm.runtime.hitl.tool_breaker_continue": [
+      {
+        "to": "llm.runtime.hitl.next_handler",
+        "line": 53
       }
     ],
     "llm.runtime.prompts.<module>": [
@@ -72717,163 +74048,163 @@
     "llm.runtime.service.<module>": [
       {
         "to": "llm.runtime.service.get_logger",
-        "line": 28
+        "line": 29
       },
       {
         "to": "llm.runtime.service.field",
-        "line": 59
+        "line": 60
       },
       {
         "to": "llm.runtime.service.LazySingleton",
-        "line": 593
+        "line": 645
+      }
+    ],
+    "llm.runtime.service._get_slot": [
+      {
+        "to": "llm.runtime.service.AgentPolicySpec",
+        "line": 328
+      },
+      {
+        "to": "llm.runtime.service.AgentPolicySpec",
+        "line": 332
+      },
+      {
+        "to": "llm.runtime.service.resolve_session_folder",
+        "line": 283
+      },
+      {
+        "to": "llm.runtime.service.RuntimeError",
+        "line": 278
+      },
+      {
+        "to": "llm.runtime.service.RuntimeError",
+        "line": 281
+      },
+      {
+        "to": "llm.runtime.service.ValueError",
+        "line": 288
+      },
+      {
+        "to": "llm.runtime.service.ValueError",
+        "line": 291
+      },
+      {
+        "to": "llm.runtime.service.ValueError",
+        "line": 301
+      },
+      {
+        "to": "llm.runtime.service.UUID",
+        "line": 286
+      },
+      {
+        "to": "llm.runtime.service.SessionStore",
+        "line": 293
+      },
+      {
+        "to": "llm.runtime.service.ProviderAdapter",
+        "line": 314
+      },
+      {
+        "to": "llm.runtime.service.create_llm_client",
+        "line": 314
+      },
+      {
+        "to": "llm.runtime.service.AgentContext",
+        "line": 316
+      },
+      {
+        "to": "llm.runtime.service.uuid4",
+        "line": 317
+      },
+      {
+        "to": "llm.runtime.service.AgentConfig",
+        "line": 319
+      },
+      {
+        "to": "llm.runtime.service.LLMRetry",
+        "line": 326
+      },
+      {
+        "to": "llm.runtime.service.ToolUseGuard",
+        "line": 330
+      },
+      {
+        "to": "llm.runtime.service._AgentSlot",
+        "line": 334
       }
     ],
     "llm.runtime.service.on_record": [
       {
         "to": "llm.runtime.service.RuntimeEvent",
-        "line": 103
+        "line": 112
       },
       {
         "to": "llm.runtime.service.getattr",
-        "line": 121
+        "line": 130
       }
     ],
     "llm.runtime.service._close_slot": [
       {
         "to": "llm.runtime.service.getattr",
-        "line": 588
+        "line": 640
       },
       {
         "to": "llm.runtime.service.close",
-        "line": 590
+        "line": 642
       }
     ],
     "llm.runtime.service.start": [
       {
         "to": "llm.runtime.service.ModelCallLimiter",
-        "line": 238
+        "line": 256
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 237
+        "line": 255
       }
     ],
     "llm.runtime.service.chat_sessions": [
       {
         "to": "llm.runtime.service.ChatSessionManager",
-        "line": 186
+        "line": 195
       }
     ],
     "llm.runtime.service.chat_session_folder": [
       {
         "to": "llm.runtime.service.resolve_session_folder",
-        "line": 191
+        "line": 209
       },
       {
         "to": "llm.runtime.service.InboundMessage",
-        "line": 193
-      }
-    ],
-    "llm.runtime.service._get_slot": [
-      {
-        "to": "llm.runtime.service.resolve_session_folder",
-        "line": 265
-      },
-      {
-        "to": "llm.runtime.service.RuntimeError",
-        "line": 260
-      },
-      {
-        "to": "llm.runtime.service.RuntimeError",
-        "line": 263
-      },
-      {
-        "to": "llm.runtime.service.ValueError",
-        "line": 270
-      },
-      {
-        "to": "llm.runtime.service.ValueError",
-        "line": 273
-      },
-      {
-        "to": "llm.runtime.service.ValueError",
-        "line": 283
-      },
-      {
-        "to": "llm.runtime.service.UUID",
-        "line": 268
-      },
-      {
-        "to": "llm.runtime.service.SessionStore",
-        "line": 275
-      },
-      {
-        "to": "llm.runtime.service.ProviderAdapter",
-        "line": 296
-      },
-      {
-        "to": "llm.runtime.service.create_llm_client",
-        "line": 296
-      },
-      {
-        "to": "llm.runtime.service.AgentContext",
-        "line": 298
-      },
-      {
-        "to": "llm.runtime.service.uuid4",
-        "line": 299
-      },
-      {
-        "to": "llm.runtime.service.AgentConfig",
-        "line": 301
-      },
-      {
-        "to": "llm.runtime.service.LLMRetry",
-        "line": 308
-      },
-      {
-        "to": "llm.runtime.service.AgentPolicySpec",
-        "line": 310
-      },
-      {
-        "to": "llm.runtime.service.AgentPolicySpec",
-        "line": 314
-      },
-      {
-        "to": "llm.runtime.service.ToolUseGuard",
-        "line": 312
-      },
-      {
-        "to": "llm.runtime.service._AgentSlot",
-        "line": 316
+        "line": 211
       }
     ],
     "llm.runtime.service.manage_chat_session": [
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 204
+        "line": 222
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 206
+        "line": 224
       },
       {
         "to": "llm.runtime.service.RuntimeError",
-        "line": 208
+        "line": 226
       },
       {
         "to": "llm.runtime.service.ValueError",
-        "line": 211
+        "line": 229
       }
     ],
     "llm.runtime.service._prepare_slot": [
       {
         "to": "llm.runtime.service.create_llm_client",
-        "line": 472
+        "line": 524
       },
       {
         "to": "llm.runtime.service.register_prompts",
-        "line": 473
+        "line": 525
       }
     ],
     "llm.runtime.session_storage.resolve_session_folder": [
@@ -75339,139 +76670,61 @@
     "llm.channel.wechat.channel.<module>": [
       {
         "to": "llm.channel.wechat.channel.get_logger",
-        "line": 31
+        "line": 28
       }
     ],
     "llm.channel.wechat.channel.__init__": [
       {
         "to": "llm.channel.wechat.channel.super",
+        "line": 51
+      },
+      {
+        "to": "llm.channel.wechat.channel.WechatReplyStore",
         "line": 59
-      },
-      {
-        "to": "llm.channel.wechat.channel.WechatAccountStateProvider",
-        "line": 85
-      }
-    ],
-    "llm.channel.wechat.channel._save_user_data_to_db": [
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 193
-      }
-    ],
-    "llm.channel.wechat.channel._load_user_data_from_db": [
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 208
-      }
-    ],
-    "llm.channel.wechat.channel.send": [
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 361
-      },
-      {
-        "to": "llm.channel.wechat.channel.hasattr",
-        "line": 349
-      },
-      {
-        "to": "llm.channel.wechat.channel.WechatAPIError",
-        "line": 366
-      }
-    ],
-    "llm.channel.wechat.channel._handle_session_command": [
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 430
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 431
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 435
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 461
-      },
-      {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 476
-      },
-      {
-        "to": "llm.channel.wechat.channel.int",
-        "line": 435
-      },
-      {
-        "to": "llm.channel.wechat.channel.max",
-        "line": 443
-      },
-      {
-        "to": "llm.channel.wechat.channel.str",
-        "line": 465
-      },
-      {
-        "to": "llm.channel.wechat.channel.UUID",
-        "line": 465
-      },
-      {
-        "to": "llm.channel.wechat.channel.OutboundMessage",
-        "line": 486
-      },
-      {
-        "to": "llm.channel.wechat.channel.LLMResponse",
-        "line": 487
       }
     ],
     "llm.channel.wechat.channel._handle_wechat_message": [
       {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 551
+        "to": "llm.channel.wechat.channel.RuntimeError",
+        "line": 190
       },
       {
-        "to": "llm.channel.wechat.channel.len",
-        "line": 552
+        "to": "llm.channel.wechat.channel.ConversationRoute",
+        "line": 170
       },
       {
-        "to": "llm.channel.wechat.channel.str",
-        "line": 533
-      },
-      {
-        "to": "llm.channel.wechat.channel.str",
-        "line": 541
+        "to": "llm.channel.wechat.channel.ConversationInput",
+        "line": 183
       },
       {
         "to": "llm.channel.wechat.channel.str",
-        "line": 654
+        "line": 186
       },
       {
-        "to": "llm.channel.wechat.channel.UUID",
-        "line": 603
-      },
-      {
-        "to": "llm.channel.wechat.channel.OutboundMessage",
-        "line": 651
-      },
-      {
-        "to": "llm.channel.wechat.channel.LLMResponse",
-        "line": 653
-      },
-      {
-        "to": "llm.channel.wechat.channel.InboundMessage",
-        "line": 608
-      },
-      {
-        "to": "llm.channel.wechat.channel.getattr",
-        "line": 654
+        "to": "llm.channel.wechat.channel.uuid4",
+        "line": 186
       },
       {
         "to": "llm.channel.wechat.channel.WechatMessageError",
-        "line": 667
+        "line": 193
       },
       {
         "to": "llm.channel.wechat.channel.WechatMessageError",
-        "line": 670
+        "line": 195
+      }
+    ],
+    "llm.channel.wechat.channel.send": [
+      {
+        "to": "llm.channel.wechat.channel.WechatAPIError",
+        "line": 128
+      },
+      {
+        "to": "llm.channel.wechat.channel.WechatAPIError",
+        "line": 131
+      },
+      {
+        "to": "llm.channel.wechat.channel.WechatAPIError",
+        "line": 140
       }
     ],
     "llm.channel.wechat.client.<module>": [
@@ -75508,6 +76761,18 @@
       {
         "to": "llm.channel.wechat.media.get_logger",
         "line": 17
+      }
+    ],
+    "llm.channel.wechat.reply_store.<module>": [
+      {
+        "to": "llm.channel.wechat.reply_store.get_logger",
+        "line": 18
+      }
+    ],
+    "llm.channel.wechat.reply_store.remember": [
+      {
+        "to": "llm.channel.wechat.reply_store.RuntimeError",
+        "line": 92
       }
     ],
     "config.migrations.config_migrator.<module>": [

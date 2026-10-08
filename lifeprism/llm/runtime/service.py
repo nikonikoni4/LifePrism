@@ -19,6 +19,7 @@ from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType, Outbound
 from lifeprism.llm.guard import ToolUseGuard
 from lifeprism.llm.providers import LLMResponse, create_llm_client
 from lifeprism.llm.providers.llm_retry import LLMRetry
+from lifeprism.llm.runtime.hitl import HITLPolicy, InteractionClient
 from lifeprism.llm.runtime.limiter import ModelCallLimiter
 from lifeprism.llm.runtime.prompts import register_prompts
 from lifeprism.llm.runtime.provider import ProviderAdapter
@@ -87,6 +88,14 @@ class _AgentSlot:
         self.terminal = None
         self.header = None
         context.event_service.register(SESSION_EVENT.name, self.on_record)
+        self.hitl = HITLPolicy()
+        context.register_policy(
+            AgentPolicySpec(
+                REQUEST_ERROR,
+                [self.hitl.maxstep_continue, self.hitl.tool_breaker_continue],
+                self.hitl,
+            )
+        )
 
     def on_record(self, payload) -> None:
         """把一条 native 会话记录转换为 ``RuntimeEvent``。
@@ -326,7 +335,14 @@ class AgentRuntime:
         self._slots[session.meta_data.session_id] = slot
         return slot, is_new
 
-    async def stream(self, message: InboundMessage) -> AsyncIterator[RuntimeEvent]:
+    async def stream(
+        self,
+        message: InboundMessage,
+        *,
+        interaction_client: InteractionClient | None = None,
+        hitl_timeout: float = 60,
+        hitl_grant_steps: int = 5,
+    ) -> AsyncIterator[RuntimeEvent]:
         """流式执行一轮，并把当前消费方注册进关闭流程可取消的集合。
 
         当前任务会被记入 ``_consumers``，使 :meth:`close` 能直接取消仍在运行的
@@ -334,6 +350,9 @@ class AgentRuntime:
 
         Args:
             message: 待执行的入站消息。
+            interaction_client: 本轮人工交互客户端；缺省时不启用人工等待。
+            hitl_timeout: 原生 HITL 等待用户决定的秒数。
+            hitl_grant_steps: 选择继续后授予的额外步骤数。
 
         Yields:
             依次产出会话头事件、每条流式记录事件，以及终止的 ``done`` 或
@@ -346,7 +365,11 @@ class AgentRuntime:
             slot, is_new = self._get_slot(message)
             sid = slot.context.session.meta_data.session_id
             self._active_sessions[sid] = self._active_sessions.get(sid, 0) + 1
-            async with contextlib.aclosing(self._stream(message, slot, is_new)) as events:
+            async with contextlib.aclosing(
+                self._stream(
+                    message, slot, is_new, interaction_client, hitl_timeout, hitl_grant_steps
+                )
+            ) as events:
                 async for event in events:
                     yield event
         finally:
@@ -359,7 +382,13 @@ class AgentRuntime:
             self._consumers.discard(consumer)
 
     async def _stream(
-        self, message: InboundMessage, slot: _AgentSlot, is_new: bool
+        self,
+        message: InboundMessage,
+        slot: _AgentSlot,
+        is_new: bool,
+        interaction_client: InteractionClient | None = None,
+        hitl_timeout: float = 60,
+        hitl_grant_steps: int = 5,
     ) -> AsyncIterator[RuntimeEvent]:
         """执行一轮串行化的运行并产出其事件。
 
@@ -386,7 +415,13 @@ class AgentRuntime:
             context = slot.context
             try:
                 await self._prepare_slot(slot, message, is_new)
+                if interaction_client is not None:
+                    interaction_client.bind(run_id=run_id, session_id=sid)
+                    slot.hitl.bind(
+                        interaction_client, timeout=hitl_timeout, grant_steps=hitl_grant_steps
+                    )
             except BaseException:
+                slot.hitl.clear(interaction_client)
                 if is_new or message.type != MessageType.CHAT:
                     self._slots.pop(sid, None)
                     await self._close_slot(slot)
@@ -435,11 +470,19 @@ class AgentRuntime:
             except Exception as exc:
                 reason = slot.terminal.reason_text if slot.terminal is not None else str(exc)
                 logger.error("Agent 运行失败: run_id=%s error=%s", run_id, reason)
-                yield RuntimeEvent(type="error", run_id=run_id, session_id=sid, text=reason)
+                data = (
+                    slot.terminal.to_record_dict()
+                    if slot.terminal is not None
+                    else {"reason_type": "error"}
+                )
+                yield RuntimeEvent(
+                    type="error", run_id=run_id, session_id=sid, text=reason, data=data
+                )
             finally:
                 if not task.done():
                     task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
+                slot.hitl.clear(interaction_client)
                 self._tasks.discard(task)
                 slot.queue = None
                 # Persist and account for completed model calls even on failed/cancelled turns.

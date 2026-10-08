@@ -1,727 +1,197 @@
-"""微信 Channel 主类模块
-本文件源自 https://github.com/HKUDS/nanobot.git，经 AI 改写适配 lifeprism 项目。
-"""
+"""微信协议收发适配；会话和 Agent 业务由注入的入口处理。"""
 
 import asyncio
 import contextlib
-import json
-from datetime import date
+from collections.abc import Awaitable, Callable
 from typing import Any
-from uuid import UUID
+from uuid import uuid4
 
 import httpx
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.llm.bus import (
-    ChannelType,
-    InboundMessage,
-    MessageQueue,
-    MessageType,
-    OutboundMessage,
-)
+from lifeprism.llm.bus import ChannelType, MessageQueue, OutboundMessage
 from lifeprism.llm.channel.base import BaseChannel
 from lifeprism.llm.channel.wechat.auth import WechatAuth
 from lifeprism.llm.channel.wechat.client import WechatClient
 from lifeprism.llm.channel.wechat.config import WechatConfig
-from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
+from lifeprism.llm.channel.wechat.exceptions import (
+    WechatAPIError,
+    WechatMediaError,
+    WechatMessageError,
+)
 from lifeprism.llm.channel.wechat.media import WechatMedia
-from lifeprism.llm.providers import LLMResponse
-from lifeprism.llm.runtime import agent_runtime
-from lifeprism.utils.logger import get_logger
+from lifeprism.llm.channel.wechat.message import WechatMessage
+from lifeprism.llm.channel.wechat.reply_store import WechatReplyStore
+from lifeprism.llm.conversation.types import ConversationInput, ConversationRoute
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
 
 class WechatChannel(BaseChannel):
-    """微信 Channel
+    """只负责认证、协议转换、媒体、回复凭据和收发生命周期。
 
-    提供微信平台的消息接入能力，包括认证、消息收发、媒体处理等功能。
-
-    Attributes:
-        name: Channel 名称标识
-        config: 微信配置对象
-        wechat_dir: 微信数据目录
-        media_dir: 媒体文件存储目录
-        state_file: 状态文件路径
-        client: 微信 API 客户端
-        auth: 认证模块
-        media: 媒体处理模块
+    on_message 由应用装配注入，提交统一输入后应及时返回。
+    bus 参数仅保留构造兼容，不用于聊天或人工交互。
     """
 
     name = "wechat"
 
-    def __init__(self, config: WechatConfig, bus: MessageQueue):
-        """初始化微信 Channel
-
-        Args:
-            config: 微信配置对象
-            bus: 消息总线队列
-        """
+    def __init__(
+        self,
+        config: WechatConfig,
+        bus: MessageQueue,
+        *,
+        on_message: Callable[[ConversationInput], Awaitable[object]] | None = None,
+        allow_input: Callable[[ConversationRoute], bool] | None = None,
+        on_start: Callable[[], Awaitable[None]] | None = None,
+        on_stop: Callable[[], Awaitable[None]] | None = None,
+        reply_store: WechatReplyStore | None = None,
+    ):
         super().__init__(config, bus)
-        self.config: WechatConfig = config
-
-        # 路径设置
+        self.config = config
         self.wechat_dir = settings.channel_path / "wechat"
         self.media_dir = self.wechat_dir / "media"
         self.state_file = self.wechat_dir / "account.json"
-
-        # 模块
         self.client: WechatClient | None = None
         self.auth: WechatAuth | None = None
         self.media: WechatMedia | None = None
-
-        # 状态
+        self.reply_store = reply_store if reply_store is not None else WechatReplyStore()
+        self.on_message = on_message
+        self.allow_input = allow_input
+        self.on_start = on_start
+        self.on_stop = on_stop
         self._poll_task: asyncio.Task | None = None
-        # 用户数据：{wechat_user_id: {"context_token": "xxx", "last_session_id": "xxx"}}
-        self._user_data: dict[str, dict[str, str]] = {}
-
-        # 数据库访问（wechat_account_state 表，替代 account.json 文件存储）
-        # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
-        from lifeprism.repository import lw_db_manager
-        from lifeprism.repository.providers.wechat_account_state_provider import (
-            WechatAccountStateProvider,
-        )
-
-        self._db_manager = lw_db_manager
-        self._account_state_provider = WechatAccountStateProvider(db_manager=self._db_manager)
-        # 使用公共方法 get_all_states()，不直接调用 _generic_query
-
-    def _migrate_account_json_to_db(self) -> bool:
-        """将 account.json 文件数据迁移到 wechat_account_state 数据库表
-
-        迁移条件：account.json 存在且 DB 表中无任何记录时执行迁移。
-        迁移完成后将 account.json 重命名为 account.json.bak（保留备份）。
-
-        支持的文件格式：
-        - 新格式：{"user_data": {user_id: {"context_token": "xxx", "last_session_id": "xxx"}}}
-        - 旧格式：{"context_tokens": {user_id: "context_token_string"}}
-
-        Returns:
-            True 表示已执行迁移；False 表示跳过迁移（文件不存在或 DB 已有记录）
-
-        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
-        """
-        # 1. account.json 不存在 → 跳过
-        if not self.state_file.exists():
-            return False
-
-        # 2. DB 已有记录 → 跳过（避免覆盖新数据）
-        with self._db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM wechat_account_state")
-            count = cursor.fetchone()[0]
-        if count > 0:
-            logger.info("DB 中已有 %s 条记录，跳过 account.json 迁移", count)
-            return False
-
-        # 3. 读取并解析 account.json
-        try:
-            file_state = json.loads(self.state_file.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            logger.error("读取 account.json 失败: error=%s", e, exc_info=True)
-            return False
-
-        # 4. 提取用户数据（支持新旧格式）
-        user_data = {}
-        if "user_data" in file_state:
-            # 新格式
-            user_data = file_state.get("user_data", {})
-        elif "context_tokens" in file_state:
-            # 旧格式：context_tokens = {user_id: "context_token_string"}
-            logger.info("检测到旧格式 context_tokens，迁移到新格式")
-            old_context_tokens = file_state.get("context_tokens", {})
-            for user_id, context_token in old_context_tokens.items():
-                user_data[user_id] = {
-                    "context_token": context_token,
-                    # 旧数据没有 session_id
-                    "last_session_id": None,
-                }
-
-        if not user_data:
-            logger.info("account.json 中无用户数据，跳过迁移")
-            # 即使无数据也重命名文件，避免反复尝试
-            self._rename_account_json_to_bak()
-            return True
-
-        # 5. 迁移到 DB
-        for wechat_user_id, data in user_data.items():
-            context_token = data.get("context_token")
-            last_session_id = data.get("last_session_id")
-            self._account_state_provider.save_state(
-                wechat_user_id=wechat_user_id,
-                context_token=context_token,
-                last_session_id=last_session_id,
-            )
-        logger.info("已迁移 %s 个用户的数据到 DB", len(user_data))
-
-        # 6. 重命名 account.json 为 account.json.bak
-        self._rename_account_json_to_bak()
-        return True
-
-    def _rename_account_json_to_bak(self) -> None:
-        """将 account.json 重命名为 account.json.bak"""
-        try:
-            bak_file = self.state_file.with_suffix(".json.bak")
-            self.state_file.rename(bak_file)
-            logger.info("已将 account.json 重命名为 %s", bak_file.name)
-        except OSError as e:
-            logger.error("重命名 account.json 失败: error=%s", e, exc_info=True)
-
-    def _save_user_data_to_db(self, wechat_user_id: str | None = None) -> None:
-        """将 _user_data 中的所有用户数据保存到 DB
-
-        使用 INSERT OR REPLACE 语义：已存在的记录会被覆盖。
-        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
-
-        Args:
-            wechat_user_id: 指定时只保存该用户，缺省保存全部用户。
-        """
-        if not self._user_data:
-            return
-        users = (
-            {wechat_user_id: self._user_data[wechat_user_id]}
-            if wechat_user_id is not None
-            else self._user_data
-        )
-        for user_id, data in users.items():
-            context_token = data.get("context_token")
-            last_session_id = data.get("last_session_id")
-            self._account_state_provider.save_state(
-                wechat_user_id=user_id,
-                context_token=context_token,
-                last_session_id=last_session_id,
-            )
-        logger.info("已保存 %s 个用户数据到 DB", len(users))
-
-    def _load_user_data_from_db(self) -> None:
-        """从 DB 加载所有用户数据到 _user_data
-
-        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
-        """
-        results = self._account_state_provider.get_all_states()
-        self._user_data = {}
-        for row in results:
-            wechat_user_id = row["wechat_user_id"]
-            self._user_data[wechat_user_id] = {
-                "context_token": row.get("context_token"),
-                "last_session_id": row.get("last_session_id"),
-            }
-        logger.info("从 DB 加载了 %s 个用户数据", len(self._user_data))
-
-    def _refresh_user_data_from_db(self, wechat_user_id: str) -> None:
-        """从 DB 刷新指定用户的 session_id 到内存缓存
-
-        解决场景：SyncClient 同步拉取到云端最新 last_session_id 后，
-        WechatChannel 的 _user_data 内存缓存仍是旧值，导致用旧 session_id
-        处理消息。每次处理消息前调用此方法刷新，保证 session_id 是最新的。
-
-        注意：只刷新 last_session_id，不覆盖 context_token
-        （context_token 由微信消息本身携带，是最新的；DB 中的 context_token
-        可能在同步链路中已过期）
-
-        Args:
-            wechat_user_id: 微信用户 ID
-        """
-        try:
-            row = self._account_state_provider.get_state(wechat_user_id)
-            if row is None:
-                # DB 中无此用户记录（首次交互），保留内存中的现有值
-                return
-            db_session_id = row.get("last_session_id")
-            # 确保 _user_data 中有此用户的字典
-            if wechat_user_id not in self._user_data:
-                self._user_data[wechat_user_id] = {}
-            cached_session_id = self._user_data[wechat_user_id].get("last_session_id")
-            if cached_session_id != db_session_id:
-                logger.info(
-                    "从 DB 刷新 session_id: %s -> %s",
-                    cached_session_id,
-                    db_session_id,
-                )
-                self._user_data[wechat_user_id]["last_session_id"] = db_session_id
-        except Exception as e:
-            # DB 查询失败不阻塞消息处理，使用内存中的旧值继续
-            logger.warning(
-                "从 DB 刷新 session_id 失败，使用内存缓存: wechat_user_id=%s, error=%s",
-                wechat_user_id,
-                e,
-            )
 
     async def start(self) -> None:
-        """启动 channel
-
-        初始化客户端、认证模块和媒体处理模块，完成登录后启动消息轮询。
-        """
+        """完成认证和注入入口的启动后开始轮询；失败时释放连接。"""
         if self._running:
             return
-
-        self._running = True
-        logger.info("启动微信 channel")
-
-        # 初始化客户端
         self.client = WechatClient(self.config.base_url)
         await self.client.__aenter__()
-
-        # 初始化认证
-        self.auth = WechatAuth(self.client, self.state_file)
-
-        # 加载状态（主要用于从 keyring 加载 token；
-        # 若 account.json 仍存在，auth.load_state 会先把 token 迁移到 keyring）
-        state = self.auth.load_state()
-        token = state.get("token", "")
-
-        # 迁移 account.json → DB（一次性迁移，参考 ADR 决策 4）
-        # 此时 account.json 中的 token 已被 auth.load_state 迁移到 keyring，
-        # 剩余的 user_data/context_tokens 迁移到 wechat_account_state 表
-        self._migrate_account_json_to_db()
-
-        # 从 DB 加载用户数据（替代原文件加载方式）
-        self._load_user_data_from_db()
-
-        logger.info("加载的 token: %s...", token[:20] if token else "None")
-        logger.info("加载的用户数据: %s 个用户", len(self._user_data))
-
-        if token:
+        prepared = False
+        try:
+            self.auth = WechatAuth(self.client, self.state_file)
+            state = self.auth.load_state()
+            self.reply_store.migrate_legacy(self.state_file)
+            token = state.get("token", "")
+            if not token:
+                logger.info("微信未配置登录凭据，跳过启动")
+                await self.client.__aexit__(None, None, None)
+                self.client = None
+                return
+            if self.on_message is None:
+                raise RuntimeError("微信渠道尚未注入输入接收入口")
             self.client.token = token
-            logger.info("使用已保存的 token")
-        else:
-            # # QR 登录
-            # success = await self.auth.qr_login()
-            # if not success:
-            #     logger.error("登录失败")
-            #     self._running = False
-            #     return
-            # 不存在token放弃启动
-            logger.info("微信 channel 不存在 token，放弃启动")
+            self.media = WechatMedia(self.client, self.media_dir)
+            if self.on_start is not None:
+                prepared = True
+                await self.on_start()
+            self._running = True
+            self._poll_task = asyncio.create_task(self._poll_loop(), name="wechat-poll")
+        except BaseException:
             self._running = False
-            return
-        # 初始化媒体处理
-        self.media = WechatMedia(self.client, self.media_dir)
-
-        # 启动长轮询
-        self._poll_task = asyncio.create_task(self._poll_loop())
-
-    async def stop(self) -> None:
-        """停止 channel
-
-        取消消息轮询任务并关闭客户端连接。
-        """
-        self._running = False
-
-        # 保存最新的用户数据到 DB（兜底保障，替代原 account.json 文件存储）
-        # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
-        if self._user_data:
             try:
-                self._save_user_data_to_db()
-                logger.info("停止时保存用户数据到 DB: %s 个用户", len(self._user_data))
-            except Exception as e:
-                logger.error("停止时保存用户数据失败: error=%s", e, exc_info=True)
-
-        if self._poll_task:
-            self._poll_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._poll_task
-        if self.client:
-            await self.client.__aexit__(None, None, None)
-        logger.info("微信 channel 已停止")
-
-    async def send(self, msg: OutboundMessage) -> None:
-        """发送消息到微信平台
-
-        Args:
-            msg: 待发送的出站消息
-        """
-        if not self.client or not self._running:
-            logger.warning("客户端未初始化或未运行")
-            return
-
-        # 从 extra 中获取目标用户ID
-        wechat_user_id = msg.extra.get("wechat_user_id") if msg.extra else None
-        if not wechat_user_id:
-            logger.error("无法发送消息：未找到目标用户 ID")
-            return
-
-        # 从用户数据中获取 context_token
-        user_data = self._user_data.get(wechat_user_id, {})
-        context_token = user_data.get("context_token", "")
-
-        # 提取内容
-        content = ""
-        if msg.response and hasattr(msg.response, "content"):
-            content = msg.response.content
-
-        if not content:
-            logger.debug("消息内容为空，跳过发送")
-            return
-
-        # 构造并发送消息
-        try:
-            from lifeprism.llm.channel.wechat.message import WechatMessage
-
-            message_body = WechatMessage.build_text_message(wechat_user_id, content, context_token)
-            logger.info("开始发送消息到微信: content_len=%s", len(content))
-            await self.client.api_post("ilink/bot/sendmessage", message_body)
-            logger.info("发送消息到微信成功")
-        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
-            logger.error("发送消息失败: 错误=%s", e, exc_info=True)
-            raise WechatAPIError(f"发送消息失败: {e}") from e
-
-    async def _poll_loop(self) -> None:
-        """消息轮询循环
-
-        持续轮询微信服务器获取新消息，处理接收到的消息并发送到消息总线。
-        发生网络或 API 错误时会记录日志并等待 5 秒后重试，确保轮询持续运行。
-        """
-        logger.info("轮询循环已启动")
-        get_updates_buf = ""
-        poll_count = 0
-
-        while self._running:
-            try:
-                poll_count += 1
-                logger.debug(
-                    "第 %s 次轮询, get_updates_buf=%s...", poll_count, get_updates_buf[:50]
-                )
-                body = {"get_updates_buf": get_updates_buf}
-                data = await self.client.api_post("ilink/bot/getupdates", body)
-
-                # 打印完整响应（使用 DEBUG 级别避免日志噪音）
-                logger.debug("完整响应数据: %s", data)
-
-                get_updates_buf = data.get("get_updates_buf", "")
-                messages = data.get("msgs", [])
-
-                logger.debug(
-                    "轮询返回: get_updates_buf=%s..., 消息数=%s",
-                    get_updates_buf[:50],
-                    len(messages),
-                )
-
-                if messages:
-                    logger.debug("*** 收到 %s 条消息 ***", len(messages))
-                    for idx, msg in enumerate(messages):
-                        logger.debug("消息 %s: %s", idx + 1, msg)
-                        await self._handle_wechat_message(msg)
-
-            except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
-                logger.error("长轮询网络错误: error=%s", e, exc_info=True)
-                await asyncio.sleep(5)
-            except (KeyError, ValueError) as e:
-                logger.error("长轮询数据解析错误: error=%s", e, exc_info=True)
-                await asyncio.sleep(5)
-
-    async def _handle_session_command(self, content: str, wechat_user_id: str) -> bool:
-        """处理聊天会话命令和历史回顾，不触发模型执行。
-
-        Args:
-            content: 微信文本内容。
-            wechat_user_id: 已通过白名单检查的微信用户 ID。
-
-        Returns:
-            是否识别并处理了会话命令。
-        """
-        parts = content.strip().split()
-        if not parts or parts[0] not in {"/new", "/continue", "/session-list"}:
-            return False
-        command = parts[0]
-        user_data = self._user_data.setdefault(wechat_user_id, {})
-        reply: str
-        response_session_id = None
-        try:
-            if command == "/session-list":
-                try:
-                    page, date_filter = self._session_list_arguments(parts[1:])
-                except ValueError:
-                    reply = (
-                        "[ERROR] 用法：/session-list [正整数页码] "
-                        "或 /session-list YYYY-MM-DD [正整数页码]"
-                    )
-                else:
-                    options = {"date_filter": date_filter} if date_filter else {}
-                    listing = await agent_runtime.chat_sessions.list_sessions(
-                        page=page, page_size=10, include_preview=True, **options
-                    )
-                    total = listing["total"]
-                    pages = max(1, (total + 9) // 10)
-                    scope = f"（{date_filter}）" if date_filter else ""
-                    lines = [f"[SUCCESS] 聊天会话{scope}：第 {page}/{pages} 页，共 {total} 个"]
-                    for item in listing["items"]:
-                        markers = []
-                        if item["id"] == user_data.get("last_session_id"):
-                            markers.append("当前")
-                        if item["is_running"]:
-                            markers.append("运行中")
-                        label = f" [{', '.join(markers)}]" if markers else ""
-                        name = " ".join(item["name"].split())[:80]
-                        preview = item.get("preview") or "暂无用户消息"
-                        lines.append(f"• {name}{label}\n{item['id']}: {preview}")
-                    if not listing["items"]:
-                        empty = (
-                            f"暂无{date_filter}的会话记录。" if date_filter else "暂无聊天会话。"
-                        )
-                        lines.append(empty if total == 0 else "此页没有会话。")
-                    lines.append("发送 /continue <完整 Session ID> 切换会话。")
-                    if page < pages:
-                        prefix = f"{date_filter} " if date_filter else ""
-                        lines.append(f"下一页：/session-list {prefix}{page + 1}")
-                    reply = "\n\n".join(lines)
-            elif command == "/continue":
-                if len(parts) != 2:
-                    reply = "[ERROR] 请提供会话ID，用法：/continue <完整 Session ID>"
-                else:
-                    try:
-                        sid = str(UUID(parts[1]))
-                    except ValueError:
-                        reply = "[ERROR] Session ID 无效，请从 /session-list 复制完整 ID。"
-                    else:
-                        history = await agent_runtime.chat_sessions.get_history(sid)
-                        if history is None:
-                            reply = (
-                                f"[ERROR] 会话 {sid} 不存在，请通过 /session-list 查看可用会话。"
-                            )
-                        else:
-                            self._persist_session_reference(wechat_user_id, sid)
-                            response_session_id = sid
-                            name = " ".join(history["session_name"].split())[:80]
-                            reply = f"[SUCCESS] 继续会话 {sid}\n{name}"
-                            last_messages = {}
-                            for message in reversed(history["messages"]):
-                                role = message["role"]
-                                if role in {"user", "assistant"} and role not in last_messages:
-                                    last_messages[role] = message["content"]
-                            if any(last_messages.values()):
-                                reply += "\n\n最后两轮对话："
-                                if last_messages.get("user"):
-                                    reply += f"\nuser:\n{last_messages['user']}"
-                                if last_messages.get("assistant"):
-                                    reply += f"\n\nA:\n{last_messages['assistant']}"
-            elif len(parts) != 1:
-                reply = "[ERROR] 用法：/new"
-            else:
-                previous = user_data.get("last_session_id")
-                created = await agent_runtime.chat_sessions.create()
-                sid = created["session_id"]
-                try:
-                    self._persist_session_reference(wechat_user_id, sid)
-                except Exception:
-                    try:
-                        await agent_runtime.chat_sessions.delete(sid)
-                    except Exception:
-                        logger.exception("清理未绑定的微信空会话失败: session_id=%s", sid)
-                    raise
-                response_session_id = sid
-                reply = f"[SUCCESS] 新建会话 {sid} --- 可以开始新的聊天了！"
-                if previous:
-                    reply += f"\n\n可以通过使用以下指令恢复上一个会话：\n/continue {previous}"
-        except Exception:
-            # 文件系统、状态存储错误隔离在命令边界，避免终止微信轮询。
-            logger.exception("微信会话命令失败: command=%s", command)
-            response_session_id = None
-            reply = "[ERROR] 会话命令执行失败，请稍后重试。"
-        await self.send(
-            OutboundMessage(
-                response=LLMResponse(content=reply),
-                session_id=response_session_id,
-                extra={"wechat_user_id": wechat_user_id},
-            )
-        )
-        return True
-
-    @staticmethod
-    def _session_list_arguments(arguments: list[str]) -> tuple[int, str | None]:
-        """兼容页码与严格本地日期；日期筛选可带第二个分页参数。"""
-        if len(arguments) > 2:
-            raise ValueError("参数过多")
-        page, date_filter = 1, None
-        if arguments:
-            first = arguments[0]
-            if len(first) == 10 and date.fromisoformat(first).isoformat() == first:
-                date_filter = first
-                page_text = arguments[1] if len(arguments) == 2 else "1"
-            elif len(arguments) == 1:
-                page_text = first
-            else:
-                raise ValueError("日期参数无效")
-            if not page_text.isascii() or not page_text.isdecimal() or int(page_text) < 1:
-                raise ValueError("页码无效")
-            page = int(page_text)
-        return page, date_filter
-
-    def _persist_session_reference(self, wechat_user_id: str, session_id: str) -> None:
-        """持久化渠道会话引用，保存失败时恢复内存中的旧引用。"""
-        data = self._user_data.setdefault(wechat_user_id, {})
-        had_reference = "last_session_id" in data
-        previous = data.get("last_session_id")
-        data["last_session_id"] = session_id
-        try:
-            self._save_user_data_to_db(wechat_user_id)
-        except Exception:
-            if had_reference:
-                data["last_session_id"] = previous
-            else:
-                data.pop("last_session_id", None)
+                if prepared and self.on_stop is not None:
+                    await self.on_stop()
+            finally:
+                await self.client.__aexit__(None, None, None)
+                self.client = None
             raise
 
-    async def _handle_wechat_message(self, msg: dict[str, Any]) -> None:
-        """处理微信消息
-
-        解析微信消息，检查权限，下载媒体文件，构造 InboundMessage 并发送到消息总线。
-        单个消息处理失败不会影响其他消息的处理。
-
-        消息路由：仅在云端模式（agent_only）下，在解析消息之前先判断本地在线状态，
-        本地在线时跳过云端处理，由本地负责回复，避免重复回复；本地离线时云端接管处理。
-        本地模式（full）下 heartbeat_manager 从不被更新，直接处理所有消息。
-
-        Args:
-            msg: 原始微信消息字典
-        """
-        # 消息路由：仅在云端模式（agent_only）时检查心跳
-        # 本地模式（full）下 heartbeat_manager 从不被更新，is_local_online() 永远返回 False，
-        # 路由检查为死代码。此守卫确保只在云端执行路由判断，防止未来误更新 heartbeat_manager
-        # 导致本地消息被错误跳过。
-        from lifeprism.sync.heartbeat_manager import heartbeat_manager
-
-        if settings.run_mode == "agent_only":
-            # 云端模式：根据本地心跳状态决定是否跳过消息处理
-            if heartbeat_manager.is_local_online():
-                logger.info(
-                    "本地在线，跳过云端处理: from_user=%s, message=%s",
-                    msg.get("from_user_id"),
-                    str(msg.get("content", ""))[:50],
-                )
-                return  # 本地会处理
-
-            # 本地离线，云端接管处理
-            logger.info(
-                "本地离线，云端接管处理: from_user=%s, message=%s",
-                msg.get("from_user_id"),
-                str(msg.get("content", ""))[:50],
-            )
-
+    async def stop(self) -> None:
+        """先停止输入，再等待注入任务收尾，最后关闭微信连接。"""
+        self._running = False
         try:
-            logger.info("开始处理微信消息")
-            from lifeprism.llm.channel.wechat.message import WechatMessage
+            if self._poll_task is not None:
+                self._poll_task.cancel()
+                try:
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await self._poll_task
+                finally:
+                    self._poll_task = None
+        finally:
+            try:
+                if self.on_stop is not None:
+                    await self.on_stop()
+            finally:
+                if self.client is not None:
+                    try:
+                        await self.client.__aexit__(None, None, None)
+                    finally:
+                        self.client = None
+        logger.info("微信渠道已停止")
 
+    async def send(self, msg: OutboundMessage) -> None:
+        """使用当前回复凭据发送完整消息；未送达不能静默视为成功。"""
+        if self.client is None or not self._running:
+            raise WechatAPIError("微信客户端未初始化或未运行")
+        user_id = (msg.extra or {}).get("wechat_user_id")
+        if not user_id:
+            raise WechatAPIError("无法发送微信消息：缺少目标用户 ID")
+        content = msg.response.content if msg.response is not None else ""
+        if not content:
+            return
+        token = self.reply_store.get_token(user_id)
+        body = WechatMessage.build_text_message(user_id, content, token)
+        try:
+            await self.client.api_post("ilink/bot/sendmessage", body)
+        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as exc:
+            raise WechatAPIError(f"发送微信消息失败: {exc}") from exc
+
+    async def _poll_loop(self) -> None:
+        """不断接收消息；入口不等待 Agent，单个坏输入不终止下一批轮询。"""
+        cursor = ""
+        while self._running:
+            try:
+                data = await self.client.api_post(
+                    "ilink/bot/getupdates", {"get_updates_buf": cursor}
+                )
+                cursor = data.get("get_updates_buf", "")
+                for msg in data.get("msgs", []):
+                    try:
+                        await self._handle_wechat_message(msg)
+                    except Exception:
+                        # 最外层入站任务边界：标记本条失败，不能让它终止整个接收器。
+                        # CancelledError 属于 BaseException，仍交给生命周期关闭。
+                        logger.exception("微信单条输入处理失败")
+            except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError, WechatAPIError):
+                logger.exception("微信轮询连接失败")
+                await asyncio.sleep(5)
+            except (KeyError, ValueError, TypeError):
+                logger.exception("微信轮询数据无效")
+                await asyncio.sleep(5)
+
+    async def _handle_wechat_message(self, msg: dict[str, Any]) -> None:
+        """转换协议输入、更新回复凭据和媒体，交给注入的业务入口。"""
+        try:
             parsed = WechatMessage.parse_message(msg)
-            logger.debug(
-                "解析后的消息: content_len=%s, media_count=%s",
-                len(parsed["content"]),
-                len(parsed["media"]),
-            )
-
-            wechat_user_id = parsed["from_user_id"]
-            content = parsed["content"]
-            context_token = parsed["context_token"]
-
-            # 检查权限
-            if not self.is_allowed(wechat_user_id):
-                logger.warning("拒绝未授权用户")
+            user_id = parsed["from_user_id"]
+            if not user_id:
                 return
-
-            logger.info("用户已授权")
-
-            # 标记是否需要持久化
-            need_save = False
-
-            # 保存 context_token 到用户数据
-            if context_token:
-                if wechat_user_id not in self._user_data:
-                    self._user_data[wechat_user_id] = {}
-                self._user_data[wechat_user_id]["context_token"] = context_token
-                logger.debug("context_token已更新")
-                need_save = True
-
-            # 下载媒体
+            route = ConversationRoute(channel=ChannelType.WECHAT, recipient_id=user_id)
+            if self.allow_input is not None and not self.allow_input(route):
+                return
+            try:
+                self.reply_store.remember(user_id, parsed["context_token"])
+            except Exception:
+                # 内存已保留最新凭据；存储失败不能让正在等待的用户答案丢失。
+                logger.warning("微信回复凭据持久化失败", exc_info=True)
             media_paths = []
-            for media_item in parsed["media"]:
-                media_type = media_item["type"]
-                media_info = media_item["info"]
-                path = await self.media.download_media(media_info, media_type)
+            for item in parsed["media"]:
+                path = await self.media.download_media(item["info"], item["type"])
                 if path:
                     media_paths.append(path)
-
-            # 从 DB 刷新 session_id 到内存缓存
-            # 解决场景：SyncClient 同步拉取到云端最新 last_session_id 后，
-            # 内存缓存仍是旧值。每次处理消息前刷新，保证 session_id 是最新的。
-            # 注意：此方法只刷新 last_session_id，不覆盖 context_token
-            # （context_token 由微信消息本身携带，DB 中的可能在同步链路中已过期）
-            self._refresh_user_data_from_db(wechat_user_id)
-
-            # 从用户数据中读取 session_id（可能是 None，让 AgentLoop 处理）
-            # 使用 or None 确保空字符串被规范化为 None
-            session_id = self._user_data.get(wechat_user_id, {}).get("last_session_id") or None
-
-            if await self._handle_session_command(content, wechat_user_id):
-                return
-
-            # 旧会话不适配；首次普通消息使用原生新会话。
-            if session_id:
-                try:
-                    UUID(session_id)
-                except ValueError:
-                    session_id = None
-
-            # 构造 InboundMessage
-            inbound_msg = InboundMessage(
-                type=MessageType.CHAT,
-                channel=ChannelType.WECHAT,
-                content=content,
-                session_id=session_id,
-                extra={
-                    "media": media_paths,
-                    "wechat_user_id": wechat_user_id,  # 传递用户ID，供 send() 使用
-                },
+            incoming = ConversationInput(
+                route=route,
+                content=parsed["content"],
+                input_id=str(msg.get("message_id") or msg.get("client_id") or uuid4().hex),
+                extra={"media": media_paths, "wechat_user_id": user_id},
             )
-
-            logger.info("提交聊天到 Runtime: id=%s", inbound_msg.id)
-            try:
-                # execute collects the final response from registered session events.
-                response: OutboundMessage = await agent_runtime.execute(inbound_msg)
-
-                if response.session_id:
-                    # 使用最新的session_id继续处理
-                    logger.debug("更新session_id %s -> %s", session_id, response.session_id)
-                    # 更新用户数据中的 session_id
-                    if wechat_user_id not in self._user_data:
-                        self._user_data[wechat_user_id] = {}
-                    self._user_data[wechat_user_id]["last_session_id"] = response.session_id
-                    need_save = True
-
-                # 统一持久化到 DB（替代原文件存储方式）
-                # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
-                if need_save:
-                    try:
-                        self._save_user_data_to_db()
-                        logger.info("已保存用户数据到 DB")
-                    except Exception as save_error:
-                        logger.error("保存用户数据失败: error=%s", save_error, exc_info=True)
-
-                # 将用户ID传递到响应中
-                if not response.extra:
-                    response.extra = {}
-                response.extra["wechat_user_id"] = wechat_user_id
-
-                await self.send(response)
-            except Exception as e:
-                logger.error("处理消息失败: error=%s", e, exc_info=True)
-                # 发送错误消息给用户
-                error_response = OutboundMessage(
-                    id=inbound_msg.id,
-                    response=LLMResponse(
-                        content=f"[ERROR] 处理消息时出错: {getattr(e, 'message', None) or str(e)}"
-                    ),
-                    extra={"wechat_user_id": wechat_user_id},  # 传递用户ID
-                )
-
-                try:
-                    await self.send(error_response)
-                except Exception as send_error:
-                    # ✅ 发送错误消息失败时，允许 except Exception（未知的第三方 API 错误）
-                    logger.error("发送错误消息也失败: error=%s", send_error, exc_info=True)
-
-        except (KeyError, ValueError, TypeError) as e:
-            logger.error("消息解析错误: error=%s", e, exc_info=True)
-            raise WechatMessageError(f"消息解析失败: {e}") from e
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error("媒体下载错误: error=%s", e, exc_info=True)
-            raise WechatMessageError(f"媒体下载失败: {e}") from e
+            if self.on_message is None:
+                raise RuntimeError("微信渠道尚未注入输入接收入口")
+            await self.on_message(incoming)
+        except (KeyError, ValueError, TypeError) as exc:
+            raise WechatMessageError(f"微信输入解析失败: {exc}") from exc
+        except (httpx.HTTPStatusError, httpx.RequestError, WechatMediaError) as exc:
+            raise WechatMessageError(f"微信媒体下载失败: {exc}") from exc

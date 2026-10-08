@@ -54,10 +54,10 @@
 - 内容摘要：配置管理模块规格，定义配置读写流程（环境变量>keyring>yaml>默认值）、路径解析规则（config_base_path 固定/lifeprism_data_path 可迁移）及打包环境前后端路径配置详细流程图、API Key 安全存储（keyring）、Provider 管理（白名单/模型历史/VLM 缓存）、配置迁移机制及前后端交互契约（REST API），包含前端路径配置已知问题说明
 
 ## wechat-channel-integration-spec
-- updated_at: 2026-05-01
+- updated_at: 2026-10-08
 - path: `docs/specs/2026-05-01-wechat-channel-integration-spec.md`
-- 触发规则：开发、修改或查询 WeChat Channel 与 LifePrism 对接相关功能时阅读（Channel 接口、配置数据流、消息总线集成）
-- 内容摘要：WeChat Channel 与 LifePrism 对接规格，定义 Channel 暴露给 LifePrism 的接口、配置数据流（WechatConfig、allow_from 白名单）、消息总线契约（InboundMessage/OutboundMessage）、Channel 生命周期管理（启动/停止）、session_id 规范
+- 触发规则：开发、修改或查询微信纯收发、会话服务接线、人工回答、命令与生命周期时阅读
+- 内容摘要：微信纯收发与会话服务契约，定义输入/输出路由、原生 HITL 回答、命令/忙状态、凭据与引用隔离、启动和关闭；聊天不走 bus
 
 ## screenshot-analysis-spec
 - updated_at: 2026-04-26
@@ -147,4 +147,4 @@
 - updated_at: 2026-10-08
 - path: `docs/specs/2026-10-03-myagent-runtime-spec.md`
 - 触发规则：修改或查询迁移后的 Agent 运行、聊天事件及后台 bus 时阅读。
-- 内容摘要：原生执行、事件终态、SSE、工具提示词、生命周期、workflow_id 存储归属、前端统一聊天 Session 管理，以及 meta.extra.last_processed_turn 增量提取。默认会话根目录为数据目录下 session，由 session_root 集中解析。
+- 内容摘要：原生执行、事件终态、SSE、工具提示词、生命周期、workflow_id 存储归属、统一聊天管理与 turn 增量提取；微信会话服务按本轮注入原生 HITL 客户端。默认根为数据目录/session。

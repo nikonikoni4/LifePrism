@@ -1,8 +1,8 @@
 ---
-version: 1.7
+version: 1.8
 created_at: 2026-10-03
 updated_at: 2026-10-08
-last_updated: 恢复微信新会话即时落盘、上一会话指令和继续聊天回顾
+last_updated: 微信会话服务消费事件流，按运行注入原生人在回路客户端
 abstract: 原生 Agent 执行、事件关联、最终答复、工具和提示词注册、共享用量统计，以及暂不可用的会话业务边界。
 ---
 
@@ -20,6 +20,7 @@ abstract: 原生 Agent 执行、事件关联、最终答复、工具和提示词
 | 1.5 | 微信聊天会话分页列表及渠道引用切换 |
 | 1.6 | 默认会话根目录收敛为 session，Runtime 以 session_root 集中解析 |
 | 1.7 | 微信命令恢复即时新建、历史回顾、日期筛选与消息摘要 |
+| 1.8 | 微信纯收发、独立会话服务与原生 HITL 的运行级注入 |
 
 ## 业务意图
 
@@ -34,6 +35,16 @@ Runtime 接收现有 InboundMessage（内容块、场景、渠道、可选 sessi
 `done` 必须满足执行任务结束且本轮终态成功；结果文本使用最后一次 assistant message，用量累加本轮所有完成的模型步骤。失败输出 error，不输出 done。取消结束 turn，不生成成功结果。用量持久化保留已完成步骤，即使后续失败或取消。成功聊天在 Runtime 记录一次生产调用日志，提示词及模型取原生 request/header；后台日志由现有任务调用方记录，避免重复。
 
 `execute` 收集上述事件得到 OutboundMessage；错误抛出 RuntimeError。后台 worker 将异常转为 OutboundMessage.error，bus 等待者立即失败。请求取消/超时取消对应后台执行。
+
+## 会话交互契约
+
+微信不等待 execute 的最终返回，输入提交到 ConversationService 后及时返回。服务拥有原 stream 的消费任务，人工提示、命令答复与最终结果共用 ConversationClient.send。具体输入、忙状态及会话命令契约见 [微信接入 Spec](2026-05-01-wechat-channel-integration-spec.md)。
+
+`stream` 增加可选 `interaction_client`、`hitl_timeout=60`、`hitl_grant_steps=5`。客户端提供 `bind(run_id, session_id)` 与原生 `ask_human(HITLMessage) -> HumanReturn`；在 Session 执行锁内、本轮 turn 启动前绑定，清理时解除匹配绑定。无客户端的本地 SSE 与后台路径保持原等待契约，不启用人工等待。
+
+原生 HITL 通过 context 注册 REQUEST_ERROR waterfall，提供最大步数及工具熔断回调；每缓存 Session 只注册一次，回调目标按本轮绑定。人工答案完成原 Future，不追加 user turn，不取得原 Session 执行锁。最大步数继续由 loop 留存 grant；取消产生 interrupted，工具熔断取消产生 error。Runtime 的 error.data 保留原生终态记录（无终态时 reason_type=error）。会话服务耗尽并关闭流、等待 Runtime 清理后才发送一次终态。
+
+默认工具配置仍不变；工具熔断回调只有在工具配置实际抛出熔断异常时介入。人工等待超时由原生策略管理，Runtime 的 1000 秒总超时包含等待。服务关闭取消并等待自有任务；共享 Runtime 由应用生命周期关闭。
 
 ## Session 存储归属
 
@@ -91,6 +102,8 @@ SystemPrompt 注册动态文件 section、技能、运行时 context 和自定�
 - [x] 崩溃轮次缺口不会被游标越过，日期章节隔离且落盘失败保留原文件。
 - [x] 微信列表、切换及即时空会话创建不调用模型；非法目标及保存失败不改变引用。
 - [x] 微信新会话可跨重启继续；返回旧会话恢复指令，继续命令展示最近对话，列表支持本地日期及摘要。
+- [x] 人工继续恢复原 turn；取消/超时保留原因，服务关闭清理 pending 和 turn。
+- [x] 微信两批协议输入可在人工等待期间收取；使用新凭据输出最终结果（离线协议替身验证）。
 - [ ] 真实微信收发与在线供应商联调。
 - [ ] 供应商专属 thinking blocks/signature 消息兼容验证。
 
@@ -115,15 +128,21 @@ P3 错误策略及剩余 P4 会话业务另行设计。当前不提供旧会话�
 
 <key_function>
 - lifeprism/llm/runtime/service.py
-  - service.AgentRuntime.start:226
-  - service.AgentRuntime.stream:320
-  - service.AgentRuntime.execute:483
-  - service.AgentRuntime.close:558
+  - service.AgentRuntime.start:244
+  - service.AgentRuntime.stream:338
+  - service.AgentRuntime.execute:535
+  - service.AgentRuntime.close:610
+- lifeprism/llm/conversation/service.py
+  - service.ConversationService.submit:110
+  - service.ConversationService.close:280
+- lifeprism/llm/conversation/client.py
+  - client.RunClient.ask_human:81
+  - client.RunClient.answer:109
 - lifeprism/llm/runtime/worker.py
   - worker.AgentBusWorker.loop:52
 - lifeprism/server/api/chatbot_api.py
-  - chatbot_api.chat_stream:152
+  - chatbot_api.chat_stream:151
 - lifeprism/llm/function/agent_schedule_job.py
-  - agent_schedule_job.extract_from_chat_messages:378
-  - agent_schedule_job.process_session_message:434
+  - agent_schedule_job.extract_from_chat_messages:382
+  - agent_schedule_job.process_session_message:438
 </key_function>

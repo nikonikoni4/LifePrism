@@ -82,3 +82,9 @@
  - path: docs/flows/2026-07-26-ssh-tunnel-flow.md
  - 触发规则：需要理解 SSH 隧道完整生命周期、密钥生成/派生/部署流程、测试连接一次性流程、SyncClient 启动隧道与 keep-alive 后台任务、sync_once 在 SSH 模式下的 remote_url 拦截、隧道断开自动重连（指数退避）、关闭隧道优雅清理时读取
  - 内容摘要：SSHTunnel 生命周期数据流，覆盖"前端切换到 SSH 模式 → 后端生成密钥 → 返回公钥"、"测试连接（建立→验证→关闭）"、"SyncClient 启动隧道（connect + keep_alive_loop）"、"sync_once 在 SSH 模式下（_read_remote_url 拦截 + _ensure_tunnel_ready 检查）"、"隧道断开自动重连（5s/10s/20s/30s 退避）"、"关闭隧道（tunnel.close + 等待 keep-alive 任务退出）"共 6 条链路，含 SSHTunnel 状态机（DISCONNECTED/CONNECTING/CONNECTED/RECONNECTING/FAILED）、5 项反常设计说明（test_connection 临时实例、known_hosts=None、无最大重试次数、隧道失败不阻塞 SyncClient、Windows GSSAPI 兼容性）
+
+## 2026-10-08-wechat-conversation-hitl-flow
+ - updated_at : 2026-10-08
+ - path: docs/flows/2026-10-08-wechat-conversation-hitl-flow.md
+ - 触发规则：讨论或实施微信纯收发重构、会话命令迁出、原生 HITL client 注入、人工回复路由、统一输出或相关任务取消与清理时读取
+ - 内容摘要：已实施 Flow，以当前操作与待答请求推导状态，覆盖输入准入、原执行等待与唤醒、命令路由、终态输出及关闭；明确 task/Future/锁拥有者、快速回答与超时竞争、每轮策略绑定、回复凭据未核实限制和验收场景。

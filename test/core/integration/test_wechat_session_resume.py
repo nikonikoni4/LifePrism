@@ -1,29 +1,51 @@
-"""微信命令与原生聊天目录的跨渠道恢复契约。"""
+"""微信命令与原生聊天目录的跨渠道恢复契约。
+
+命令业务已从微信渠道迁到 ``SessionCommandService``：本测试用真实 Runtime
+的 ``chat_sessions`` 和内存会话引用直接驱动命令服务，验证跨渠道继续、
+工作流排除与重启后沿用 /new 会话。
+"""
 
 import asyncio
-from unittest.mock import AsyncMock, Mock
 
 import pytest
 from test_myagent_runtime import FakeClient, make_runtime
 
 from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
-from lifeprism.llm.channel.wechat import channel as channel_module
-from lifeprism.llm.channel.wechat.channel import WechatChannel
+from lifeprism.llm.conversation.commands import SessionCommandService
+from lifeprism.llm.conversation.types import ConversationRoute
 
 pytestmark = pytest.mark.core
 
 
-def test_wechat_commands_resume_local_chat_and_exclude_workflow(tmp_path, monkeypatch):
+class MemoryReferences:
+    """内存会话引用；不触碰生产账号状态。"""
+
+    def __init__(self):
+        self.values = {}
+
+    def get(self, route):
+        return self.values.get(route)
+
+    def set(self, route, session_id):
+        self.values[route] = session_id
+
+
+def _content(message) -> str:
+    """取出命令回复文本。"""
+    assert message is not None
+    assert message.response is not None
+    return message.response.content
+
+
+def test_wechat_commands_resume_local_chat_and_exclude_workflow(tmp_path):
     """本地会话可从微信继续，工作流不可切换；命令本身不调用模型。"""
 
     async def scenario():
         client = FakeClient()
         runtime = make_runtime(tmp_path, client)
-        monkeypatch.setattr(channel_module, "agent_runtime", runtime)
-        channel = WechatChannel.__new__(WechatChannel)
-        channel._user_data = {"wx": {"context_token": "ctx"}}
-        channel.send = AsyncMock()
-        channel._save_user_data_to_db = Mock()
+        references = MemoryReferences()
+        service = SessionCommandService(runtime.chat_sessions, references)
+        route = ConversationRoute(channel=ChannelType.WECHAT, recipient_id="wx")
         try:
             local = await runtime.execute(InboundMessage(type=MessageType.CHAT, content="local"))
             workflow = await runtime.execute(
@@ -32,21 +54,20 @@ def test_wechat_commands_resume_local_chat_and_exclude_workflow(tmp_path, monkey
                 )
             )
             calls = len(client.calls)
-            assert await channel._handle_session_command("/session-list", "wx")
-            listing = channel.send.call_args.args[0].response.content
-            assert local.session_id in listing
-            assert workflow.session_id not in listing
-            await channel._handle_session_command(f"/continue {local.session_id}", "wx")
-            assert channel._user_data["wx"]["last_session_id"] == local.session_id
-            await channel._handle_session_command(f"/continue {workflow.session_id}", "wx")
-            assert channel._user_data["wx"]["last_session_id"] == local.session_id
+            listing = await service.handle("/session-list", route)
+            assert local.session_id in _content(listing)
+            assert workflow.session_id not in _content(listing)
+            await service.handle(f"/continue {local.session_id}", route)
+            assert references.get(route) == local.session_id
+            await service.handle(f"/continue {workflow.session_id}", route)
+            assert references.get(route) == local.session_id
             assert len(client.calls) == calls
             result = await runtime.execute(
                 InboundMessage(
                     type=MessageType.CHAT,
                     channel=ChannelType.WECHAT,
                     content="wechat follow-up",
-                    session_id=channel._user_data["wx"]["last_session_id"],
+                    session_id=references.get(route),
                 )
             )
             assert result.session_id == local.session_id
@@ -60,20 +81,18 @@ def test_wechat_commands_resume_local_chat_and_exclude_workflow(tmp_path, monkey
     asyncio.run(scenario())
 
 
-def test_new_command_saved_session_continues_after_runtime_restart(tmp_path, monkeypatch):
-    """/new回复的ID已落盘，重启后首条普通消息继续同一ID。"""
+def test_new_command_saved_session_continues_after_runtime_restart(tmp_path):
+    """/new 回复的 ID 已落盘，重启后首条普通消息继续同一 ID。"""
 
     async def scenario():
         client = FakeClient()
         runtime = make_runtime(tmp_path, client)
-        monkeypatch.setattr(channel_module, "agent_runtime", runtime)
-        channel = WechatChannel.__new__(WechatChannel)
-        channel._user_data = {"wx": {"context_token": "ctx"}}
-        channel.send = AsyncMock()
-        channel._save_user_data_to_db = Mock()
-        await channel._handle_session_command("/new", "wx")
-        sid = channel._user_data["wx"]["last_session_id"]
-        assert channel.send.call_args.args[0].session_id == sid
+        references = MemoryReferences()
+        service = SessionCommandService(runtime.chat_sessions, references)
+        route = ConversationRoute(channel=ChannelType.WECHAT, recipient_id="wx")
+        message = await service.handle("/new", route)
+        sid = references.get(route)
+        assert message.session_id == sid
         assert not client.calls
         await runtime.close()
         restarted = make_runtime(tmp_path, client)

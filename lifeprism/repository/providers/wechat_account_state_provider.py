@@ -143,3 +143,73 @@ class WechatAccountStateProvider(LWBaseDataProvider):
                 e,
             )
             raise DataAccessError(f"保存微信账户状态 {wechat_user_id} 失败") from e
+
+    def save_context_token(self, wechat_user_id: str, context_token: str) -> bool:
+        """
+        仅更新 context_token 字段（不触碰 last_session_id）
+
+        先确保记录存在（INSERT OR IGNORE），再只更新 context_token 一个字段，
+        避免"读旧记录 → save_state 整体覆盖"导致 last_session_id 被清空。
+
+        Args:
+            wechat_user_id: 微信用户 ID（主键）
+            context_token: 微信对话上下文 token
+
+        Returns:
+            是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败，或记录未匹配导致更新行数为 0
+        """
+        try:
+            self._generic_insert({"wechat_user_id": wechat_user_id}, on_conflict="ignore")
+            updated = self._generic_update(wechat_user_id, {"context_token": context_token})
+        except Exception as e:
+            logger.error(
+                "保存微信 context_token 失败: wechat_user_id=%s, error=%s", wechat_user_id, e
+            )
+            raise DataAccessError(f"保存微信 context_token {wechat_user_id} 失败") from e
+
+        if not updated:
+            logger.error(
+                "保存微信 context_token 失败: wechat_user_id=%s, 记录未匹配，更新行数为 0",
+                wechat_user_id,
+            )
+            raise DataAccessError(f"保存微信 context_token {wechat_user_id} 失败: 记录未匹配")
+        logger.info("保存微信 context_token 成功: wechat_user_id=%s", wechat_user_id)
+        return True
+
+    def save_session_reference(self, wechat_user_id: str, session_id: str) -> bool:
+        """
+        仅更新 last_session_id 字段（不触碰 context_token）
+
+        先确保记录存在（INSERT OR IGNORE），再只更新 last_session_id 一个字段，
+        避免"读旧记录 → save_state 整体覆盖"导致 context_token 被清空。
+
+        Args:
+            wechat_user_id: 微信用户 ID（主键）
+            session_id: 最后一次会话 ID
+
+        Returns:
+            是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败，或记录未匹配导致更新行数为 0
+        """
+        try:
+            self._generic_insert({"wechat_user_id": wechat_user_id}, on_conflict="ignore")
+            updated = self._generic_update(wechat_user_id, {"last_session_id": session_id})
+        except Exception as e:
+            logger.error(
+                "保存微信 last_session_id 失败: wechat_user_id=%s, error=%s", wechat_user_id, e
+            )
+            raise DataAccessError(f"保存微信 last_session_id {wechat_user_id} 失败") from e
+
+        if not updated:
+            logger.error(
+                "保存微信 last_session_id 失败: wechat_user_id=%s, 记录未匹配，更新行数为 0",
+                wechat_user_id,
+            )
+            raise DataAccessError(f"保存微信 last_session_id {wechat_user_id} 失败: 记录未匹配")
+        logger.info("保存微信 last_session_id 成功: wechat_user_id=%s", wechat_user_id)
+        return True

@@ -1,19 +1,28 @@
-"""
-WechatChannel 数据库状态读写测试
+"""微信账户状态字段隔离持久化与 stop 不覆盖测试
 
-测试 seam:
-- Seam: _save_user_data_to_db() / _load_user_data_from_db()
-  - _save_user_data_to_db() 将 _user_data 写入 DB
-  - _load_user_data_from_db() 从 DB 加载到 _user_data
-  - stop() 调用 _save_user_data_to_db() 而非 auth.save_state()
-  - start() 先迁移再从 DB 加载 _user_data
+测试 seam（真实实现，不使用替身）:
+
+- ``WechatReplyStore.remember`` / ``.get_token``：只读写 context_token 字段
+- ``WechatSessionReferences.set`` / ``.get``：只读写 last_session_id 字段
+- ``WechatChannel.stop()``：不覆盖两侧已及时保存的最新字段，也不写 account.json
+
+两侧字段各自及时落库，互不覆盖；数据库指向 ``tmp_path`` 临时文件，不触碰生产库。
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
 """
 
-import json
+from pathlib import Path
 
 import pytest
+
+from lifeprism.llm.channel.wechat.reply_store import WechatReplyStore
+from lifeprism.llm.conversation.references import WechatSessionReferences
+from lifeprism.llm.conversation.types import ConversationRoute
+from lifeprism.repository.database_manager import DatabaseManager
+from lifeprism.repository.lw_table_manager import LWTableManager
+from lifeprism.repository.providers.wechat_account_state_provider import (
+    WechatAccountStateProvider,
+)
 
 pytestmark = pytest.mark.core
 
@@ -22,225 +31,169 @@ pytestmark = pytest.mark.core
 
 
 @pytest.fixture(scope="module")
-def initialized_db(test_data_path):
-    """初始化数据库，创建所有表"""
+def initialized_settings():
+    """初始化 settings，使 WechatChannel 能解析 channel_path。"""
     from lifeprism.config.settings_manager import settings
 
     settings._initialize()
-
-    from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.base_providers.lw_base_data_provider import (
-        LWBaseDataProvider,
-    )
-    from lifeprism.repository.lw_table_manager import LWTableManager
-
-    LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
-    LWBaseDataProvider._TABLES_WITH_TIMESTAMPS = None
-
-    manager = LWTableManager(db_manager=lw_db_manager)
-    manager.init_database()
-
-    yield lw_db_manager
+    yield settings
 
 
 @pytest.fixture
-def wechat_channel(initialized_db):
-    """创建 WechatChannel 实例（不调用 start()）"""
+def provider(tmp_path: Path) -> WechatAccountStateProvider:
+    """构造指向临时 SQLite 文件、已建表的真实 Provider（不触碰生产库）。"""
+    db_manager = DatabaseManager(DB_PATH=str(tmp_path / "lw_test.db"))
+    LWTableManager(db_manager=db_manager).init_database()
+    return WechatAccountStateProvider(db_manager=db_manager)
+
+
+@pytest.fixture
+def store(provider: WechatAccountStateProvider) -> WechatReplyStore:
+    """使用临时 Provider 的凭据存储，隔离生产账号状态。"""
+    return WechatReplyStore(repository=provider)
+
+
+@pytest.fixture
+def references(provider: WechatAccountStateProvider) -> WechatSessionReferences:
+    """使用临时 Provider 的会话引用存储，隔离生产账号状态。"""
+    return WechatSessionReferences(repository=provider)
+
+
+@pytest.fixture
+def channel(initialized_settings, store, tmp_path):
+    """创建 WechatChannel 实例（不调用 start()），account.json 指向临时目录。"""
     from lifeprism.llm.bus.queue import MessageQueue
     from lifeprism.llm.channel.wechat import WechatChannel, WechatConfig
 
     config = WechatConfig(enabled=True, allow_from=["*"])
     bus = MessageQueue()
-    channel = WechatChannel(config, bus)
-
-    yield channel
-
-    # 清理
-    if channel.state_file.exists():
-        channel.state_file.unlink()
-    bak_file = channel.state_file.with_suffix(".json.bak")
-    if bak_file.exists():
-        bak_file.unlink()
-
-    with initialized_db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM wechat_account_state")
-        conn.commit()
+    channel = WechatChannel(config, bus, reply_store=store)
+    # 把 state_file 重定向到临时目录，确保 stop() 不写 account.json 的断言隔离生产路径
+    channel.state_file = tmp_path / "account.json"
+    return channel
 
 
-@pytest.fixture
-def clean_account_state_table(initialized_db):
-    """清理 wechat_account_state 表"""
-    with initialized_db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM wechat_account_state")
-        conn.commit()
-    yield
+def _route(recipient: str) -> ConversationRoute:
+    """构造微信路由，recipient_id 作为 wechat_account_state 主键。"""
+    return ConversationRoute(channel="wechat", recipient_id=recipient, transport_id="wechat")
 
 
-# ==================== Seam: _save_user_data_to_db() ====================
+# ==================== Seam: 字段隔离保存 ====================
 
 
-class TestSaveUserDataToDb:
-    """Seam: _save_user_data_to_db() 将 _user_data 写入 DB"""
+class TestFieldIsolatedSave:
+    """Seam: context_token 与 last_session_id 各自及时落库，互不覆盖"""
 
-    def test_save_multiple_users_to_db(self, wechat_channel, clean_account_state_table):
-        """_save_user_data_to_db() 将多个用户数据写入 DB"""
-        # Arrange: 设置 _user_data
-        wechat_channel._user_data = {
-            "user_a": {"context_token": "ctx_a", "last_session_id": "sess_a"},
-            "user_b": {"context_token": "ctx_b", "last_session_id": "sess_b"},
-        }
+    def test_save_multiple_users_to_db(self, store, references, provider):
+        """两侧字段各自保存多个用户的数据到 DB"""
+        # Act: 凭据侧写 context_token，引用侧写 last_session_id
+        store.remember("user_a", "ctx_a")
+        references.set(_route("user_a"), "sess_a")
+        store.remember("user_b", "ctx_b")
+        references.set(_route("user_b"), "sess_b")
 
-        # Act: 保存到 DB
-        wechat_channel._save_user_data_to_db()
-
-        # Assert: DB 中有两条记录
-        state_a = wechat_channel._account_state_provider.get_state("user_a")
+        # Assert: DB 中有两条记录，两个字段都正确
+        state_a = provider.get_state("user_a")
         assert state_a is not None
         assert state_a["context_token"] == "ctx_a"
         assert state_a["last_session_id"] == "sess_a"
 
-        state_b = wechat_channel._account_state_provider.get_state("user_b")
+        state_b = provider.get_state("user_b")
         assert state_b is not None
         assert state_b["context_token"] == "ctx_b"
         assert state_b["last_session_id"] == "sess_b"
 
-    def test_save_empty_user_data_does_nothing(self, wechat_channel, clean_account_state_table):
-        """_user_data 为空时不执行任何 DB 操作"""
-        # Arrange: _user_data 为空
-        wechat_channel._user_data = {}
-
-        # Act: 保存到 DB（不应抛出异常）
-        wechat_channel._save_user_data_to_db()
+    def test_save_empty_token_does_nothing(self, store, provider):
+        """空 token 视为无效凭据，不执行任何 DB 操作"""
+        # Act: 保存空 token（不应抛出异常，也不写库）
+        store.remember("user_empty", "")
 
         # Assert: DB 中无记录
-        with wechat_channel._db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM wechat_account_state")
-            count = cursor.fetchone()[0]
-        assert count == 0
+        assert provider.get_all_states() == []
 
-    def test_save_overwrites_existing_record(self, wechat_channel, clean_account_state_table):
-        """save 时如果 DB 已有该用户记录，应覆盖（INSERT OR REPLACE 语义）"""
+    def test_save_overwrites_existing_record(self, store, provider):
+        """保存已有用户时覆盖该字段自身，但不触碰另一字段（字段隔离）"""
         # Arrange: DB 中先插入一条记录
-        wechat_channel._account_state_provider.save_state(
+        provider.save_state(
             wechat_user_id="user_c",
             context_token="old_token",
             last_session_id="old_session",
         )
 
-        # Arrange: _user_data 中有该用户的新数据
-        wechat_channel._user_data = {
-            "user_c": {"context_token": "new_token", "last_session_id": "new_session"},
-        }
+        # Act: 凭据侧写入新 token
+        store.remember("user_c", "new_token")
 
-        # Act: 保存到 DB
-        wechat_channel._save_user_data_to_db()
-
-        # Assert: DB 中的记录已被更新
-        state_c = wechat_channel._account_state_provider.get_state("user_c")
+        # Assert: context_token 已被覆盖，last_session_id 保持不变
+        state_c = provider.get_state("user_c")
         assert state_c is not None
         assert state_c["context_token"] == "new_token"
-        assert state_c["last_session_id"] == "new_session"
+        assert state_c["last_session_id"] == "old_session", "覆盖凭据不应清空会话引用"
 
 
-# ==================== Seam: _load_user_data_from_db() ====================
+# ==================== Seam: 字段隔离读取 ====================
 
 
 class TestLoadUserDataFromDb:
-    """Seam: _load_user_data_from_db() 从 DB 加载到 _user_data"""
+    """Seam: 从 DB 分别读取 context_token 与 last_session_id"""
 
-    def test_load_multiple_users_from_db(self, wechat_channel, clean_account_state_table):
-        """_load_user_data_from_db() 从 DB 加载多个用户数据"""
+    def test_load_multiple_users_from_db(self, store, references, provider):
+        """两侧 seam 各自从 DB 读取多个用户的数据"""
         # Arrange: DB 中插入两条记录
-        wechat_channel._account_state_provider.save_state(
-            wechat_user_id="user_x",
-            context_token="ctx_x",
-            last_session_id="sess_x",
-        )
-        wechat_channel._account_state_provider.save_state(
-            wechat_user_id="user_y",
-            context_token="ctx_y",
-            last_session_id=None,
-        )
+        provider.save_state("user_x", "ctx_x", "sess_x")
+        provider.save_state("user_y", "ctx_y", None)
 
-        # Act: 从 DB 加载
-        wechat_channel._user_data = {}  # 清空当前数据
-        wechat_channel._load_user_data_from_db()
+        # Assert: 凭据侧读 context_token，引用侧读 last_session_id
+        assert store.get_token("user_x") == "ctx_x"
+        assert references.get(_route("user_x")) == "sess_x"
 
-        # Assert: _user_data 包含两条记录
-        assert "user_x" in wechat_channel._user_data
-        assert wechat_channel._user_data["user_x"]["context_token"] == "ctx_x"
-        assert wechat_channel._user_data["user_x"]["last_session_id"] == "sess_x"
+        assert store.get_token("user_y") == "ctx_y"
+        # None 值应保留为 None
+        assert references.get(_route("user_y")) is None
 
-        assert "user_y" in wechat_channel._user_data
-        assert wechat_channel._user_data["user_y"]["context_token"] == "ctx_y"
-        # None 值应保留为 None（或可能不存在该 key）
-        last_session = wechat_channel._user_data["user_y"].get("last_session_id")
-        assert last_session is None
-
-    def test_load_empty_db_results_in_empty_user_data(
-        self, wechat_channel, clean_account_state_table
-    ):
-        """DB 为空时 _user_data 也为空"""
-        # Arrange: DB 为空（依赖 clean_account_state_table）
-
-        # Act: 从 DB 加载
-        wechat_channel._user_data = {"stale": {"context_token": "should_be_cleared"}}
-        wechat_channel._load_user_data_from_db()
-
-        # Assert: _user_data 为空
-        assert wechat_channel._user_data == {}
+    def test_load_empty_db_results_in_empty_user_data(self, store, references):
+        """DB 为空时两侧读取都为空"""
+        # Assert: 无记录时凭据侧返回空串，引用侧返回 None
+        assert store.get_token("stale") == ""
+        assert references.get(_route("stale")) is None
 
 
-# ==================== Seam: stop() 保存到 DB ====================
+# ==================== Seam: stop() 不覆盖最新字段 ====================
 
 
-class TestStopSavesToDb:
-    """Seam: stop() 调用 _save_user_data_to_db() 而非 auth.save_state()"""
+class TestStopDoesNotClobber:
+    """Seam: stop() 不覆盖两侧已保存的最新字段，也不写 account.json"""
 
     @pytest.mark.asyncio
-    async def test_stop_saves_user_data_to_db(self, wechat_channel, clean_account_state_table):
-        """stop() 将 _user_data 保存到 DB"""
-        # Arrange: 设置 _user_data（不设置 auth/client，避免文件保存）
-        wechat_channel._user_data = {
-            "stop_user": {"context_token": "stop_ctx", "last_session_id": "stop_sess"},
-        }
-        wechat_channel._running = True
+    async def test_stop_does_not_overwrite_latest_fields(
+        self, channel, store, references, provider
+    ):
+        """两侧字段及时保存后，stop() 不覆盖已落库的最新字段"""
+        # Arrange: 两侧各自及时保存最新字段
+        store.remember("stop_user", "stop_ctx")
+        references.set(_route("stop_user"), "stop_sess")
+        channel._running = True
 
         # Act: 调用 stop()
-        await wechat_channel.stop()
+        await channel.stop()
 
-        # Assert: DB 中有记录
-        state = wechat_channel._account_state_provider.get_state("stop_user")
+        # Assert: DB 中仍是最新字段，stop 未覆盖
+        state = provider.get_state("stop_user")
         assert state is not None
         assert state["context_token"] == "stop_ctx"
         assert state["last_session_id"] == "stop_sess"
 
     @pytest.mark.asyncio
-    async def test_stop_does_not_write_account_json(
-        self, wechat_channel, clean_account_state_table
-    ):
-        """stop() 不再写入 account.json 文件"""
+    async def test_stop_does_not_write_account_json(self, channel, provider):
+        """stop() 不再写入 account.json 文件，也不触发 DB 写入"""
         # Arrange: 确保 account.json 不存在
-        if wechat_channel.state_file.exists():
-            wechat_channel.state_file.unlink()
-
-        wechat_channel._user_data = {
-            "no_file_user": {
-                "context_token": "no_file_ctx",
-                "last_session_id": "no_file_sess",
-            },
-        }
-        wechat_channel._running = True
+        assert not channel.state_file.exists()
+        channel._running = True
 
         # Act: 调用 stop()
-        await wechat_channel.stop()
+        await channel.stop()
 
         # Assert: account.json 未被创建
-        assert not wechat_channel.state_file.exists(), "stop() 不应创建 account.json 文件"
+        assert not channel.state_file.exists(), "stop() 不应创建 account.json 文件"
 
-        # Assert: DB 中有记录（数据已保存到 DB）
-        state = wechat_channel._account_state_provider.get_state("no_file_user")
-        assert state is not None
+        # Assert: stop() 不触发任何 DB 写入
+        assert provider.get_all_states() == []

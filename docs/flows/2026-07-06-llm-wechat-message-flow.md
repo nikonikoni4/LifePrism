@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated: 初始版本
+updated_at: 2026-10-08
+last_updated: 标注旧 bus 接入为历史参考，链接当前会话与人在回路 Flow
 abstract: 微信消息全通路数据流，覆盖 WechatChannel 从启动认证到消息接收、解析、媒体处理、Bus 交互、Agent 回复再到 Channel 停止的完整链路。串联 WechatAuth（keyring+文件双层 token 存储）、WechatClient（HTTP 长轮询）、WechatMessage（消息解析/构建）、WechatMedia（AES-ECB 解密下载）四个子模块与 MessageQueue 的协作。
 ---
 
@@ -15,6 +15,8 @@ abstract: 微信消息全通路数据流，覆盖 WechatChannel 从启动认证�
 # 数据流：WechatMessageTrace
 
 **Flow 对象**：WechatMessageTrace
+
+> 本文件保留旧实现的认证/媒体参考。消息总线、旧 Session 和 Channel 内命令路径已被替换；当前入口及完整交互见 [微信会话与人在回路 Flow](2026-10-08-wechat-conversation-hitl-flow.md)。
 **对应 Spec**：[llm-communication-spec](../specs/2026-07-06-llm-communication-spec.md)
 
 ## WechatMessageTrace 数据结构
@@ -85,12 +87,12 @@ class WechatMessageTrace:
 
 <key_function>
 - lifeprism/llm/channel/wechat/channel.py
-  - channel.WechatChannel.__init__:52
-  - channel.WechatChannel.start:249
-  - channel.WechatChannel.stop:303
-  - channel.WechatChannel.send:327
-  - channel.WechatChannel._poll_loop:368
-  - channel.WechatChannel._handle_wechat_message:508
+  - channel.WechatChannel.__init__:40
+  - channel.WechatChannel.start:66
+  - channel.WechatChannel.stop:102
+  - channel.WechatChannel.send:125
+  - channel.WechatChannel._poll_loop:142
+  - channel.WechatChannel._handle_wechat_message:163
 - lifeprism/llm/channel/wechat/auth.py
   - auth.WechatAuth.load_state:135
   - auth.WechatAuth.save_state:224

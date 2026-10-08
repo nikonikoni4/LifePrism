@@ -1,8 +1,8 @@
 ---
-version: 3.0
+version: 3.1
 created_at: 2026-04-09
-updated_at: 2026-10-03
-last_updated: 替换 Agent 内核为 myagent，区分聊天事件与后台 bus 入口
+updated_at: 2026-10-08
+last_updated: 微信纯收发与会话业务分层，接入原生人在回路
 abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后端架构、主干数据流和关键依赖方向。
 ---
 
@@ -21,6 +21,7 @@ abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后�
 | 2.2 | 更新已知耦合说明：原 llm provider/summary_context 反向依赖 server 已解除；新增 habit_tool.py 反向依赖 server.services.habit_service 的耦合点说明，关联技术债文档 |
 
 | 3.0 | myagent Runtime、原生 Session、事件聊天与后台 bus 双入口 |
+| 3.1 | 微信收发、会话服务、原生 HITL 的独立边界 |
 
 ## 项目概述
 
@@ -130,6 +131,7 @@ lifeprism/
 │   └── errors/                     # 错误处理
 │
 ├── llm/                            # LLM 智能层
+│   ├── conversation/               # 输入路由、会话命令、统一输出与人工回答
 │   ├── runtime/                    # myagent 适配、事件订阅与后台 worker
 │   ├── runtime_tools/              # 原生 Tool 业务实现
 │   ├── deprecated_agent/           # 旧内核归档（生产不导入）
@@ -218,7 +220,8 @@ utils → config → repository → monitor → processors → server
 | server/ | FastAPI 服务入口，REST API + WebSocket，生命周期管理 | HTTP + WebSocket | - |
 | llm/runtime/ | myagent 原生执行适配、终态和生命周期 | 事件订阅 / 后台 bus | [myagent-runtime](specs/2026-10-03-myagent-runtime-spec.md) |
 | llm/chat/ | ChatBot 无状态对话 API | HTTP | [llm-communication](specs/2026-07-06-llm-communication-spec.md) |
-| llm/channel/ | 多渠道消息接入（WeChat Channel 完整实现） | HTTP 轮询 | [wechat-channel-integration](specs/2026-05-01-wechat-channel-integration-spec.md) |
+| llm/conversation/ | 会话输入路由、命令、运行任务与人工回答 | 注入收发 client | [wechat-conversation-hitl](flows/2026-10-08-wechat-conversation-hitl-flow.md) |
+| llm/channel/ | 平台协议收发、认证、媒体和回复凭据 | HTTP 轮询 | [wechat-channel-integration](specs/2026-05-01-wechat-channel-integration-spec.md) |
 | llm/session/ | 旧 Session 业务留存，新执行使用 myagent 原生 Session | 内部调用 | [llm-communication](specs/2026-07-06-llm-communication-spec.md) |
 | llm/classify/ | AI 内容分类（ClassifyGraph 多步 / ClassifySimple 单步） | 内部调用 | [classify](specs/2026-04-16-classify-spec.md) |
 | llm/providers/ | LLM Provider 适配（LiteLLM 多服务商 + Custom OpenAI SDK） | HTTPS | [llm-infrastructure](specs/2026-07-06-llm-infrastructure-spec.md) |
@@ -346,11 +349,12 @@ settings_manager（单例初始化）
 ### 4. LLM Agent 对话流
 
 ```
-本地 ChatBot / 微信 → Runtime → myagent turn
-                           ↑         ↓
-                    session/event 订阅
-                           ↓
-                 本地 SSE / 微信最终答复
+本地 ChatBot → Runtime → myagent turn → session/event → 本地 SSE
+微信收发 ⇄ ConversationService → Runtime → myagent turn
+                  ↑                 ↓
+       ConversationClient ← 原生 HITL（REQUEST_ERROR）
+                  ↑
+          原事件消费任务的最终结果
 
 后台任务 → bus.send → AgentBusWorker → 同一 Runtime
                    ← OutboundMessage ← 事件收集的最终结果
@@ -360,7 +364,8 @@ settings_manager（单例初始化）
 - 聊天与工具执行直接使用原生事件；bus 保留后台请求响应职责。
 - Runtime 统一事件关联、同会话串行、模型限速、用量统计与执行取消。
 - 提示词使用 myagent SystemPrompt 注册，工具继承原生 Tool；原生 Session 负责执行记录和持久化。
-- 旧会话业务及错误策略尚未迁移，契约见 [myagent Runtime](specs/2026-10-03-myagent-runtime-spec.md)，决策见 [ADR](adr/2026-10-03-myagent-runtime.md)。
+- 微信只收发；会话服务拥有命令、引用、任务与输出；原生 HITL 通过注入 client 发问，用户回答唤醒同一 turn。
+- 旧数据迁移及其他恢复策略另行设计，契约见 [myagent Runtime](specs/2026-10-03-myagent-runtime-spec.md)，决策见 [ADR](adr/2026-10-03-myagent-runtime.md)。
 
 ### 5. 自定义记录 AI 录入流
 
