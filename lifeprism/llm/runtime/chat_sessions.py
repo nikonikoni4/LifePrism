@@ -3,12 +3,15 @@
 import json
 import os
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
+from myagent.agent.core.session import SessionStore
+
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import utc_to_local
 
 if TYPE_CHECKING:
     from lifeprism.llm.runtime.service import AgentRuntime
@@ -21,6 +24,27 @@ class ChatSessionManager:
 
     def __init__(self, runtime: "AgentRuntime"):
         self.runtime = runtime
+
+    async def create(self, name: str = "新会话") -> dict:
+        """创建并落盘原生空会话，不创建执行context或虚构聊天轮次。"""
+        if self.runtime._closing:
+            raise RuntimeError("Agent Runtime 正在关闭")
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 200:
+            raise ValueError("会话名称须为 1–200 个字符")
+        folder = self.runtime.chat_session_folder
+        session = SessionStore(folder, flat=True).create(name.strip(), self.runtime.data_path)
+        meta = session.meta_data.meta_data()
+        path = self._path(meta["session_id"])
+        folder.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.stem}.{uuid4().hex}.tmp")
+        try:
+            if path.exists():
+                raise FileExistsError("会话已存在")
+            temporary.write_bytes(json.dumps(meta, ensure_ascii=False).encode("utf-8") + b"\n")
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return {"session_id": meta["session_id"], "session_name": meta["name"]}
 
     async def process_pending(
         self,
@@ -141,10 +165,19 @@ class ChatSessionManager:
                 messages.append(projected)
         return messages
 
-    async def list_sessions(self, page: int = 1, page_size: int = 20) -> dict:
+    async def list_sessions(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        *,
+        date_filter: str | None = None,
+        include_preview: bool = False,
+    ) -> dict:
         """按更新时间降序分页，包含尚未首次落盘的运行会话。"""
         if page < 1 or not 1 <= page_size <= 100:
             raise ValueError("分页参数无效")
+        if date_filter is not None and date.fromisoformat(date_filter).isoformat() != date_filter:
+            raise ValueError("日期须为 YYYY-MM-DD")
         folder = self.runtime.chat_session_folder
         ids = {path.stem for path in folder.glob("*.jsonl")}
         ids.update(
@@ -158,16 +191,25 @@ class ChatSessionManager:
                     continue
                 meta, records = loaded
                 updated = records[-1]["timestamp"] if records else meta["updated_at"]
+                updated = max(meta["updated_at"], updated)
+                if date_filter and utc_to_local(updated).date().isoformat() != date_filter:
+                    continue
+                messages = self._messages(records)
                 items.append(
                     {
                         "id": sid,
                         "name": meta["name"],
                         "created_at": meta["created_at"],
-                        "updated_at": max(meta["updated_at"], updated),
-                        "message_count": len(self._messages(records)),
+                        "updated_at": updated,
+                        "message_count": len(messages),
                         "is_running": self.runtime.is_session_running(sid),
                     }
                 )
+                if include_preview:
+                    last_user = next(
+                        (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
+                    )
+                    items[-1]["preview"] = " ".join(last_user.split())[:20]
             except (ValueError, KeyError, TypeError, OSError):
                 logger.warning("跳过无法读取的聊天会话: %s", sid, exc_info=True)
         items.sort(key=lambda item: (item["updated_at"], item["id"]), reverse=True)

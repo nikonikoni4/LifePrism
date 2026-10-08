@@ -28,6 +28,8 @@ USER_ID = "wx"
 OLD_SID = "old"
 # 含十六进制字母，用于验证 UUID 规范化（大写输入 → 小写输出）
 TARGET_SID = "abcdef01-1234-4abc-8def-0123456789ab"
+# /new 创建的新会话 ID：create() 固定返回它，用于断言保存的是新 UUID 而非空串
+NEW_SID = "fedcba98-7654-4321-8abc-def012345678"
 
 
 # ==================== 辅助函数 ====================
@@ -55,17 +57,25 @@ def _build_channel(
     channel.send = AsyncMock()
     channel._save_user_data_to_db = Mock()
 
-    sessions = sessions if sessions is not None else Mock()
+    sessions = sessions if sessions is not None else _init_command_manager()
     runtime = SimpleNamespace(chat_sessions=sessions, execute=AsyncMock())
     monkeypatch.setattr(f"{CHANNEL_MODULE}.agent_runtime", runtime)
     return channel, sessions, runtime
 
 
-def _init_command_manager(*, items: list[dict] | None = None, total: int = 0) -> Mock:
-    """构造带 list_sessions / get_history 的会话管理器 mock。"""
+def _init_command_manager(
+    *, items: list[dict] | None = None, total: int = 0, new_session_id: str = NEW_SID
+) -> Mock:
+    """构造带 list_sessions / get_history / create / delete 的会话管理器 mock。
+
+    `create` 固定返回 `new_session_id`（默认 `NEW_SID`），供 /new 断言
+    保存的是新生成的 UUID。
+    """
     sessions = Mock()
     sessions.list_sessions = AsyncMock(return_value={"items": items or [], "total": total})
     sessions.get_history = AsyncMock(return_value=None)
+    sessions.create = AsyncMock(return_value={"session_id": new_session_id})
+    sessions.delete = AsyncMock(return_value=None)
     return sessions
 
 
@@ -107,7 +117,7 @@ def test_session_list_defaults_to_first_page(monkeypatch):
     recognized = asyncio.run(channel._handle_session_command("/session-list", USER_ID))
 
     assert recognized is True
-    sessions.list_sessions.assert_awaited_once_with(page=1, page_size=10)
+    sessions.list_sessions.assert_awaited_once_with(page=1, page_size=10, include_preview=True)
     reply = _reply(channel)
     assert "日记复盘" in reply, "缺少会话名称"
     assert TARGET_SID in reply, "缺少完整 Session ID"
@@ -124,7 +134,7 @@ def test_session_list_accepts_explicit_page(monkeypatch):
     recognized = asyncio.run(channel._handle_session_command("/session-list 2", USER_ID))
 
     assert recognized is True
-    sessions.list_sessions.assert_awaited_once_with(page=2, page_size=10)
+    sessions.list_sessions.assert_awaited_once_with(page=2, page_size=10, include_preview=True)
 
 
 def test_session_list_empty_result_is_friendly(monkeypatch):
@@ -280,38 +290,52 @@ def test_continue_read_error_replies_without_raising(monkeypatch):
 # ==================== /new ====================
 
 
-def test_new_clears_reference_and_saves(monkeypatch):
-    """契约：/new 无参数时清空引用并保存，回复确认。"""
-    channel, _, _ = _build_channel(monkeypatch)
+def test_new_creates_session_and_saves_new_uuid(monkeypatch):
+    """契约：/new 创建新会话并保存新生成的 UUID（而非空字符串）。
+
+    回复必须包含“新建会话”与新 Session ID，并提供恢复旧会话的 /continue 指令。
+    """
+    sessions = _init_command_manager()
+    channel, _, _ = _build_channel(monkeypatch, sessions=sessions)
 
     recognized = asyncio.run(channel._handle_session_command("/new", USER_ID))
 
     assert recognized is True
-    assert channel._user_data[USER_ID]["last_session_id"] == ""
+    sessions.create.assert_awaited_once_with()
+    sessions.delete.assert_not_awaited()
+    assert channel._user_data[USER_ID]["last_session_id"] == NEW_SID, "应保存新 UUID 而非空串"
     channel._save_user_data_to_db.assert_called_once()
-    assert "新会话" in _reply(channel)
+    reply = _reply(channel)
+    assert "新建会话" in reply, "缺少新建会话确认"
+    assert NEW_SID in reply, "缺少新 Session ID"
+    assert OLD_SID in reply, "缺少恢复旧会话的指令"
 
 
 def test_new_with_argument_shows_usage(monkeypatch):
-    """契约：/new 带参数时只回复用法，不保存、不改引用。"""
-    channel, _, _ = _build_channel(monkeypatch)
+    """契约：/new 带参数时只回复用法，不创建、不保存、不改引用。"""
+    sessions = _init_command_manager()
+    channel, _, _ = _build_channel(monkeypatch, sessions=sessions)
 
     recognized = asyncio.run(channel._handle_session_command("/new now", USER_ID))
 
     assert recognized is True
+    sessions.create.assert_not_awaited()
     channel._save_user_data_to_db.assert_not_called()
     assert channel._user_data[USER_ID]["last_session_id"] == OLD_SID
     assert "用法：/new" in _reply(channel)
 
 
-def test_new_save_failure_restores_reference(monkeypatch):
-    """契约：/new 保存失败时恢复原引用并回复错误。"""
-    channel, _, _ = _build_channel(monkeypatch)
+def test_new_save_failure_restores_reference_and_deletes_session(monkeypatch):
+    """契约：/new 保存失败时恢复原引用、删除新会话并回复错误。"""
+    sessions = _init_command_manager()
+    channel, _, _ = _build_channel(monkeypatch, sessions=sessions)
     channel._save_user_data_to_db = Mock(side_effect=RuntimeError("db down"))
 
     recognized = asyncio.run(channel._handle_session_command("/new", USER_ID))
 
     assert recognized is True
+    sessions.create.assert_awaited_once_with()
+    sessions.delete.assert_awaited_once_with(NEW_SID), "应清理未绑定的新会话"
     assert channel._user_data[USER_ID]["last_session_id"] == OLD_SID
     assert "失败" in _reply(channel)
 
@@ -433,7 +457,7 @@ def test_handle_wechat_message_short_circuits_session_command(monkeypatch):
     asyncio.run(channel._handle_wechat_message({"from_user_id": USER_ID}))
 
     # 命令被识别：走命令分支并回复，而非进入 runtime
-    sessions.list_sessions.assert_awaited_once_with(page=1, page_size=10)
+    sessions.list_sessions.assert_awaited_once_with(page=1, page_size=10, include_preview=True)
     channel.send.assert_awaited_once()
     assert "聊天会话" in _reply(channel)
     runtime.execute.assert_not_awaited(), "会话命令不得调用 runtime.execute"

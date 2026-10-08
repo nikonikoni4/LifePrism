@@ -699,11 +699,13 @@ def test_default_session_root_is_directly_under_data_path(tmp_path):
         runtime._session_folder = None
         try:
             first = await runtime.execute(InboundMessage(type=MessageType.CHAT))
+            assert runtime.chat_session_folder == tmp_path / "session" / "chat"
         finally:
             await runtime.close()
-        assert (tmp_path / "myagent_sessions" / "chat" / f"{first.session_id}.jsonl").is_file()
+        assert (tmp_path / "session" / "chat" / f"{first.session_id}.jsonl").is_file()
+        assert not (tmp_path / "myagent_sessions").exists()
         resumed = make_runtime(tmp_path / "new-data-root", FakeClient())
-        resumed._session_folder = tmp_path / "myagent_sessions"
+        resumed._session_folder = tmp_path / "session"
         try:
             result = await resumed.execute(
                 InboundMessage(type=MessageType.CHAT, session_id=first.session_id)

@@ -153,7 +153,7 @@ class AgentRuntime:
             data_path: LifePrism 数据根目录；省略时回退到
                 ``settings.lifeprism_data_path``。
             session_folder: 业务会话的存储根目录，其下按工作流或聊天分目录；省略时回退到
-                ``<data_path>/myagent_sessions``。
+                ``<data_path>/session``。
             client_factory: 零参数工厂，为每个新会话返回一个 provider。传
                 ``None`` 时创建生产 LLM client 并用 :class:`ProviderAdapter`
                 包装。
@@ -186,10 +186,19 @@ class AgentRuntime:
         return ChatSessionManager(self)
 
     @property
+    def session_root(self) -> Path:
+        """返回会话存储根目录，注入的根目录优先于默认数据目录。
+
+        默认根直接位于 :attr:`data_path` 之下，不重复嵌套数据目录名。聊天与
+        工作流两条路径共用本属性，避免默认根表达式分散后发生漂移。
+        """
+        return self._session_folder or self.data_path / "session"
+
+    @property
     def chat_session_folder(self) -> Path:
         """返回经过归属校验的统一聊天目录。"""
         return resolve_session_folder(
-            self._session_folder or self.data_path / "myagent_sessions",
+            self.session_root,
             InboundMessage(type=MessageType.CHAT, content=""),
         )
 
@@ -261,7 +270,7 @@ class AgentRuntime:
         sid = message.session_id
         if sid in self._managed_sessions:
             raise RuntimeError("Session 正在管理中")
-        root = self._session_folder or self.data_path / "myagent_sessions"
+        root = self.session_root
         folder = resolve_session_folder(root, message)
         if sid:
             try:

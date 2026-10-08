@@ -262,6 +262,10 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
     # 构建content
     content = f"""
     你需要帮我更新recent_state.md 文档，如果涉及到user.md相关内容,也需要更新user.md文档。
+    ## 记忆文件的完整路径
+    recent_state.md：{(settings.lifeprism_data_path / "user/daily_data/recent_state.md").resolve()}
+    user.md：{(settings.lifeprism_data_path / "user/user.md").resolve()}
+    请读取并更新上述目标文件，不使用其他目录的同名文件。
     ## 近{date_offset}天的behavior.md内容
     <behavior_md content>
     {behavior_md}

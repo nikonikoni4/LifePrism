@@ -1,8 +1,8 @@
 ---
-version: 1.3
+version: 1.4
 created_at: 2026-10-03
-updated_at: 2026-10-07
-last_updated: 前端聊天管理限 chat 目录，运行中拒删并永久删除
+updated_at: 2026-10-08
+last_updated: 默认会话根目录收敛为 session
 abstract: 使用外部 myagent 执行所有 Agent 轮次，聊天订阅原生 session 事件，后台保留 bus 请求响应桥接，旧会话业务与错误策略分别延后。
 status: decided
 ---
@@ -17,6 +17,7 @@ status: decided
 | 1.1 | Session 先按归属隔离目录，再实施会话管理 |
 | 1.2 | 聊天目录统一为 chat/<session_id>，channel 不参与归属 |
 | 1.3 | 恢复前端聊天管理，工作流仍作为独立 API 请求记录 |
+| 1.4 | 默认会话根目录收敛为 session |
 
 ## 问题与约束
 
@@ -54,7 +55,7 @@ P3 单独决定工具熔断配置、loop IoC、人在回路、重试、退避与
 
 采用原生 JSONL 文件直接置于归属目录，而不是为每个 Session 再建一层文件夹；这与 myagent 已有持久化接口一致。目录归属由业务层控制，不扩展目前无法恢复自定义字段的原生 metadata。拒绝跨归属恢复和缓存复用，不扫描全目录寻找同名 ID。
 
-默认存储根目录修正为数据目录下的 myagent_sessions，避免重复 localData，并消除项目路径编码对会话定位的影响。旧目录与已有数据不自动移动；提取进度仍作为后续任务。
+默认存储根目录定在数据目录下的 session，避免重复 localData，并消除项目路径编码对会话定位的影响。Runtime 以 `session_root` 属性集中解析该根，聊天与工作流两条路径共用，防止默认根表达式分散后漂移；注入替代根目录的规则不变。旧目录与已有数据不自动移动；提取进度仍作为后续任务。
 
 ## 前端聊天管理决策（2026-10-07）
 

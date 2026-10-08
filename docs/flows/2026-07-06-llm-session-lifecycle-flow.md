@@ -98,19 +98,19 @@ class SessionLifecycleTrace:
   - manager.Session:21
   - manager.Session.add_message:47
   - manager.Session.get_history_message:55
-  - manager.SessionManager._load_session:82
-  - manager.SessionManager.get_or_create_session:132
-  - manager.SessionManager.delete_session:155
+  - manager.SessionManager._load_session:80
+  - manager.SessionManager.get_or_create_session:130
+  - manager.SessionManager.delete_session:153
   - manager.SessionManager._remove_image_content:156
-  - manager.SessionManager.save_session:199
+  - manager.SessionManager.save_session:197
   - manager.SessionManager.get_session_metadata:214
-  - manager.SessionManager.remove_from_cache:249
+  - manager.SessionManager.remove_from_cache:247
   - manager.SessionManager.show_session_list:261
   - manager.SessionManager.show_session_content_list:268
-  - manager.ChatHistoryManager.load_histories:347
-  - manager.ChatHistoryManager.get_histories_to_dream:384
-  - manager.ChatHistoryManager.add_content:397
-  - manager.ChatHistoryManager.save_history:424
+  - manager.ChatHistoryManager.load_histories:345
+  - manager.ChatHistoryManager.get_histories_to_dream:382
+  - manager.ChatHistoryManager.add_content:395
+  - manager.ChatHistoryManager.save_history:422
 - lifeprism/llm/agent/loop.py
   - loop.AgentLoop._process_msg:468
   - loop.AgentLoop.auto_compact:606

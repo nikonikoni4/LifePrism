@@ -115,8 +115,8 @@ class AgentExecutionTrace:
   - queue.MessageQueue.consume_inbound:40
   - queue.MessageQueue.publish_outbound:43
 - lifeprism/llm/session/manager.py
-  - manager.SessionManager.get_or_create_session:132
-  - manager.SessionManager.save_session:199
+  - manager.SessionManager.get_or_create_session:130
+  - manager.SessionManager.save_session:197
 </key_function>
 
 ## 流程概览

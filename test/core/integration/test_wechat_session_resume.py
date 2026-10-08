@@ -58,3 +58,38 @@ def test_wechat_commands_resume_local_chat_and_exclude_workflow(tmp_path, monkey
             await runtime.close()
 
     asyncio.run(scenario())
+
+
+def test_new_command_saved_session_continues_after_runtime_restart(tmp_path, monkeypatch):
+    """/new回复的ID已落盘，重启后首条普通消息继续同一ID。"""
+
+    async def scenario():
+        client = FakeClient()
+        runtime = make_runtime(tmp_path, client)
+        monkeypatch.setattr(channel_module, "agent_runtime", runtime)
+        channel = WechatChannel.__new__(WechatChannel)
+        channel._user_data = {"wx": {"context_token": "ctx"}}
+        channel.send = AsyncMock()
+        channel._save_user_data_to_db = Mock()
+        await channel._handle_session_command("/new", "wx")
+        sid = channel._user_data["wx"]["last_session_id"]
+        assert channel.send.call_args.args[0].session_id == sid
+        assert not client.calls
+        await runtime.close()
+        restarted = make_runtime(tmp_path, client)
+        try:
+            result = await restarted.execute(
+                InboundMessage(
+                    type=MessageType.CHAT,
+                    channel=ChannelType.WECHAT,
+                    content="first",
+                    session_id=sid,
+                )
+            )
+            assert result.session_id == sid
+            history = await restarted.chat_sessions.get_history(sid)
+            assert [m["role"] for m in history["messages"]] == ["user", "assistant"]
+        finally:
+            await restarted.close()
+
+    asyncio.run(scenario())

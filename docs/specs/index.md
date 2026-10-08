@@ -144,7 +144,7 @@
 - 内容摘要：SSH 隧道同步模块规格，定义作为 HTTP/HTTPS 之外第三种连接方式的安全传输通道。覆盖 SSHTunnel 类对外接口（connect/close/start_keep_alive_loop/test_connection/状态机枚举）、SyncClient SSH 集成方法（_should_use_ssh_tunnel 三层守卫、_read_remote_url 统一拦截入口、_start_ssh_tunnel、_stop_ssh_tunnel）、3 个 SSH 隧道管理 API 端点、配置 Schema（sync.connection_mode 和 sync.ssh_tunnel.*）、7 个错误码契约（SSH_KEY_REJECTED/SSH_NETWORK_UNREACHABLE/SSH_LOCAL_PORT_IN_USE 等）、远端 8102 端口默认绑定 127.0.0.1 策略、非侵入式设计与三层守卫策略、密钥存储路由复用 ADR 2026-07-09
 
 ## myagent-runtime-spec
-- updated_at: 2026-10-07
+- updated_at: 2026-10-08
 - path: `docs/specs/2026-10-03-myagent-runtime-spec.md`
 - 触发规则：修改或查询迁移后的 Agent 运行、聊天事件及后台 bus 时阅读。
-- 内容摘要：原生执行、事件终态、SSE、工具提示词、生命周期、workflow_id 存储归属、前端统一聊天 Session 管理，以及 meta.extra.last_processed_turn 增量提取。
+- 内容摘要：原生执行、事件终态、SSE、工具提示词、生命周期、workflow_id 存储归属、前端统一聊天 Session 管理，以及 meta.extra.last_processed_turn 增量提取。默认会话根目录为数据目录下 session，由 session_root 集中解析。

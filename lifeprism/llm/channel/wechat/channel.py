@@ -5,6 +5,7 @@
 import asyncio
 import contextlib
 import json
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -410,7 +411,7 @@ class WechatChannel(BaseChannel):
                 await asyncio.sleep(5)
 
     async def _handle_session_command(self, content: str, wechat_user_id: str) -> bool:
-        """处理聊天会话命令；只切换渠道引用，不触发模型执行。
+        """处理聊天会话命令和历史回顾，不触发模型执行。
 
         Args:
             content: 微信文本内容。
@@ -425,70 +426,126 @@ class WechatChannel(BaseChannel):
         command = parts[0]
         user_data = self._user_data.setdefault(wechat_user_id, {})
         reply: str
+        response_session_id = None
         try:
             if command == "/session-list":
-                if len(parts) > 2 or (
-                    len(parts) == 2 and (not parts[1].isascii() or not parts[1].isdecimal())
-                ):
-                    reply = "用法：/session-list [正整数页码]"
+                try:
+                    page, date_filter = self._session_list_arguments(parts[1:])
+                except ValueError:
+                    reply = (
+                        "[ERROR] 用法：/session-list [正整数页码] "
+                        "或 /session-list YYYY-MM-DD [正整数页码]"
+                    )
                 else:
-                    page = int(parts[1]) if len(parts) == 2 else 1
-                    if page < 1:
-                        reply = "用法：/session-list [正整数页码]"
-                    else:
-                        listing = await agent_runtime.chat_sessions.list_sessions(
-                            page=page, page_size=10
+                    options = {"date_filter": date_filter} if date_filter else {}
+                    listing = await agent_runtime.chat_sessions.list_sessions(
+                        page=page, page_size=10, include_preview=True, **options
+                    )
+                    total = listing["total"]
+                    pages = max(1, (total + 9) // 10)
+                    scope = f"（{date_filter}）" if date_filter else ""
+                    lines = [f"[SUCCESS] 聊天会话{scope}：第 {page}/{pages} 页，共 {total} 个"]
+                    for item in listing["items"]:
+                        markers = []
+                        if item["id"] == user_data.get("last_session_id"):
+                            markers.append("当前")
+                        if item["is_running"]:
+                            markers.append("运行中")
+                        label = f" [{', '.join(markers)}]" if markers else ""
+                        name = " ".join(item["name"].split())[:80]
+                        preview = item.get("preview") or "暂无用户消息"
+                        lines.append(f"• {name}{label}\n{item['id']}: {preview}")
+                    if not listing["items"]:
+                        empty = (
+                            f"暂无{date_filter}的会话记录。" if date_filter else "暂无聊天会话。"
                         )
-                        total = listing["total"]
-                        pages = max(1, (total + 9) // 10)
-                        lines = [f"聊天会话：第 {page}/{pages} 页，共 {total} 个"]
-                        for item in listing["items"]:
-                            markers = []
-                            if item["id"] == user_data.get("last_session_id"):
-                                markers.append("当前")
-                            if item["is_running"]:
-                                markers.append("运行中")
-                            label = f" [{', '.join(markers)}]" if markers else ""
-                            name = " ".join(item["name"].split())[:80]
-                            lines.append(f"{name}{label}\n{item['id']}")
-                        if not listing["items"]:
-                            lines.append("暂无聊天会话。" if total == 0 else "此页没有会话。")
-                        lines.append("发送 /continue <完整 Session ID> 切换会话。")
-                        if page < pages:
-                            lines.append(f"下一页：/session-list {page + 1}")
-                        reply = "\n\n".join(lines)
+                        lines.append(empty if total == 0 else "此页没有会话。")
+                    lines.append("发送 /continue <完整 Session ID> 切换会话。")
+                    if page < pages:
+                        prefix = f"{date_filter} " if date_filter else ""
+                        lines.append(f"下一页：/session-list {prefix}{page + 1}")
+                    reply = "\n\n".join(lines)
             elif command == "/continue":
                 if len(parts) != 2:
-                    reply = "用法：/continue <完整 Session ID>"
+                    reply = "[ERROR] 请提供会话ID，用法：/continue <完整 Session ID>"
                 else:
                     try:
                         sid = str(UUID(parts[1]))
                     except ValueError:
-                        reply = "Session ID 无效，请从 /session-list 复制完整 ID。"
+                        reply = "[ERROR] Session ID 无效，请从 /session-list 复制完整 ID。"
                     else:
                         history = await agent_runtime.chat_sessions.get_history(sid)
                         if history is None:
-                            reply = "聊天会话不存在，请通过 /session-list 查看可用会话。"
+                            reply = (
+                                f"[ERROR] 会话 {sid} 不存在，请通过 /session-list 查看可用会话。"
+                            )
                         else:
                             self._persist_session_reference(wechat_user_id, sid)
+                            response_session_id = sid
                             name = " ".join(history["session_name"].split())[:80]
-                            reply = f"已切换到会话：{name}\n{sid}\n下条消息将在此会话继续。"
+                            reply = f"[SUCCESS] 继续会话 {sid}\n{name}"
+                            last_messages = {}
+                            for message in reversed(history["messages"]):
+                                role = message["role"]
+                                if role in {"user", "assistant"} and role not in last_messages:
+                                    last_messages[role] = message["content"]
+                            if any(last_messages.values()):
+                                reply += "\n\n最后两轮对话："
+                                if last_messages.get("user"):
+                                    reply += f"\nuser:\n{last_messages['user']}"
+                                if last_messages.get("assistant"):
+                                    reply += f"\n\nA:\n{last_messages['assistant']}"
             elif len(parts) != 1:
-                reply = "用法：/new"
+                reply = "[ERROR] 用法：/new"
             else:
-                self._persist_session_reference(wechat_user_id, "")
-                reply = "已清空当前会话，下条消息将开始新会话。"
+                previous = user_data.get("last_session_id")
+                created = await agent_runtime.chat_sessions.create()
+                sid = created["session_id"]
+                try:
+                    self._persist_session_reference(wechat_user_id, sid)
+                except Exception:
+                    try:
+                        await agent_runtime.chat_sessions.delete(sid)
+                    except Exception:
+                        logger.exception("清理未绑定的微信空会话失败: session_id=%s", sid)
+                    raise
+                response_session_id = sid
+                reply = f"[SUCCESS] 新建会话 {sid} --- 可以开始新的聊天了！"
+                if previous:
+                    reply += f"\n\n可以通过使用以下指令恢复上一个会话：\n/continue {previous}"
         except Exception:
             # 文件系统、状态存储错误隔离在命令边界，避免终止微信轮询。
             logger.exception("微信会话命令失败: command=%s", command)
-            reply = "会话命令执行失败，请稍后重试。"
+            response_session_id = None
+            reply = "[ERROR] 会话命令执行失败，请稍后重试。"
         await self.send(
             OutboundMessage(
                 response=LLMResponse(content=reply),
+                session_id=response_session_id,
                 extra={"wechat_user_id": wechat_user_id},
             )
         )
         return True
+
+    @staticmethod
+    def _session_list_arguments(arguments: list[str]) -> tuple[int, str | None]:
+        """兼容页码与严格本地日期；日期筛选可带第二个分页参数。"""
+        if len(arguments) > 2:
+            raise ValueError("参数过多")
+        page, date_filter = 1, None
+        if arguments:
+            first = arguments[0]
+            if len(first) == 10 and date.fromisoformat(first).isoformat() == first:
+                date_filter = first
+                page_text = arguments[1] if len(arguments) == 2 else "1"
+            elif len(arguments) == 1:
+                page_text = first
+            else:
+                raise ValueError("日期参数无效")
+            if not page_text.isascii() or not page_text.isdecimal() or int(page_text) < 1:
+                raise ValueError("页码无效")
+            page = int(page_text)
+        return page, date_filter
 
     def _persist_session_reference(self, wechat_user_id: str, session_id: str) -> None:
         """持久化渠道会话引用，保存失败时恢复内存中的旧引用。"""
