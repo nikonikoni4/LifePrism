@@ -809,7 +809,7 @@ async def health_check():
 
     用于监控服务运行状态
     """
-    return {"status": "healthy", "service": "lifeprism-api", "version": "0.2.0"}
+    return {"status": "healthy", "service": "lifeprism-api", "version": "0.3.0"}
 
 
 def is_port_available(port: int) -> bool:

@@ -233,7 +233,7 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """健康检查端点"""
-    return {"status": "healthy", "service": "lifeprism-web-demo", "version": "0.2.0"}
+    return {"status": "healthy", "service": "lifeprism-web-demo", "version": "0.3.0"}
 
 
 if __name__ == "__main__":
