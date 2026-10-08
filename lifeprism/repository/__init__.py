@@ -82,9 +82,20 @@ from lifeprism.repository.providers import value_provider as value_repository
 from lifeprism.repository.providers import (
     wechat_account_state_provider as wechat_account_state_repository,
 )
+from lifeprism.utils.lazy_singleton import LazySingleton
 
 from .base_providers import AWBaseDataProvider, LWBaseDataProvider
 from .sync_repository import SyncRepository
+
+
+def _create_rag_repository():
+    """RAG 关闭时不加载外部索引依赖。"""
+    from .rag_storage import RagRepository
+
+    return RagRepository()
+
+
+rag_repository = LazySingleton(_create_rag_repository)
 
 __all__ = [
     "QueryOptions",
@@ -120,4 +131,5 @@ __all__ = [
     "custom_record_repository",
     # 同步 repository
     "SyncRepository",
+    "rag_repository",
 ]

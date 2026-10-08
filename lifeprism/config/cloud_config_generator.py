@@ -181,6 +181,8 @@ class CloudConfigGenerator:
                 "sync_api_key": sync_api_key,
                 "wechat_token": wechat_token,
                 "providers": providers_map,
+                "rag_embedding_api_key": settings.get_storage_key("rag_embedding_api_key") or "",
+                "rag_rerank_api_key": settings.get_storage_key("rag_rerank_api_key") or "",
             },
             "config": {
                 "llm": {
@@ -190,6 +192,11 @@ class CloudConfigGenerator:
                 },
                 "monitor_type": "none",  # 强制覆盖：云端必须禁用 Monitor
                 "timezone": settings.get("timezone", "Asia/Shanghai"),  # 透传用户时区配置
+                "rag": {
+                    "enabled": settings.get("rag.enabled", False),
+                    "rerank_enabled": settings.get("rag.rerank_enabled", False),
+                    "index_directories": settings.get("rag.index_directories", ["user", "diary"]),
+                },
             },
         }
 

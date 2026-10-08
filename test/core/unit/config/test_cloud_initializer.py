@@ -134,6 +134,24 @@ def _write_cloud_init(data_path: Path, data: dict):
 # ==================== Slice 1: should_initialize() ====================
 
 
+def test_rag_cloud_import_keeps_keys_separate(setup_paths, cloud_init_data):
+    from lifeprism.config.cloud_initializer import CloudInitializer
+
+    cloud_init_data['config']['rag'] = {'enabled': True, 'rerank_enabled': True, 'index_directories': ['user', 'diary']}
+    cloud_init_data['storage'].update(rag_embedding_api_key='synthetic-embedding', rag_rerank_api_key='synthetic-rerank')
+    initializer = CloudInitializer(setup_paths['data_path'])
+    initializer._write_config_yaml(cloud_init_data)
+    initializer._write_storage_yaml(cloud_init_data)
+    config = yaml.safe_load(setup_paths['config_path'].read_text(encoding='utf-8'))
+    storage = yaml.safe_load(setup_paths['storage_path'].read_text(encoding='utf-8'))
+    assert config['rag.enabled'] is True
+    assert config['rag.rerank_enabled'] is True
+    assert config['rag.index_directories'] == ['user', 'diary']
+    assert 'rag_embedding_api_key' not in config
+    assert storage['rag_embedding_api_key'] == 'synthetic-embedding'
+    assert storage['rag_rerank_api_key'] == 'synthetic-rerank'
+
+
 class TestShouldInitialize:
     """测试 CloudInitializer.should_initialize() 检测 cloud_init.yaml 是否存在"""
 

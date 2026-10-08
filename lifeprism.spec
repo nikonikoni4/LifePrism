@@ -10,6 +10,7 @@ LifePrism PyInstaller 配置文件
 """
 
 import sys
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_submodules
 from pathlib import Path
 
 block_cipher = None
@@ -20,8 +21,8 @@ project_root = Path('.').resolve()
 a = Analysis(
     ['lifeprism/server/main.py'],
     pathex=[str(project_root)],
-    binaries=[],
-    datas=[
+    binaries=collect_dynamic_libs('sqlite_vec'),
+    datas=collect_data_files('jieba') + [
         # Python 模块文件
         ('lifeprism/config/__init__.py', 'lifeprism/config'),
         ('lifeprism/config/crawler.py', 'lifeprism/config'),
@@ -40,7 +41,7 @@ a = Analysis(
         (r'D:\program\anaconda\Lib\site-packages\litellm\llms\openai_like\providers.json', 'litellm/llms/openai_like'),
         (r'D:\program\anaconda\Lib\site-packages\litellm\llms\huggingface\huggingface_llms_metadata', 'litellm/llms/huggingface/huggingface_llms_metadata'),
     ],
-    hiddenimports=[
+    hiddenimports=collect_submodules('simple_rag') + [
         # FastAPI/Uvicorn 相关
         'uvicorn.logging',
         'uvicorn.loops',

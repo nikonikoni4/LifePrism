@@ -137,11 +137,19 @@ def build_tools(message_type: str) -> list[Tool]:
     会话查询、bootstrap 等工具不属于本包，不在此注册。
     """
     if message_type == MessageType.CHAT:
+        from lifeprism.config.settings_manager import settings
+
+        extra = []
+        if settings.get("rag.enabled", False):
+            from lifeprism.llm.runtime_tools.rag_tool import RagSearchTool
+
+            extra.append(RagSearchTool())
         return (
             _filesystem_tools()
             + _lifeprismsystem_tools()
             + _habit_tools()
             + _custom_records_tools()
+            + extra
         )
     if message_type == MessageType.DREAM_TASK:
         return [UserActivitySummaryTool(), UserComputerLogTool()] + _filesystem_tools()

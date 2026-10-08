@@ -330,17 +330,19 @@ class TestScheduleServiceIntegration:
         # 等待任务执行几次
         await asyncio.sleep(3)
 
-        # 记录移除前的执行次数
-        count_before_removal = execution_count
-
         # 移除任务
         schedule_service.remove_job(job_id)
+
+        # APScheduler 移除的是后续调度，不会取消已提交给线程池的回调。
+        # 给本轮短回调留出结束时间，再验证后续周期不产生新的执行。
+        await asyncio.sleep(0.1)
+        count_after_removal = execution_count
 
         # 等待一段时间，确保任务不再执行
         await asyncio.sleep(3)
 
         # 验证任务已停止执行
-        assert execution_count == count_before_removal, "任务移除后仍在执行"
+        assert execution_count == count_after_removal, "任务移除后仍产生新的周期执行"
 
     @pytest.mark.asyncio
     async def test_get_jobs_list(self, schedule_service):

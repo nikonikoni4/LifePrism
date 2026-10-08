@@ -82,6 +82,7 @@ def mock_env(tmp_path):
         "timezone": "Asia/Shanghai",
     }.get(key, default if default is not None else "")
     mock_settings.lifeprism_data_path = tmp_path
+    mock_settings.get_storage_key.return_value = None
 
     mock_pm = MagicMock()
     mock_pm.get_all_providers.return_value = PROVIDERS
@@ -130,6 +131,22 @@ def mock_env(tmp_path):
 
 
 # ==================== 测试类 ====================
+
+
+def test_rag_cloud_export_includes_independent_keys_and_settings(mock_env):
+    from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+    original_get = mock_env['settings'].get.side_effect
+    rag_values = {'rag.enabled': True, 'rag.rerank_enabled': True, 'rag.index_directories': ['user', 'diary']}
+    mock_env['settings'].get.side_effect = lambda key, default=None: rag_values.get(key, original_get(key, default))
+    mock_env['settings'].get_storage_key.side_effect = lambda key: {
+        'rag_embedding_api_key': 'synthetic-embedding', 'rag_rerank_api_key': 'synthetic-rerank'
+    }.get(key)
+    path, _ = CloudConfigGenerator().generate_cloud_config()
+    data = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+    assert data['config']['rag'] == {'enabled': True, 'rerank_enabled': True, 'index_directories': ['user', 'diary']}
+    assert data['storage']['rag_embedding_api_key'] == 'synthetic-embedding'
+    assert data['storage']['rag_rerank_api_key'] == 'synthetic-rerank'
 
 
 class TestCloudConfigGeneratorReadsExistingKey:

@@ -1,8 +1,8 @@
 ---
-version: 3.1
+version: 3.2
 created_at: 2026-04-09
 updated_at: 2026-10-08
-last_updated: 微信纯收发与会话业务分层，接入原生人在回路
+last_updated: 增加独立 RAG 检索层与每日索引快照单向同步
 abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后端架构、主干数据流和关键依赖方向。
 ---
 
@@ -15,6 +15,7 @@ abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后�
 | 版本 | 更新内容 |
 |------|---------|
 | 1.0 | 创建架构地图初稿 |
+| 3.2 | 增加 RAG 检索层、独立索引与每日单向快照同步 |
 | 1.1 | 补充 abstract 字段 |
 | 2.0 | 全面重写：参照 agents-hub 格式重构，新增 LLM Agent/Channel/Repository 等核心模块，补充技术栈表、分层架构图、4 条主干数据流和文档导航 |
 | 2.1 | 新增自定义记录模块（Custom Records）：前端架构图和目录结构同步更新 |
@@ -117,6 +118,8 @@ LifePrism 是一个围绕**生活记录与数据分析**构建的桌面应用项
 
 ## 后端架构详解
 
+RAG 由 `lifeprism/rag/` 提供索引构建与检索，依赖 config、repository 和外部 simple_rag。`llm/runtime_tools/` 将检索暴露给聊天 Agent，`sync/rag_sync.py` 负责每日索引更新后的本地到云端发布。索引 SQLite 独立存放在数据根 `rag/`，不参与业务表 LWW 同步。契约见 [Simple RAG](specs/2026-10-08-simple-rag-spec.md)。
+
 ### 目录结构
 
 ```
@@ -153,6 +156,9 @@ lifeprism/
 │   ├── provider/                   # ActivityWatch 数据源适配
 │   ├── components/                 # EventTransformer / CacheMatcher / ClassifyCollector
 │   └── models/                     # 数据模型
+│
+├── rag/                            # 个人资料/日记索引构建、版本发布与检索
+├── sync/                           # 业务同步、SSH 隧道及独立 RAG 快照单向发布
 │
 ├── monitor/                        # 监控层
 │   ├── windows_monitor/            # Windows 窗口监控

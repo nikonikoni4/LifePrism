@@ -148,3 +148,10 @@
 - path: `docs/specs/2026-10-03-myagent-runtime-spec.md`
 - 触发规则：修改或查询迁移后的 Agent 运行、聊天事件及后台 bus 时阅读。
 - 内容摘要：原生执行、事件终态、SSE、工具提示词、生命周期、workflow_id 存储归属、统一聊天管理与 turn 增量提取；微信会话服务按本轮注入原生 HITL 客户端。默认根为数据目录/session。
+
+## simple-rag
+
+- updated_at: 2026-10-08
+- path: `docs/specs/2026-10-08-simple-rag-spec.md`
+- 触发规则：修改 RAG 设置、模型密钥、检索工具、索引构建或每日单向索引同步时阅读。
+- 内容摘要：默认 vec、可选 own_bm25 和 rerank；固定模型；每日记忆更新后完整重建，独立上传 SQLite 快照；版本发布与失败重试契约。

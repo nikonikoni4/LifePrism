@@ -266,6 +266,12 @@ class CloudInitializer:
         if timezone_from_cloud:
             existing_config["timezone"] = timezone_from_cloud
 
+        from lifeprism.rag.config import RagSettingsPatch
+
+        rag_config = RagSettingsPatch.model_validate(config_section.get("rag") or {})
+        for key, value in rag_config.model_dump(exclude_unset=True).items():
+            existing_config[f"rag.{key}"] = value
+
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(
                 existing_config, f, allow_unicode=True, default_flow_style=False, sort_keys=False
@@ -308,6 +314,8 @@ class CloudInitializer:
             "sync_api_key": storage_config.get("sync_api_key", ""),
             "wechat_token": storage_config.get("wechat_token", ""),
             "providers": storage_config.get("providers") or {},
+            "rag_embedding_api_key": storage_config.get("rag_embedding_api_key", ""),
+            "rag_rerank_api_key": storage_config.get("rag_rerank_api_key", ""),
         }
 
         # 通过 SettingsManager public 接口写入（保证权限 600）

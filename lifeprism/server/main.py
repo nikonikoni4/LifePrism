@@ -234,6 +234,8 @@ _log_startup_time("  - cloud_config_router", _import_start)
 
 _import_start = time.perf_counter()
 from lifeprism.server.api.add_on_api import router as add_on_router
+from lifeprism.server.api.rag_settings_api import router as rag_settings_router
+from lifeprism.server.api.rag_sync_api import router as rag_sync_router
 
 _log_startup_time("  - add_on_router", _import_start)
 
@@ -506,6 +508,8 @@ async def lifespan(app: FastAPI):
         logger.warning("创建 SyncClient 失败: error=%s", e)
         app.state.sync_client = None
 
+    schedule_service.configure_rag_sync(app.state.sync_client)
+
     # 先启动 AgentBusWorker，再执行启动同步
     # 原因：sync_once 在遇到 CONFLICT 时会通过 bus.send 发送 AI 合并请求，
     # 若 AgentBusWorker 未启动，请求会在队列中积压直到 timeout 超时降级。
@@ -765,6 +769,10 @@ app.include_router(sync_status_router)  # 同步状态查询和手动触发
 app.include_router(cloud_config_router)  # 云端配置生成
 app.include_router(ssh_tunnel_router, prefix="/api/v2")  # SSH 隧道管理（仅 full 模式注册）
 app.include_router(add_on_router)
+
+app.include_router(rag_settings_router, prefix="/api/v2")
+if settings.run_mode == "agent_only":
+    app.include_router(rag_sync_router)
 
 _log_startup_time("[OK] API routers registered (21 routers)", _router_start)
 

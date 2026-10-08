@@ -43,7 +43,13 @@ class SettingsManager:
 
     # storage.yaml 承载的 Key 类字段（run_mode 为云端时从 storage.yaml 读写）
     # api_key 不纳入，保持现有 ENV_VAR + keyring 路径
-    STORAGE_KEY_FIELDS = {"sync_api_key", "wechat_token", "ssh_tunnel_private_key"}
+    STORAGE_KEY_FIELDS = {
+        "sync_api_key",
+        "wechat_token",
+        "ssh_tunnel_private_key",
+        "rag_embedding_api_key",
+        "rag_rerank_api_key",
+    }
 
     # storage key → keyring username 映射
     # storage.yaml 中用 wechat_token 作为字段名，但 keyring 中历史使用 wechat_bot_token 作为 username（PRD 规范）。
@@ -58,6 +64,9 @@ class SettingsManager:
     DEFAULTS = {
         "user_name": "默认用户",
         "api_key": None,
+        "rag.enabled": False,
+        "rag.rerank_enabled": False,
+        "rag.index_directories": ["user", "diary"],
         "provider": "",
         "model": "",
         "api_base": "",  # 空=由 settings 界面按 provider 历史/默认值回填

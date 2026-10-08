@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CategoryAPI } from '../lifewatch/pages/category/api';
 import type { CategoryTreeItem } from '../lifewatch/pages/category/types';
 import { SyncConfigSection } from './components/SyncConfigSection';
+import { RagConfigSection } from './components/RagConfigSection';
 import { SyncStatusSection } from './components/SyncStatusSection';
 
 // 常用时区选项
@@ -1554,6 +1555,7 @@ const SettingsApp: React.FC = () => {
             </section>
 
             {/* 9. 数据同步配置 */}
+            <RagConfigSection />
             <SyncConfigSection />
 
             {/* 10. 同步状态展示 */}

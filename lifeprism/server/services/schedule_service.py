@@ -34,7 +34,7 @@ TEST_CRON_AFTER_MINUTES = 1  # 定时任务测试参数（启动后N分钟触发
 # ====================================================
 
 
-async def _dreaming():
+async def _dreaming(owner=None):
     # 每天本地 10:00 执行时，获取昨天的完整数据（昨天04:00 ~ 今天04:00）
     # 基于本地时区计算"昨天"：用户在本地午夜前后看到的日期与预期一致。
     yesterday = (get_local_today() - timedelta(days=1)).isoformat()
@@ -93,6 +93,9 @@ async def _dreaming():
         if acquired:
             global_task_state.release()
 
+    # 索引更新必须在本轮记忆写入和备份完成之后，再独立发布云端。
+    await (owner or schedule_service).run_rag_daily(after_memory=True)
+
 
 async def _process_session_message():
     # 全局任务状态互斥：获取 LOCAL_TASK 状态（5 分钟超时）
@@ -131,6 +134,10 @@ class ScheduleService:
 
         # 注册系统任务（在 start() 后自动添加）
         self._system_jobs = []
+        self._rag_job = None
+        self._rag_sync_client = None
+        self._rag_data_root = None
+        self._rag_memory_lock = asyncio.Lock()
 
         # 根据配置决定是否注册任务
         # 会话信息提取（process_session_message）：正常每 4 小时一次；
@@ -187,6 +194,18 @@ class ScheduleService:
             self._system_jobs.extend(
                 [
                     {
+                        "func": self.run_rag_daily,
+                        "trigger": "cron",
+                        "kwargs": {"cron_expr": "0 10 * * *"},
+                        "job_id": "rag_daily",
+                    },
+                    {
+                        "func": self.run_rag_daily,
+                        "trigger": "interval",
+                        "kwargs": {"minutes": 15},
+                        "job_id": "rag_retry",
+                    },
+                    {
                         "func": backup_service.backup_database,
                         "trigger": "cron",
                         "kwargs": {"cron_expr": "0 0,8,16 * * *"},  # 每天本地 00/08/16 点
@@ -195,6 +214,56 @@ class ScheduleService:
                     },
                 ]
             )
+
+    def configure_rag_sync(self, sync_client: object | None) -> None:
+        """复用应用拥有的 SyncClient，不创建第二条 SSH 隧道。"""
+        self._rag_sync_client = sync_client
+        self._rag_job = None
+
+    async def run_rag_daily(self, after_memory: bool = False) -> None:
+        """每日更新后上传一次；失败由 15 分钟任务重试并在启动后补执行。"""
+        if settings.run_mode != "full" or not settings.get("rag.enabled", False):
+            return
+        data_root = Path(settings.lifeprism_data_path).resolve()
+        self._state_file_path = data_root / self._STATE_FILE_NAME
+        today = get_local_today().isoformat()
+        if not after_memory:
+            now = datetime.now(pytz.timezone(get_user_timezone()))
+            if now.hour < 10:
+                return
+            if (
+                settings.auto_update_memory or settings.auto_diary_summary
+            ) and self._load_cron_state().get("update_memory") != today:
+                if not any(job["job_id"] == "update_memory" for job in self._system_jobs):
+                    # 启动后才开启记忆开关：由 RAG 轮询补执行，仍保证记忆先于索引。
+                    async with self._rag_memory_lock:
+                        if self._load_cron_state().get("update_memory") != today:
+                            await self._execute_cron_with_state(
+                                lambda: _dreaming(self), "update_memory"
+                            )
+                return
+        if self._rag_job is None or self._rag_data_root != data_root:
+            from lifeprism.rag.service import get_rag_service
+            from lifeprism.sync.rag_sync import DailyRagJob, RagSyncSender
+            from lifeprism.sync.sync_config import get_sync_api_key
+
+            if self._rag_sync_client is None:
+                logger.warning("RAG 发布等待 SyncClient 初始化")
+                return
+            service = get_rag_service()
+            sender = RagSyncSender(service, self._rag_sync_client, get_sync_api_key)
+            self._rag_job = DailyRagJob(service, sender.upload)
+            self._rag_data_root = data_root
+        acquired = await asyncio.to_thread(global_task_state.try_acquire, TaskState.LOCAL_TASK, 0.0)
+        if not acquired:
+            return
+        try:
+            await self._rag_job.run(today, settings.get("rag.index_directories", ["user", "diary"]))
+        except Exception as exc:
+            # 不把失败写成成功；DailyRagJob 的 built_date/synced_date 负责恢复。
+            logger.warning("每日 RAG 任务失败，稍后重试: %s", type(exc).__name__)
+        finally:
+            global_task_state.release()
 
     def _load_cron_state(self) -> dict:
         """加载 Cron 任务执行状态
