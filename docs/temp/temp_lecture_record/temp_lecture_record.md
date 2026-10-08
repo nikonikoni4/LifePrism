@@ -38,3 +38,7 @@
 - 教训：抽取业务文件不足以解决耦合，必须明确原执行任务、交互 Future 和统一输出入口的拥有者；下一条用户输入只解决待答交互，不能再次等待上次执行结果或启动普通 user turn。
 - 源码核实后纠正此前并发假设：微信 `_poll_loop` 实际逐条 await 消息处理，会被 execute 阻塞。必须让提交入口及时返回，由会话服务持有执行任务。
 - 区分 step finally 内的可恢复错误 waterfall 与 turn/end 的终态，不在未核实源码时把 finally 一概当成清理结束。
+
+## 2026-10-08 工具调用混合输出的归因
+- 用户指出不同工具名被合并；检查 session 分片确认两个不同 call_id 使用相同 index=0，而 ProviderAdapter 仅按 index 累积，覆盖 ID 并拼接 name/arguments。
+- 教训：非法 arguments 不能直接归因于模型输出；先比对分片中的 index、call_id 和最终聚合结果。区分原生 tool_calls 拼接与 XML 解析路径，未保存原始 SDK 流时不声称已证实服务端原始输出。
