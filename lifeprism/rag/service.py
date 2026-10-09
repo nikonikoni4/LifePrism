@@ -29,6 +29,7 @@ from lifeprism.rag.config import (
     read_settings,
     validate_directories,
 )
+from lifeprism.rag.diagnostics import log_rag_failure, rag_stage
 from lifeprism.repository import rag_repository
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ConflictError, ValidationError
@@ -134,7 +135,7 @@ class RagService:
         if task.cancelled():
             self._manual_error = "索引构建已中断，原索引未被清除"
         elif (error := task.exception()) is not None:
-            logger.warning("手动 RAG 索引失败: %s", type(error).__name__)
+            log_rag_failure(logger, "手动 RAG 索引失败", error, self.config)
             self._manual_error = "索引构建失败，请检查模型密钥、网络和目录；原索引已保留"
 
     def _embedding(self):
@@ -283,48 +284,64 @@ class RagService:
                 # to_thread 不能停止已有线程。先等线程释放连接再交还写锁。
                 try:
                     await worker
-                except Exception:
-                    logger.warning("取消 RAG 构建时工作线程失败")
+                except Exception as exc:
+                    log_rag_failure(logger, "取消 RAG 构建时工作线程失败", exc, self.config)
                 raise
 
     async def _build(self, directories: list[str]) -> IndexManifest:
         """工作线程内创建连接和网络客户端，避免跨线程使用 sqlite。"""
-        from simple_rag.chunking.structured_file.md_chunk_by_title import chunk_by_title
+        with rag_stage("load_dependencies"):
+            from simple_rag.chunking.structured_file.md_chunk_by_title import chunk_by_title
 
         self.root.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="build-", dir=self.root) as workspace:
             work = Path(workspace)
             sources = work / "sources"
-            files, fingerprint = self._copy_sources(directories, sources)
+            with rag_stage("source_copy", root=self.data_root, directories=directories):
+                files, fingerprint = self._copy_sources(directories, sources)
             candidate = work / "candidate.db"
             snapshot = work / "snapshot.db"
-            async with self.embedding_factory() as embedding:
+            with rag_stage("embedding_client", model=EMBEDDING_MODEL):
+                client = self.embedding_factory()
+            async with client as embedding:
                 with rag_repository.open(candidate) as conn:
-                    pipeline = rag_repository.pipeline(conn, embedding)
+                    with rag_stage("index_initialization"):
+                        pipeline = rag_repository.pipeline(conn, embedding)
                     drafts = []
                     for path in files:
-                        drafts.extend(
-                            chunk_by_title(
-                                path, 384, 0, source_name=path.relative_to(sources).as_posix()
+                        with rag_stage("chunk", source=path.relative_to(sources).as_posix()):
+                            drafts.extend(
+                                chunk_by_title(
+                                    path, 384, 0, source_name=path.relative_to(sources).as_posix()
+                                )
                             )
-                        )
-                    merged = pipeline.merge(drafts)
+                    with rag_stage("merge", files=len(files), chunks=len(drafts)):
+                        merged = pipeline.merge(drafts)
                     # 外部合并器会丢弃唯一短块；LifePrism 不能因此漏掉整份用户资料。
                     if drafts and not merged:
                         merged = drafts
-                    pipeline.store(await pipeline.embedding(merged))
-                    rag_repository.snapshot(conn, snapshot)
+                    with rag_stage(
+                        "embedding", model=EMBEDDING_MODEL, files=len(files), chunks=len(merged)
+                    ):
+                        embedded = await pipeline.embedding(merged)
+                    with rag_stage("index_write", chunks=len(embedded)):
+                        pipeline.store(embedded)
+                    with rag_stage("snapshot"):
+                        rag_repository.snapshot(conn, snapshot)
+            with rag_stage("validation"):
+                count = rag_repository.validate(snapshot)
             manifest = IndexManifest(
                 version=uuid4().hex,
                 sqlite_vec_version=sqlite_vec.__version__,
                 created_at=datetime.now(UTC),
                 sha256=file_hash(snapshot),
                 size=snapshot.stat().st_size,
-                chunk_count=rag_repository.validate(snapshot),
+                chunk_count=count,
                 source_fingerprint=fingerprint,
                 directories=directories,
             )
-            self.install(snapshot, manifest)
+            with rag_stage("publish", version=manifest.version):
+                self.install(snapshot, manifest)
             self._manual_error = None
             logger.info(
                 "RAG 索引已发布: version=%s chunks=%d", manifest.version, manifest.chunk_count
@@ -361,7 +378,8 @@ class RagService:
                         raise ValueError("rerank 返回为空")
                     return reranked[:k]
                 except Exception as exc:
-                    logger.warning("RAG rerank 失败，回退粗排: %s", type(exc).__name__)
+                    exc.add_note(f"RAG stage=rerank model={RERANK_MODEL}")
+                    log_rag_failure(logger, "RAG rerank 失败，回退粗排", exc, self.config)
             return results[:k]
 
 

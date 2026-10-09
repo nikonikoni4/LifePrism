@@ -18,6 +18,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from lifeprism.config import get_user_timezone
 from lifeprism.config.settings_manager import settings
 from lifeprism.llm.function.agent_schedule_job import dreaming, process_session_message
+from lifeprism.rag.diagnostics import log_rag_failure
 from lifeprism.server.services.backup_service import backup_service
 from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.server.services.global_task_state import TaskState, global_task_state
@@ -261,7 +262,7 @@ class ScheduleService:
             await self._rag_job.run(today, settings.get("rag.index_directories", ["user", "diary"]))
         except Exception as exc:
             # 不把失败写成成功；DailyRagJob 的 built_date/synced_date 负责恢复。
-            logger.warning("每日 RAG 任务失败，稍后重试: %s", type(exc).__name__)
+            log_rag_failure(logger, "每日 RAG 任务失败，稍后重试", exc, settings)
         finally:
             global_task_state.release()
 

@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 
 import httpx
 
+from lifeprism.rag.diagnostics import rag_stage
 from lifeprism.rag.service import IndexManifest, RagService, atomic_json
 
 
@@ -86,7 +87,8 @@ class DailyRagJob:
                 manifest = await self.service.build(directories)
                 state.update(built_date=today, version=manifest.version)
                 atomic_json(self.service.root / "daily.json", state)
-            receipt = await self.upload(manifest)
+            with rag_stage("upload", version=manifest.version):
+                receipt = await self.upload(manifest)
             if (
                 receipt.get("version") != manifest.version
                 or receipt.get("sha256") != manifest.sha256
