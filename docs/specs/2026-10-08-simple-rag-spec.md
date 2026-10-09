@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-10-08
 updated_at: 2026-10-08
-last_updated: 补齐 agent_only 实际接收入口，验证正常模式发送和云端接收流程
+last_updated: 增加设置页上次成功索引时间与本地手动后台索引
 abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和阿里云重排模型、默认 vec 检索、可选 BM25、每日记忆更新后独立单向同步完整 SQLite 快照。
 ---
 
@@ -14,6 +14,7 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 |------|---------|
 | 1.0 | 设置、原生检索工具、每日完整构建与云端快照发布 |
 | 1.1 | 接通独立 agent_only 启动入口；验证实际 HTTP 上传、确认失败重试与 SSH 地址选择；补齐代理上传限制 |
+| 1.2 | 设置页显示成功索引时间，支持手动后台重建与状态轮询，复用全局任务互斥 |
 
 ## Overview
 
@@ -33,6 +34,7 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 - [x] 启动补执行、数据目录迁移、启动后开启记忆更新的补执行。
 - [x] 云端认证、限量上传、只读检验、版本幂等与原子发布。
 - [x] 查询固定版本，活跃版本不被清理；rerank 失败回退粗排。
+- [x] 设置页显示上次成功索引时间，可手动完整重建本地索引，失败保留旧版本。
 
 ## Technical Contract
 
@@ -60,8 +62,14 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 | GET /api/v2/settings/rag | 无 | RagSettings | get_rag_settings |
 | PATCH /api/v2/settings/rag | 可选 enabled、rerank_enabled、index_directories | RagSettings | update_rag_settings |
 | PUT /api/v2/settings/rag/keys/{purpose} | `{api_key: string}`，最大 4096 字符；purpose 为 embedding 或 rerank | RagSettings | update_rag_key |
+| GET /api/v2/settings/rag/index | 无 | RagIndexStatus | get_rag_index_status |
+| POST /api/v2/settings/rag/index | 无 | 202，RagIndexStatus | build_rag_index |
 
 PATCH 省略字段表示保留，显式 null 或额外字段返回 422；模型、base_url 不可通过 API 修改。RagSettings 包含 `enabled: bool`、`rerank_enabled: bool`、`index_directories: string[]`、`embedding` 和 `rerank`。两个模型对象均包含 `model: string`、`base_url: string`、`configured: bool`，不包含密钥。开启缺少凭据的功能返回 422。
+
+`RagIndexStatus` 包含 `last_index_time: datetime | null`（当前成功发布版本的 created_at，UTC ISO 8601）、`building: bool`（手动或定时构建进行中）、`error: string | null`（手动后台任务的安全失败提示）、`can_build: bool`（full 模式、RAG 开启且 embedding key 已配置）。未索引显示“尚未索引”；时间按用户配置时区显示。页面每 2 秒刷新状态，离开页面停止轮询；关闭设置页不取消后台任务。后台错误状态只保存在当前进程，新构建成功后清除。
+
+手动 POST 只在 full 模式接受，按已保存目录完整重建，返回 202 表示已启动而非已成功；缺少开关或密钥返回 422，非本地模式返回 403，重复构建或全局本地任务/同步忙碌返回 409。后台失败保留当前索引及其时间，页面显示失败提示。手动构建复用构建锁及全局 LOCAL_TASK 互斥，防止与每日上传或业务同步并发；不写 daily.json、不直接上传、不改变每日成功一次的规则。当天已成功上传后，手动更新的内容需等下一次每日任务同步。每次手动构建均重新嵌入并产生 API 成本。
 
 ### 检索工具
 
@@ -121,16 +129,18 @@ IndexManifest 全部字段：
 
 <key_function>
 - lifeprism/rag/service.py
-  - service.RagService.build:231
-  - service.RagService.search:290
-  - service.RagService.install:157
+  - service.RagService.build:274
+  - service.RagService.search:334
+  - service.RagService.install:200
 - lifeprism/sync/rag_sync.py
   - rag_sync.DailyRagJob.run:74
   - rag_sync.RagSyncSender.upload:30
 - lifeprism/server/api/rag_settings_api.py
-  - rag_settings_api.get_rag_settings:15
-  - rag_settings_api.update_rag_settings:21
-  - rag_settings_api.update_rag_key:34
+  - rag_settings_api.get_rag_settings:39
+  - rag_settings_api.update_rag_settings:45
+  - rag_settings_api.update_rag_key:58
+  - rag_settings_api.get_rag_index_status:17
+  - rag_settings_api.build_rag_index:30
 - lifeprism/server/api/rag_sync_api.py
   - rag_sync_api.receive_index:22
   - rag_sync_api.get_index_manifest:52
@@ -142,7 +152,7 @@ IndexManifest 全部字段：
 
 完整快照传输避免业务行同步遗漏 vec0 影子表；候选库校验后发布保证构建失败不损坏在线索引。固定模型和扩展版本使本地与云端使用一致的向量契约。构建状态与上传状态分离使网络重试不重复消耗 embedding。
 
-每日完整重嵌入会产生按语料规模计算的 API 成本。当天成功上传后云端被清空，需要到下一日重新发布；本版本不自动探测已成功上传版本的丢失。配置和密钥通过 cloud_init 导出/初始化传递，运行中修改不会随索引包传递；需要重新部署配置。源文件在每日任务之间的改动要等下一轮索引才可检索。
+每日完整重嵌入会产生按语料规模计算的 API 成本。当天成功上传后云端被清空，需要到下一日重新发布；本版本不自动探测已成功上传版本的丢失。配置和密钥通过 cloud_init 导出/初始化传递，运行中修改不会随索引包传递；需要重新部署配置。源文件改动可通过手动更新立即进入本地检索，云端按每日任务发布。
 
 ## Interaction / UX Notes
 

@@ -16,9 +16,16 @@ export type RagSettingsPatch = Partial<
   Pick<RagSettings, 'enabled' | 'rerank_enabled' | 'index_directories'>
 >;
 
+export interface RagIndexStatus {
+  last_index_time: string | null;
+  building: boolean;
+  error: string | null;
+  can_build: boolean;
+}
+
 const getApiBase = createApiV2UrlGetter();
 
-async function request(path: string, init?: RequestInit): Promise<RagSettings> {
+async function request<T = RagSettings>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBase()}/settings/rag${path}`, init);
   if (!response.ok) {
     const body: { detail?: string | { msg: string }[]; message?: string } = await response
@@ -34,6 +41,8 @@ async function request(path: string, init?: RequestInit): Promise<RagSettings> {
 }
 
 export const RagAPI = {
+  indexStatus: () => request<RagIndexStatus>('/index'),
+  buildIndex: () => request<RagIndexStatus>('/index', { method: 'POST' }),
   get: () => request(''),
   update: (patch: RagSettingsPatch) =>
     request('', {

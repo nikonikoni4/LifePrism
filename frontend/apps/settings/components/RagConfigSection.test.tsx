@@ -4,7 +4,15 @@ import { afterEach } from 'vitest';
 import { RagConfigSection } from './RagConfigSection';
 import { RagAPI } from '../ragApi';
 
-vi.mock('../ragApi', () => ({ RagAPI: { get: vi.fn(), update: vi.fn(), saveKey: vi.fn() } }));
+vi.mock('../ragApi', () => ({
+  RagAPI: {
+    get: vi.fn(),
+    update: vi.fn(),
+    saveKey: vi.fn(),
+    indexStatus: vi.fn(),
+    buildIndex: vi.fn(),
+  },
+}));
 
 const defaults = {
   enabled: false,
@@ -26,6 +34,12 @@ describe('RagConfigSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(RagAPI.get).mockResolvedValue(defaults);
+    vi.mocked(RagAPI.indexStatus).mockResolvedValue({
+      last_index_time: null,
+      building: false,
+      error: null,
+      can_build: false,
+    });
   });
   afterEach(cleanup);
 
@@ -57,5 +71,85 @@ describe('RagConfigSection', () => {
     fireEvent.change(await screen.findByLabelText('索引目录'), { target: { value: '../user' } });
     fireEvent.click(screen.getByRole('button', { name: '保存索引目录' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('目录越界');
+  });
+
+  it('shows never indexed and disables manual build without available local configuration', async () => {
+    render(<RagConfigSection />);
+    expect(await screen.findByText('尚未索引')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '立即更新索引' })).toBeDisabled();
+  });
+
+  it('starts a manual build and disables repeat requests while building', async () => {
+    vi.mocked(RagAPI.get).mockResolvedValue({
+      ...defaults,
+      enabled: true,
+      embedding: { ...defaults.embedding, configured: true },
+    });
+    vi.mocked(RagAPI.indexStatus).mockResolvedValue({
+      last_index_time: '2026-10-08T01:02:03Z',
+      building: false,
+      error: null,
+      can_build: true,
+    });
+    vi.mocked(RagAPI.buildIndex).mockResolvedValue({
+      last_index_time: '2026-10-08T01:02:03Z',
+      building: true,
+      error: null,
+      can_build: true,
+    });
+    render(<RagConfigSection />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '立即更新索引' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '立即更新索引' }));
+    await waitFor(() => expect(RagAPI.buildIndex).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: '索引中…' })).toBeDisabled();
+    expect(screen.getByText(/只更新本地索引/)).toBeInTheDocument();
+  });
+
+  it('shows background failure together with the previous successful index time', async () => {
+    vi.mocked(RagAPI.indexStatus).mockResolvedValue({
+      last_index_time: '2026-10-08T01:02:03Z',
+      building: false,
+      error: '索引构建失败，旧索引已保留',
+      can_build: true,
+    });
+    localStorage.setItem('lifeprism_timezone', 'Asia/Hong_Kong');
+    render(<RagConfigSection />);
+    expect(await screen.findByText('索引构建失败，旧索引已保留')).toBeInTheDocument();
+    expect(screen.getByText(/09:02:03/)).toBeInTheDocument();
+    localStorage.removeItem('lifeprism_timezone');
+  });
+
+  it('refreshes successful time after a background build completes', async () => {
+    vi.mocked(RagAPI.get).mockResolvedValue({
+      ...defaults,
+      enabled: true,
+      embedding: { ...defaults.embedding, configured: true },
+    });
+    vi.mocked(RagAPI.indexStatus).mockResolvedValue({
+      last_index_time: null,
+      building: false,
+      error: null,
+      can_build: true,
+    });
+    vi.mocked(RagAPI.buildIndex).mockResolvedValue({
+      last_index_time: null,
+      building: true,
+      error: null,
+      can_build: true,
+    });
+    localStorage.setItem('lifeprism_timezone', 'Asia/Hong_Kong');
+    render(<RagConfigSection />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '立即更新索引' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '立即更新索引' }));
+    expect(await screen.findByRole('button', { name: '索引中…' })).toBeDisabled();
+    vi.mocked(RagAPI.indexStatus).mockResolvedValue({
+      last_index_time: '2026-10-08T02:03:04Z',
+      building: false,
+      error: null,
+      can_build: true,
+    });
+    expect(await screen.findByText(/10:03:04/, {}, { timeout: 3500 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '立即更新索引' })).toBeEnabled();
+    localStorage.removeItem('lifeprism_timezone');
   });
 });

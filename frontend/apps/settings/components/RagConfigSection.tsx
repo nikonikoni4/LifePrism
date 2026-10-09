@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Loader2 } from 'lucide-react';
-import { RagAPI, RagSettings, RagSettingsPatch } from '../ragApi';
+import { Database, Loader2, RefreshCw } from 'lucide-react';
+import { RagAPI, RagIndexStatus, RagSettings, RagSettingsPatch } from '../ragApi';
+import { getUserTimezone, parseISOString } from '../../../core/utils/dateUtils';
 
 const inputStyle =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-50';
@@ -14,6 +15,9 @@ export const RagConfigSection: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [indexStatus, setIndexStatus] = useState<RagIndexStatus | null>(null);
+  const [indexError, setIndexError] = useState('');
+  const [startingIndex, setStartingIndex] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -31,6 +35,42 @@ export const RagConfigSection: React.FC = () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      try {
+        const status = await RagAPI.indexStatus();
+        if (active) {
+          setIndexStatus(status);
+          setIndexError('');
+        }
+      } catch (reason) {
+        if (active) setIndexError(reason instanceof Error ? reason.message : '读取索引状态失败');
+      } finally {
+        if (active) timer = setTimeout(() => void refresh(), 2000);
+      }
+    }
+    void refresh();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [settings?.enabled, settings?.embedding.configured]);
+
+  async function buildIndex() {
+    setStartingIndex(true);
+    setIndexError('');
+    setMessage('');
+    try {
+      setIndexStatus(await RagAPI.buildIndex());
+    } catch (reason) {
+      setIndexError(reason instanceof Error ? reason.message : '启动索引失败');
+    } finally {
+      setStartingIndex(false);
+    }
+  }
 
   async function update(patch: RagSettingsPatch) {
     setBusy(true);
@@ -82,6 +122,57 @@ export const RagConfigSection: React.FC = () => {
         <p className="text-sm text-slate-500">正在读取 RAG 配置…</p>
       ) : (
         <div className="space-y-6">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-slate-600">
+                <span className="text-slate-400">上次成功索引：</span>
+                <span className="font-medium">
+                  {!indexStatus
+                    ? '正在读取…'
+                    : indexStatus.last_index_time
+                      ? parseISOString(indexStatus.last_index_time).toLocaleString('sv-SE', {
+                          timeZone: getUserTimezone(),
+                          hour12: false,
+                        })
+                      : '尚未索引'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void buildIndex()}
+                disabled={
+                  busy ||
+                  startingIndex ||
+                  !indexStatus?.can_build ||
+                  indexStatus.building ||
+                  !settings.enabled ||
+                  !settings.embedding.configured
+                }
+                className={`${buttonStyle} flex items-center gap-2`}
+              >
+                {startingIndex || indexStatus?.building ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    索引中…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    立即更新索引
+                  </>
+                )}
+              </button>
+            </div>
+            {(indexError || indexStatus?.error) && (
+              <p role="alert" className="mt-2 text-sm text-red-600">
+                {indexError || indexStatus?.error}
+              </p>
+            )}
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              手动更新使用已保存的目录完整重建，只更新本地索引，会产生嵌入模型 API 费用。
+              云端仍按每日一次规则同步；当天已同步后，手动更新的内容将在下一次每日任务中同步。
+            </p>
+          </div>
           <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -211,7 +302,7 @@ export const RagConfigSection: React.FC = () => {
           })}
           <p className="text-xs leading-relaxed text-slate-500">
             本地更新失败时保留旧索引；云端上传失败每 15 分钟重试，复用当天已建索引。rerank
-            不可用时回退到重排前结果。首次启用后需等待索引任务完成；云端模型密钥通过“生成云端配置”部署。
+            不可用时回退到重排前结果。首次启用后可手动更新或等待每日索引任务；云端模型密钥通过“生成云端配置”部署。
           </p>
         </div>
       )}

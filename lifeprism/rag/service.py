@@ -31,9 +31,19 @@ from lifeprism.rag.config import (
 )
 from lifeprism.repository import rag_repository
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ConflictError, ValidationError
 
 logger = get_logger(__name__)
 MAX_INDEX_BYTES = 512 * 1024 * 1024
+
+
+class RagIndexStatus(BaseModel):
+    """本地成功索引时间及当前构建状态，不包含凭据。"""
+
+    last_index_time: datetime | None = None
+    building: bool = False
+    error: str | None = None
+    can_build: bool = False
 
 
 class IndexManifest(BaseModel):
@@ -93,6 +103,39 @@ class RagService:
         self.build_lock = asyncio.Lock()
         self.publish_lock = threading.RLock()
         self._leases: dict[str, int] = {}
+        self._manual_task: asyncio.Task[IndexManifest] | None = None
+        self._manual_error: str | None = None
+
+    def index_status(self) -> RagIndexStatus:
+        """读取已成功发布版本的时间，构建失败不改变该时间。"""
+        manifest = self.current()
+        return RagIndexStatus(
+            last_index_time=manifest.created_at if manifest else None,
+            building=self.build_lock.locked()
+            or (self._manual_task is not None and not self._manual_task.done()),
+            error=self._manual_error,
+        )
+
+    def start_manual_build(self) -> asyncio.Task[IndexManifest]:
+        """按已保存目录启动后台构建，拒绝重复请求，不触发上传。"""
+        options = read_settings(self.config)
+        if not options.enabled or not options.embedding.configured:
+            raise ValidationError("请先配置嵌入模型密钥并启用 RAG")
+        if self.index_status().building:
+            raise ConflictError("索引正在构建，请等待完成")
+        directories = validate_directories(options.index_directories)
+        self._manual_error = None
+        self._manual_task = asyncio.create_task(self.build(directories))
+        self._manual_task.add_done_callback(self._manual_build_finished)
+        return self._manual_task
+
+    def _manual_build_finished(self, task: asyncio.Task[IndexManifest]) -> None:
+        """后台任务边界：提取失败并暴露安全提示，避免泄露模型响应。"""
+        if task.cancelled():
+            self._manual_error = "索引构建已中断，原索引未被清除"
+        elif (error := task.exception()) is not None:
+            logger.warning("手动 RAG 索引失败: %s", type(error).__name__)
+            self._manual_error = "索引构建失败，请检查模型密钥、网络和目录；原索引已保留"
 
     def _embedding(self):
         """显式指定固定模型/地址，缺少凭据时不使用环境兜底。"""
@@ -282,6 +325,7 @@ class RagService:
                 directories=directories,
             )
             self.install(snapshot, manifest)
+            self._manual_error = None
             logger.info(
                 "RAG 索引已发布: version=%s chunks=%d", manifest.version, manifest.chunk_count
             )
