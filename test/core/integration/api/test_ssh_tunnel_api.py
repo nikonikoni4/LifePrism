@@ -58,7 +58,9 @@ def client():
     return _create_test_app()
 
 
-def _make_mock_private_key(public_key_str: str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyDataForTestOnly"):
+def _make_mock_private_key(
+    public_key_str: str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyDataForTestOnly",
+):
     """构造 mock asyncssh 私钥对象
 
     Args:
@@ -89,9 +91,7 @@ def mock_no_private_key():
             "lifeprism.server.api.ssh_tunnel_api.settings.get_storage_key",
             return_value=None,
         ) as mock_get,
-        patch(
-            "lifeprism.server.api.ssh_tunnel_api.settings.set_storage_key"
-        ) as mock_set,
+        patch("lifeprism.server.api.ssh_tunnel_api.settings.set_storage_key") as mock_set,
     ):
         yield mock_get, mock_set
 
@@ -113,9 +113,7 @@ def mock_existing_private_key():
             "lifeprism.server.api.ssh_tunnel_api.settings.get_storage_key",
             return_value=existing_pem,
         ) as mock_get,
-        patch(
-            "lifeprism.server.api.ssh_tunnel_api.settings.set_storage_key"
-        ) as mock_set,
+        patch("lifeprism.server.api.ssh_tunnel_api.settings.set_storage_key") as mock_set,
     ):
         yield mock_get, mock_set, existing_pem
 
@@ -126,9 +124,7 @@ def mock_existing_private_key():
 class TestEnableEndpoint:
     """测试 POST /api/v2/settings/ssh-tunnel/enable 端点"""
 
-    def test_enable_generates_new_keypair_when_no_private_key(
-        self, client, mock_no_private_key
-    ):
+    def test_enable_generates_new_keypair_when_no_private_key(self, client, mock_no_private_key):
         """Seam 1: keyring 无私钥时自动生成 ed25519 密钥对 + 返回 is_new=true
 
         验证:
@@ -190,9 +186,7 @@ class TestEnableEndpoint:
         # 验证从已有私钥派生公钥（import_private_key 被调用）
         mock_import.assert_called_once()
 
-    def test_enable_returns_public_key_with_correct_format(
-        self, client, mock_no_private_key
-    ):
+    def test_enable_returns_public_key_with_correct_format(self, client, mock_no_private_key):
         """Seam 3: 返回的公钥格式正确（以 'ssh-ed25519 ' 开头）
 
         验证:
@@ -200,9 +194,7 @@ class TestEnableEndpoint:
         - public_key 以 'ssh-ed25519 ' 开头
         """
         mock_get, mock_set = mock_no_private_key
-        expected_public_key = (
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyDataForTestOnly"
-        )
+        expected_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyDataForTestOnly"
         mock_key = _make_mock_private_key(public_key_str=expected_public_key)
 
         with patch(
@@ -234,9 +226,7 @@ class TestPublicKeyEndpoint:
         - 返回的 public_key 是从私钥派生而来
         """
         mock_get, mock_set, existing_pem = mock_existing_private_key
-        expected_public_key = (
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDerivedPublicKeyFromExisting"
-        )
+        expected_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDerivedPublicKeyFromExisting"
         mock_key = _make_mock_private_key(public_key_str=expected_public_key)
 
         with patch(
@@ -251,9 +241,7 @@ class TestPublicKeyEndpoint:
         # 验证从 keyring 读取的私钥被传给 import_private_key
         mock_import.assert_called_once_with(existing_pem)
 
-    def test_public_key_returns_empty_string_when_no_private_key(
-        self, client, mock_no_private_key
-    ):
+    def test_public_key_returns_empty_string_when_no_private_key(self, client, mock_no_private_key):
         """Seam 2: keyring 无私钥时返回空字符串（不抛错）
 
         验证:
@@ -281,7 +269,9 @@ class TestPublicKeyEndpoint:
 class TestTestEndpoint:
     """测试 POST /api/v2/settings/ssh-tunnel/test 端点"""
 
-    def test_test_endpoint_calls_ssh_tunnel_test_connection(self, client, mock_existing_private_key):
+    def test_test_endpoint_calls_ssh_tunnel_test_connection(
+        self, client, mock_existing_private_key
+    ):
         """Seam 1: 调用 SSHTunnel.test_connection()（mock SSHTunnel.test_connection）
 
         验证:
@@ -309,9 +299,7 @@ class TestTestEndpoint:
             "lifeprism.server.api.ssh_tunnel_api.SSHTunnel",
             return_value=mock_tunnel,
         ) as mock_tunnel_cls:
-            response = client.post(
-                "/api/v2/settings/ssh-tunnel/test", json=request_body
-            )
+            response = client.post("/api/v2/settings/ssh-tunnel/test", json=request_body)
 
         assert response.status_code == 200
         # 验证 SSHTunnel 实例化参数
@@ -326,9 +314,7 @@ class TestTestEndpoint:
         # 验证调用 test_connection
         mock_tunnel.test_connection.assert_awaited_once()
 
-    def test_test_endpoint_returns_success_result(
-        self, client, mock_existing_private_key
-    ):
+    def test_test_endpoint_returns_success_result(self, client, mock_existing_private_key):
         """Seam 2: 返回测试结果（成功场景）
 
         验证:
@@ -354,9 +340,7 @@ class TestTestEndpoint:
             "lifeprism.server.api.ssh_tunnel_api.SSHTunnel",
             return_value=mock_tunnel,
         ):
-            response = client.post(
-                "/api/v2/settings/ssh-tunnel/test", json=request_body
-            )
+            response = client.post("/api/v2/settings/ssh-tunnel/test", json=request_body)
 
         assert response.status_code == 200
         data = response.json()
@@ -364,9 +348,7 @@ class TestTestEndpoint:
         assert data["status"] == "ok"
         assert "remote_response" in data
 
-    def test_test_endpoint_returns_failure_result(
-        self, client, mock_existing_private_key
-    ):
+    def test_test_endpoint_returns_failure_result(self, client, mock_existing_private_key):
         """Seam 3: 返回测试结果（失败场景，如"密钥被拒绝"/"远程 8102 不可达"）
 
         验证:
@@ -394,9 +376,7 @@ class TestTestEndpoint:
             "lifeprism.server.api.ssh_tunnel_api.SSHTunnel",
             return_value=mock_tunnel,
         ):
-            response = client.post(
-                "/api/v2/settings/ssh-tunnel/test", json=request_body
-            )
+            response = client.post("/api/v2/settings/ssh-tunnel/test", json=request_body)
 
         assert response.status_code == 200
         data = response.json()
@@ -431,9 +411,7 @@ class TestTestEndpoint:
             "lifeprism.server.api.ssh_tunnel_api.SSHTunnel",
             return_value=mock_tunnel,
         ):
-            response = client.post(
-                "/api/v2/settings/ssh-tunnel/test", json=request_body
-            )
+            response = client.post("/api/v2/settings/ssh-tunnel/test", json=request_body)
 
         assert response.status_code == 200
         # test_connection 内部已关闭连接，API 层不应再次调用 close()

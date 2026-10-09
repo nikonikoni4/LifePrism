@@ -12,6 +12,7 @@ pytestmark = pytest.mark.core
 
 def test_sse_returns_final_tool_answer_and_total_usage(tmp_path, monkeypatch):
     """守护单轮 SSE 会透出工具事件、最终回答并汇总 usage。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动工具轮次的 SSE 场景。"""
         runtime = make_runtime(tmp_path, FakeClient(with_tool=True))
@@ -33,6 +34,7 @@ def test_sse_returns_final_tool_answer_and_total_usage(tmp_path, monkeypatch):
 
 def test_sse_disconnect_cancels_model_and_errors_have_no_done(tmp_path, monkeypatch):
     """守护断开连接会取消模型调用，且 provider 报错后不再产生 done 事件。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动先断开、后失败的 SSE 场景。"""
         client = FakeClient(block=True)
@@ -61,6 +63,7 @@ def test_sse_disconnect_cancels_model_and_errors_have_no_done(tmp_path, monkeypa
 
 def test_deferred_token_api_returns_501(tmp_path, monkeypatch):
     """守护延后处理的 token 接口保持未实现，直接返回 HTTP 501。"""
+
     async def scenario():
         """在 `asyncio.run` 下驱动延后 token 接口场景。"""
         from fastapi import HTTPException

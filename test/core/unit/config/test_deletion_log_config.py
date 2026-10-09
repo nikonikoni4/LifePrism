@@ -46,8 +46,7 @@ class TestDeletionLogConfigExists:
         from lifeprism.config.database import DELETION_LOG_CONFIG
 
         assert isinstance(DELETION_LOG_CONFIG, dict), (
-            "DELETION_LOG_CONFIG 应为 dict，实际为 "
-            f"{type(DELETION_LOG_CONFIG).__name__}"
+            f"DELETION_LOG_CONFIG 应为 dict，实际为 {type(DELETION_LOG_CONFIG).__name__}"
         )
 
     def test_config_registered_in_table_configs(self):
@@ -55,8 +54,7 @@ class TestDeletionLogConfigExists:
         from lifeprism.config.database import TABLE_CONFIGS
 
         assert "deletion_log" in TABLE_CONFIGS, (
-            "TABLE_CONFIGS 应包含 'deletion_log' 键，当前 keys: "
-            f"{sorted(TABLE_CONFIGS.keys())}"
+            f"TABLE_CONFIGS 应包含 'deletion_log' 键，当前 keys: {sorted(TABLE_CONFIGS.keys())}"
         )
 
     def test_table_name_field_correct(self):
@@ -64,8 +62,7 @@ class TestDeletionLogConfigExists:
         from lifeprism.config.database import DELETION_LOG_CONFIG
 
         assert DELETION_LOG_CONFIG["table_name"] == EXPECTED_TABLE_NAME, (
-            f"table_name 应为 {EXPECTED_TABLE_NAME!r}, "
-            f"实际 {DELETION_LOG_CONFIG['table_name']!r}"
+            f"table_name 应为 {EXPECTED_TABLE_NAME!r}, 实际 {DELETION_LOG_CONFIG['table_name']!r}"
         )
 
 
@@ -95,8 +92,7 @@ class TestDeletionLogConfigColumns:
         )
         actual = columns[column_name]
         assert actual["type"] == expected_spec["type"], (
-            f"{column_name} 的 type 应为 {expected_spec['type']!r}, "
-            f"实际 {actual['type']!r}"
+            f"{column_name} 的 type 应为 {expected_spec['type']!r}, 实际 {actual['type']!r}"
         )
         for constraint in expected_spec["constraints"]:
             assert constraint in actual["constraints"], (
@@ -113,9 +109,7 @@ class TestDeletionLogConfigColumns:
         from lifeprism.config.database import DELETION_LOG_CONFIG
 
         columns = DELETION_LOG_CONFIG["columns"]
-        assert "target_table" in columns, (
-            "columns 应包含 'target_table' 字段（被删记录所在表名）"
-        )
+        assert "target_table" in columns, "columns 应包含 'target_table' 字段（被删记录所在表名）"
         # 显式断言 columns 中没有 'table_name' 键（避免与代码变量名混淆）
         assert "table_name" not in columns, (
             "columns 不应有 'table_name' 键（已用 target_table 代替，"
@@ -132,8 +126,7 @@ class TestDeletionLogConfigColumns:
 
         columns = DELETION_LOG_CONFIG["columns"]
         assert set(columns.keys()) == set(EXPECTED_COLUMNS.keys()), (
-            f"columns keys 应为 {sorted(EXPECTED_COLUMNS.keys())}, "
-            f"实际 {sorted(columns.keys())}"
+            f"columns keys 应为 {sorted(EXPECTED_COLUMNS.keys())}, 实际 {sorted(columns.keys())}"
         )
 
 
@@ -150,8 +143,7 @@ class TestDeletionLogConfigTimestamps:
         from lifeprism.config.database import DELETION_LOG_CONFIG
 
         assert DELETION_LOG_CONFIG.get("timestamps") is True, (
-            "timestamps 应为 True，实际 "
-            f"{DELETION_LOG_CONFIG.get('timestamps')!r}"
+            f"timestamps 应为 True，实际 {DELETION_LOG_CONFIG.get('timestamps')!r}"
         )
 
     def test_update_at_is_true(self):
@@ -164,8 +156,7 @@ class TestDeletionLogConfigTimestamps:
         from lifeprism.config.database import DELETION_LOG_CONFIG
 
         assert DELETION_LOG_CONFIG.get("update_at") is True, (
-            "update_at 应为 True，实际 "
-            f"{DELETION_LOG_CONFIG.get('update_at')!r}"
+            f"update_at 应为 True，实际 {DELETION_LOG_CONFIG.get('update_at')!r}"
         )
 
 
@@ -192,12 +183,8 @@ class TestDeletionLogConfigTableConstraints:
 
         constraints = DELETION_LOG_CONFIG.get("table_constraints", [])
         found = any(
-            "UNIQUE" in c.upper()
-            and "target_table" in c
-            and "record_id" in c
-            for c in constraints
+            "UNIQUE" in c.upper() and "target_table" in c and "record_id" in c for c in constraints
         )
         assert found, (
-            f"table_constraints 应包含 UNIQUE(target_table, record_id)，"
-            f"实际 {constraints!r}"
+            f"table_constraints 应包含 UNIQUE(target_table, record_id)，实际 {constraints!r}"
         )

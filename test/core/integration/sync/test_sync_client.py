@@ -623,7 +623,9 @@ class TestSyncOnce:
                 return _make_mock_response({"tombstones": []})
             elif "/push-deletion-log" in url:
                 # 墓碑 Push 端点：返回成功，不计入数据同步 call_order
-                return _make_mock_response({"success": True, "applied_count": 0, "skipped_count": 0})
+                return _make_mock_response(
+                    {"success": True, "applied_count": 0, "skipped_count": 0}
+                )
             elif "/cleanup-deletion-log" in url:
                 # 墓碑清理端点：返回成功，不计入数据同步 call_order
                 return _make_mock_response({"success": True, "cleaned_count": 0})
@@ -1384,9 +1386,7 @@ class TestSendPing:
     def test_send_ping_skips_when_remote_url_missing(self, sync_client):
         """配置缺失路径：remote_url 为空时跳过 ping，不发 HTTP 请求"""
         with (
-            patch(
-                "lifeprism.config.settings_manager.get_setting", return_value=""
-            ),
+            patch("lifeprism.config.settings_manager.get_setting", return_value=""),
             patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
             patch("lifeprism.sync.sync_client.httpx.post") as mock_post,
         ):
@@ -1421,9 +1421,7 @@ class TestSendPing:
                 return_value="http://test:8000",
             ),
             patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
-            patch(
-                "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
-            ) as mock_post,
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
         ):
             # 不应抛异常
             sync_client.send_ping()
@@ -1515,7 +1513,9 @@ class TestSyncCutoffTime:
     末尾用该值更新 last_sync_time。
     """
 
-    def test_sync_once_records_cutoff_time_at_start(self, sync_client, initialized_db, clean_tables):
+    def test_sync_once_records_cutoff_time_at_start(
+        self, sync_client, initialized_db, clean_tables
+    ):
         """sync_cutoff_time 在 sync_once 开头计算（pull 之前），保证覆盖 sync 期间写入的数据
 
         通过 mock 在 pull 阶段捕获时间戳，断言 last_sync_time 更新值
@@ -1560,7 +1560,9 @@ class TestSyncCutoffTime:
             "last_sync_time 在 pull 之后更新（在 sync_once 末尾），但其值是开头计算的 sync_cutoff_time"
         )
 
-    def test_sync_once_uses_iso8601_utc_cutoff_time(self, sync_client, initialized_db, clean_tables):
+    def test_sync_once_uses_iso8601_utc_cutoff_time(
+        self, sync_client, initialized_db, clean_tables
+    ):
         """sync_cutoff_time 是 ISO 8601 UTC 格式（含时区后缀 +00:00）"""
         captured_value = {"last_sync_time": None}
 

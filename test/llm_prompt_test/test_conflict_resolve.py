@@ -166,15 +166,15 @@ class TestConflictPromptContent:
     def test_contains_context_description(self, prompt_content):
         """prompt 应包含上下文说明（整块冲突上下文：base/ours/theirs + 扩展 20~30 行）"""
         assert "上下文" in prompt_content, "prompt 应说明上下文内容"
-        assert "base" in prompt_content.lower() or "ours" in prompt_content.lower() or "theirs" in prompt_content.lower(), (
-            "prompt 应说明上下文包含 base/ours/theirs 内容"
-        )
+        assert (
+            "base" in prompt_content.lower()
+            or "ours" in prompt_content.lower()
+            or "theirs" in prompt_content.lower()
+        ), "prompt 应说明上下文包含 base/ours/theirs 内容"
 
     def test_contains_prohibition_rules(self, prompt_content):
         """prompt 应包含禁止事项（不能输出自然语言解释，不能输出 markdown code fence）"""
-        assert "禁止" in prompt_content or "不能" in prompt_content, (
-            "prompt 应包含禁止事项说明"
-        )
+        assert "禁止" in prompt_content or "不能" in prompt_content, "prompt 应包含禁止事项说明"
 
     def test_contains_no_natural_language_explanation(self, prompt_content):
         """prompt 应明确禁止输出自然语言解释"""
@@ -182,9 +182,11 @@ class TestConflictPromptContent:
 
     def test_contains_no_markdown_code_fence(self, prompt_content):
         """prompt 应明确禁止输出 markdown code fence"""
-        assert "code fence" in prompt_content.lower() or "代码块" in prompt_content or "```" in prompt_content, (
-            "prompt 应明确禁止输出 markdown code fence"
-        )
+        assert (
+            "code fence" in prompt_content.lower()
+            or "代码块" in prompt_content
+            or "```" in prompt_content
+        ), "prompt 应明确禁止输出 markdown code fence"
 
 
 @pytest.mark.core
@@ -215,12 +217,8 @@ class TestConflictPromptFutureReadFileToolNote:
         """
         # prompt 不应包含 {start_line} 占位符（已在 TestConflictPromptPlaceholders 验证）
         # 但 prompt 文档应在说明文字中提及 start_line / end_line 作为未来扩展点
-        assert "start_line" in prompt_content, (
-            "prompt 应在文档中提及 start_line 作为未来扩展点说明"
-        )
-        assert "end_line" in prompt_content, (
-            "prompt 应在文档中提及 end_line 作为未来扩展点说明"
-        )
+        assert "start_line" in prompt_content, "prompt 应在文档中提及 start_line 作为未来扩展点说明"
+        assert "end_line" in prompt_content, "prompt 应在文档中提及 end_line 作为未来扩展点说明"
 
     def test_future_readfiletool_note_clearly_states_condition(self, prompt_content):
         """未来扩展说明应明确条件：添加 ReadFileTool 时才需要这些参数"""

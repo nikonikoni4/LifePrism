@@ -75,7 +75,9 @@ class TestInitializeResources:
 
         initialize_resources_copy(templates_dir, data_path)
 
-        assert (data_path / "prompts" / "prompt.md").read_text(encoding="utf-8") == "template content"
+        assert (data_path / "prompts" / "prompt.md").read_text(
+            encoding="utf-8"
+        ) == "template content"
 
     def test_non_overwrite_file_is_not_overwritten(self, tmp_path):
         """
@@ -117,7 +119,9 @@ class TestInitializeResources:
 
         initialize_resources_copy(templates_dir, data_path)
 
-        assert (data_path / "agent" / "chat" / "soul.md").read_text(encoding="utf-8") == "template soul"
+        assert (data_path / "agent" / "chat" / "soul.md").read_text(
+            encoding="utf-8"
+        ) == "template soul"
 
     def test_bootstrap_md_is_not_overwritten(self, tmp_path):
         """
@@ -169,7 +173,9 @@ class TestInitializeResources:
 
         initialize_resources_copy(templates_dir, data_path)
 
-        assert (data_path / "agent" / "chat" / "identity.md").read_text(encoding="utf-8") == "user set name: Alice"
+        assert (data_path / "agent" / "chat" / "identity.md").read_text(
+            encoding="utf-8"
+        ) == "user set name: Alice"
 
     def test_classify_preference_md_is_not_overwritten(self, tmp_path):
         """
@@ -190,10 +196,9 @@ class TestInitializeResources:
 
         initialize_resources_copy(templates_dir, data_path)
 
-        assert (
-            (data_path / "agent" / "classify" / "classify_preference.md").read_text(encoding="utf-8")
-            == "user preference"
-        )
+        assert (data_path / "agent" / "classify" / "classify_preference.md").read_text(
+            encoding="utf-8"
+        ) == "user preference"
 
     def test_bootstrap_md_not_created_on_first_init(self, tmp_path):
         """
@@ -234,7 +239,9 @@ class TestInitializeResources:
 
         initialize_resources_copy(templates_dir, data_path)
 
-        assert (data_path / "agent" / "chat" / "bootstrap.md").read_text(encoding="utf-8") == "user bootstrap"
+        assert (data_path / "agent" / "chat" / "bootstrap.md").read_text(
+            encoding="utf-8"
+        ) == "user bootstrap"
 
     def test_non_existent_user_file_is_copied(self, tmp_path):
         """
@@ -276,7 +283,9 @@ class TestInitializeResources:
 
         initialize_resources_copy(templates_dir, data_path)
 
-        assert (data_path / "agent" / "chat" / "soul.md").read_text(encoding="utf-8") == "new template soul"
+        assert (data_path / "agent" / "chat" / "soul.md").read_text(
+            encoding="utf-8"
+        ) == "new template soul"
 
     def test_bootstrap_md_not_overwritten_even_if_agent_in_dir_list(self, tmp_path):
         """

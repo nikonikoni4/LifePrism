@@ -274,7 +274,9 @@ def _build_records(messages: list[dict]) -> list[SessionRecordData]:
                 tool_names[call.id] = call.name
                 emit(
                     "tool/call",
-                    ToolCallData(call_id=call.id, tool_name=call.name, arguments=call.raw_arguments),
+                    ToolCallData(
+                        call_id=call.id, tool_name=call.name, arguments=call.raw_arguments
+                    ),
                     timestamp=ts,
                 )
         elif role == "tool":
@@ -420,7 +422,10 @@ def main(argv: list[str] | None = None) -> int:
                 total_records += len(records)
                 logger.info(
                     "[dry-run] %s: 消息 %d(裁剪 %d) -> 记录 %d",
-                    path.stem, len(messages) - compacted_loc, compacted_loc, len(records),
+                    path.stem,
+                    len(messages) - compacted_loc,
+                    compacted_loc,
+                    len(records),
                 )
                 continue
             stat = _migrate_one(
@@ -429,14 +434,19 @@ def main(argv: list[str] | None = None) -> int:
             total_records += stat["records"]
             logger.info(
                 "%s: 消息 %d(裁剪 %d) -> 记录 %d",
-                stat["session_id"], stat["messages"], stat["compacted"], stat["records"],
+                stat["session_id"],
+                stat["messages"],
+                stat["compacted"],
+                stat["records"],
             )
         except (ValueError, json.JSONDecodeError) as exc:
             failed += 1
             logger.error("迁移失败 %s: %s", path.name, exc)
 
     if args.dry_run:
-        logger.info("[dry-run] 共 %d 个文件，%d 条记录，未产生任何磁盘写入", len(files), total_records)
+        logger.info(
+            "[dry-run] 共 %d 个文件，%d 条记录，未产生任何磁盘写入", len(files), total_records
+        )
     else:
         logger.info("完成: %d 个文件，%d 条记录，失败 %d 个", len(files), total_records, failed)
         logger.info("备份目录: %s", args.backup)

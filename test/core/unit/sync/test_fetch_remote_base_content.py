@@ -66,7 +66,9 @@ class TestFetchRemoteBaseContent:
         assert result is None
 
     @patch("lifeprism.config.settings_manager.settings")
-    def test_single_backup_hash_match_returns_content(self, mock_settings, sync_client, backup_dir, tmp_path):
+    def test_single_backup_hash_match_returns_content(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
         """单个备份目录中 hash 匹配 → 返回文件内容"""
         mock_settings.lifeprism_data_path = tmp_path
 
@@ -92,7 +94,9 @@ class TestFetchRemoteBaseContent:
         assert result == content
 
     @patch("lifeprism.config.settings_manager.settings")
-    def test_single_backup_hash_mismatch_returns_none(self, mock_settings, sync_client, backup_dir, tmp_path):
+    def test_single_backup_hash_mismatch_returns_none(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
         """单个备份目录中 hash 不匹配 → 返回 None"""
         mock_settings.lifeprism_data_path = tmp_path
 
@@ -111,12 +115,16 @@ class TestFetchRemoteBaseContent:
         assert result is None
 
     @patch("lifeprism.config.settings_manager.settings")
-    def test_newest_matching_backup_returned_first(self, mock_settings, sync_client, backup_dir, tmp_path):
+    def test_newest_matching_backup_returned_first(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
         """多个备份目录：最新的匹配优先（降序遍历）"""
         mock_settings.lifeprism_data_path = tmp_path
 
         # 创建 3 个备份目录（时间戳降序创建）
-        for i, ts in enumerate(["2026-07-15T03-00-00", "2026-07-16T03-00-00", "2026-07-17T03-00-00"]):
+        for i, ts in enumerate(
+            ["2026-07-15T03-00-00", "2026-07-16T03-00-00", "2026-07-17T03-00-00"]
+        ):
             ts_dir = backup_dir / ts
             ts_dir.mkdir()
             file_path = ts_dir / "agent" / "behavior.md"
@@ -138,7 +146,9 @@ class TestFetchRemoteBaseContent:
         assert result == newest_content
 
     @patch("lifeprism.config.settings_manager.settings")
-    def test_all_backups_mismatch_returns_none(self, mock_settings, sync_client, backup_dir, tmp_path):
+    def test_all_backups_mismatch_returns_none(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
         """多个备份目录均不匹配 → 返回 None"""
         mock_settings.lifeprism_data_path = tmp_path
 
@@ -185,7 +195,9 @@ class TestFetchRemoteBaseContent:
         assert result == content
 
     @patch("lifeprism.config.settings_manager.settings")
-    def test_older_backup_match_returned_when_newer_mismatch(self, mock_settings, sync_client, backup_dir, tmp_path):
+    def test_older_backup_match_returned_when_newer_mismatch(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
         """最新备份不匹配但旧备份匹配 → 返回旧备份内容"""
         mock_settings.lifeprism_data_path = tmp_path
 

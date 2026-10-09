@@ -44,8 +44,7 @@ class TestTimeParadoxesIdAutoincrement:
 
         id_constraints = TABLE_CONFIGS["time_paradoxes"]["columns"]["id"]["constraints"]
         assert id_constraints == ["PRIMARY KEY", "AUTOINCREMENT"], (
-            f"time_paradoxes.id 约束应为 ['PRIMARY KEY', 'AUTOINCREMENT']，"
-            f"实际: {id_constraints!r}"
+            f"time_paradoxes.id 约束应为 ['PRIMARY KEY', 'AUTOINCREMENT']，实际: {id_constraints!r}"
         )
 
     def test_id_constraints_not_contains_not_null(self):
@@ -63,6 +62,4 @@ class TestTimeParadoxesIdAutoincrement:
         from lifeprism.config.database import TABLE_CONFIGS
 
         id_type = TABLE_CONFIGS["time_paradoxes"]["columns"]["id"]["type"]
-        assert id_type == "INTEGER", (
-            f"time_paradoxes.id 类型应为 INTEGER，实际: {id_type!r}"
-        )
+        assert id_type == "INTEGER", f"time_paradoxes.id 类型应为 INTEGER，实际: {id_type!r}"

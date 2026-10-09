@@ -41,18 +41,23 @@ def parse_conflicts(merged, local_hash, remote_hash):
     blocks = []
     for m in MARKER_RE.finditer(merged):
         assert m.group("loc") == local_hash, (
-            f"local hash mismatch: {m.group('loc')} != {local_hash}")
+            f"local hash mismatch: {m.group('loc')} != {local_hash}"
+        )
         assert m.group("rem") == remote_hash, (
-            f"remote hash mismatch: {m.group('rem')} != {remote_hash}")
+            f"remote hash mismatch: {m.group('rem')} != {remote_hash}"
+        )
         assert m.group("n") == m.group("n2"), (
-            f"mismatched sequence number in block: {m.group('n')} vs {m.group('n2')}")
-        blocks.append({
-            "n": int(m.group("n")),
-            "local": m.group("loc"),
-            "remote": m.group("rem"),
-            "ours": m.group("ours"),
-            "theirs": m.group("theirs"),
-        })
+            f"mismatched sequence number in block: {m.group('n')} vs {m.group('n2')}"
+        )
+        blocks.append(
+            {
+                "n": int(m.group("n")),
+                "local": m.group("loc"),
+                "remote": m.group("rem"),
+                "ours": m.group("ours"),
+                "theirs": m.group("theirs"),
+            }
+        )
     return blocks
 
 
@@ -69,7 +74,7 @@ def assert_unique_sequence_numbers(merged, local_hash, remote_hash):
 # --------------------------------------------------------------------------
 def test_scenario_1_different_regions():
     base = "L1\nL2\nL3\nL4\nL5\n"
-    ours = "L1\nL2-OURS\nL3\nL4\nL5\n"      # changed L2
+    ours = "L1\nL2-OURS\nL3\nL4\nL5\n"  # changed L2
     theirs = "L1\nL2\nL3\nL4-THEIRS\nL5\n"  # changed L4
 
     r = merge(base, ours, theirs, LOCAL, REMOTE)
@@ -111,7 +116,7 @@ def test_scenario_2_same_line_different():
 # --------------------------------------------------------------------------
 def test_scenario_3_delete_vs_modify():
     base = "keep1\ntarget\nkeep2\n"
-    ours = "keep1\nkeep2\n"             # deleted target
+    ours = "keep1\nkeep2\n"  # deleted target
     theirs = "keep1\ntarget-MOD\nkeep2\n"  # modified target
 
     r = merge(base, ours, theirs, LOCAL, REMOTE)
@@ -120,7 +125,8 @@ def test_scenario_3_delete_vs_modify():
     blocks = assert_unique_sequence_numbers(r["merged"], LOCAL, REMOTE)
     # ours side of the conflict should be empty (deleted)
     assert blocks[0]["ours"].strip() == "", (
-        f"ours side should be empty for delete, got {blocks[0]['ours']!r}")
+        f"ours side should be empty for delete, got {blocks[0]['ours']!r}"
+    )
     assert "target-MOD" in blocks[0]["theirs"], "theirs modification missing"
     assert "keep1\n" in r["merged"] and "keep2\n" in r["merged"]
 
@@ -130,7 +136,7 @@ def test_scenario_3_delete_vs_modify():
 # --------------------------------------------------------------------------
 def test_scenario_4_empty_vs_content():
     base = "original line 1\noriginal line 2\n"
-    ours = ""                                  # empty file
+    ours = ""  # empty file
     theirs = "original line 1\noriginal line 2\nNEW\n"
 
     r = merge(base, ours, theirs, LOCAL, REMOTE)
@@ -140,8 +146,7 @@ def test_scenario_4_empty_vs_content():
     # The NEW content from theirs must survive somewhere in the output
     assert "NEW\n" in r["merged"], "theirs new content lost"
     # The ours side of at least one conflict should be empty
-    assert any(b["ours"].strip() == "" for b in blocks), (
-        "expected at least one empty ours side")
+    assert any(b["ours"].strip() == "" for b in blocks), "expected at least one empty ours side"
 
 
 # --------------------------------------------------------------------------
@@ -149,8 +154,8 @@ def test_scenario_4_empty_vs_content():
 # --------------------------------------------------------------------------
 def test_scenario_5_add_different_positions():
     base = "head\nmid\ntail\n"
-    ours = "HEAD-NEW\nhead\nmid\ntail\n"        # added at start
-    theirs = "head\nmid\ntail\nTAIL-NEW\n"      # added at end
+    ours = "HEAD-NEW\nhead\nmid\ntail\n"  # added at start
+    theirs = "head\nmid\ntail\nTAIL-NEW\n"  # added at end
 
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, f"expected auto-merge, got conflicts={r['conflicts']}"
@@ -190,7 +195,8 @@ def test_scenario_7_block_move():
 
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, (
-        f"expected auto-merge for block move, got conflicts={r['conflicts']}")
+        f"expected auto-merge for block move, got conflicts={r['conflicts']}"
+    )
     assert r["conflicts"] == 0
     # The moved ordering should be preserved (ours' reordering wins because
     # theirs == base is unchanged).
@@ -211,4 +217,5 @@ def test_multi_conflict_unique_numbers():
     blocks = assert_unique_sequence_numbers(r["merged"], LOCAL, REMOTE)
     nums = sorted(b["n"] for b in blocks)
     assert nums == list(range(1, r["conflicts"] + 1)), (
-        f"sequence numbers should be 1..N contiguous, got {nums}")
+        f"sequence numbers should be 1..N contiguous, got {nums}"
+    )

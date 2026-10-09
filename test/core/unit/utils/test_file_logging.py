@@ -40,8 +40,7 @@ def clean_root_file_logging():
 
     # 移除 root logger 上所有 FileHandler / RotatingFileHandler
     file_handlers_to_remove = [
-        h for h in root_logger.handlers
-        if isinstance(h, (logging.FileHandler, RotatingFileHandler))
+        h for h in root_logger.handlers if isinstance(h, (logging.FileHandler, RotatingFileHandler))
     ]
     for h in file_handlers_to_remove:
         try:
@@ -90,9 +89,7 @@ def test_setup_file_logging_adds_rotating_file_handler(clean_root_file_logging, 
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) >= 1, "root logger 应至少有一个 RotatingFileHandler"
 
 
@@ -102,9 +99,7 @@ def test_setup_file_logging_maxbytes_1mb(clean_root_file_logging, tmp_path):
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) >= 1
     assert rotating_handlers[0].maxBytes == 1 * 1024 * 1024
 
@@ -115,9 +110,7 @@ def test_setup_file_logging_backupcount_one(clean_root_file_logging, tmp_path):
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) >= 1
     assert rotating_handlers[0].backupCount == 1
 
@@ -128,9 +121,7 @@ def test_setup_file_logging_file_path(clean_root_file_logging, tmp_path):
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) >= 1
 
     expected_path = str(tmp_path / "lifeprism.log")
@@ -145,9 +136,7 @@ def test_setup_file_logging_encoding_utf8(clean_root_file_logging, tmp_path):
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) >= 1
     assert rotating_handlers[0].encoding == "utf-8"
 
@@ -158,9 +147,7 @@ def test_setup_file_logging_uses_truncating_formatter(clean_root_file_logging, t
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) >= 1
     assert isinstance(rotating_handlers[0].formatter, TruncatingFormatter)
 
@@ -214,9 +201,7 @@ def test_setup_file_logging_idempotent(clean_root_file_logging, tmp_path):
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) == 1, (
         f"重复调用应保持幂等，期望 1 个 RotatingFileHandler，实际 {len(rotating_handlers)} 个"
     )
@@ -239,9 +224,7 @@ def test_setup_file_logging_rollover_creates_old_log(clean_root_file_logging, tm
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) == 1
     handler = rotating_handlers[0]
 
@@ -298,9 +281,7 @@ def test_setup_file_logging_rollover_overwrites_old_log(clean_root_file_logging,
     setup_file_logging(tmp_path)
 
     root_logger = logging.getLogger()
-    rotating_handlers = [
-        h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)
-    ]
+    rotating_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
     assert len(rotating_handlers) == 1
     handler = rotating_handlers[0]
 
@@ -327,9 +308,7 @@ def test_setup_file_logging_rollover_overwrites_old_log(clean_root_file_logging,
     write_until_rollover(marker_a)
     assert old_log.exists(), "第一次轮转后应生成 lifeprism.old.log"
     old_content_after_first = old_log.read_text(encoding="utf-8")
-    assert marker_a in old_content_after_first, (
-        "第一次轮转后 lifeprism.old.log 应包含 marker A"
-    )
+    assert marker_a in old_content_after_first, "第一次轮转后 lifeprism.old.log 应包含 marker A"
 
     # 第二次轮转：标记 B 应覆盖旧的 .old.log（包含 A 的内容应消失）
     marker_b = "SECOND-MARKER-B"

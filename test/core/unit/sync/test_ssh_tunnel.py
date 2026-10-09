@@ -289,7 +289,7 @@ class TestConnectErrorTransparency:
             # 验证 options 是 SSHClientConnectionOptions 实例且 gss_host 为空字符串
             options = call_kwargs["options"]
             assert isinstance(options, asyncssh.SSHClientConnectionOptions)
-            assert options.gss_host == '', (
+            assert options.gss_host == "", (
                 "gss_host 必须为空字符串以跳过 GSSClient 初始化，"
                 "否则打包环境会因 win32timezone 缺失而失败"
             )

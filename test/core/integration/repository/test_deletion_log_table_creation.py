@@ -99,9 +99,7 @@ class TestDeletionLogTableCreation:
         columns = _get_table_columns(initialized_db, "deletion_log")
         actual_set = set(columns)
         extra = actual_set - EXPECTED_DELETION_LOG_COLUMNS
-        assert not extra, (
-            f"deletion_log 表有意外列: {sorted(extra)}，当前列: {sorted(actual_set)}"
-        )
+        assert not extra, f"deletion_log 表有意外列: {sorted(extra)}，当前列: {sorted(actual_set)}"
 
     def test_deletion_log_table_has_target_table_column_not_table_name(self, initialized_db):
         """deletion_log 表应有 target_table 列而非 table_name 列

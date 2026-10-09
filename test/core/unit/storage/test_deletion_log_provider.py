@@ -352,9 +352,7 @@ class TestWriteTombstoneWithCursor:
 class TestGetTombstonesSince:
     """Seam 4: get_tombstones_since 增量查询 + source 过滤"""
 
-    def test_get_tombstones_since_returns_records_after_threshold(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstones_since_returns_records_after_threshold(self, deletion_log_provider):
         """get_tombstones_since 返回 created_at > last_sync_time 的记录"""
         # 准备数据：用显式 created_at 控制时间
         deletion_log_provider.create_tombstone(
@@ -380,9 +378,7 @@ class TestGetTombstonesSince:
         results = deletion_log_provider.get_tombstones_since("")
         assert len(results) == 2
 
-    def test_get_tombstones_since_filter_by_source_local(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstones_since_filter_by_source_local(self, deletion_log_provider):
         """get_tombstones_since(source='local') 只返回 source=local 的记录"""
         deletion_log_provider.create_tombstone("mood_entries", "mood-1", "local")
         deletion_log_provider.create_tombstone("mood_entries", "mood-2", "cloud")
@@ -392,9 +388,7 @@ class TestGetTombstonesSince:
         assert results[0]["source"] == "local"
         assert results[0]["record_id"] == "mood-1"
 
-    def test_get_tombstones_since_filter_by_source_cloud(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstones_since_filter_by_source_cloud(self, deletion_log_provider):
         """get_tombstones_since(source='cloud') 只返回 source=cloud 的记录"""
         deletion_log_provider.create_tombstone("mood_entries", "mood-1", "local")
         deletion_log_provider.create_tombstone("mood_entries", "mood-2", "cloud")
@@ -405,9 +399,7 @@ class TestGetTombstonesSince:
         for r in results:
             assert r["source"] == "cloud"
 
-    def test_get_tombstones_since_orders_by_created_at_asc(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstones_since_orders_by_created_at_asc(self, deletion_log_provider):
         """get_tombstones_since 应按 created_at 升序排列"""
         deletion_log_provider.create_tombstone(
             "mood_entries", "mood-late", "local", created_at="2026-07-22T10:00:00+00:00"
@@ -421,15 +413,11 @@ class TestGetTombstonesSince:
         assert results[0]["record_id"] == "mood-early"  # 早的在前
         assert results[1]["record_id"] == "mood-late"
 
-    def test_get_tombstones_since_empty_when_no_records_match(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstones_since_empty_when_no_records_match(self, deletion_log_provider):
         """无匹配记录时返回空列表"""
         deletion_log_provider.create_tombstone("mood_entries", "mood-1", "local")
 
-        results = deletion_log_provider.get_tombstones_since(
-            "2099-12-31T23:59:59+00:00"
-        )
+        results = deletion_log_provider.get_tombstones_since("2099-12-31T23:59:59+00:00")
         assert results == []
 
 
@@ -441,30 +429,20 @@ class TestGetTombstone:
 
     def test_get_tombstone_returns_record_when_exists(self, deletion_log_provider):
         """get_tombstone 在记录存在时返回墓碑字典"""
-        deletion_log_provider.create_tombstone(
-            "mood_entries", "mood-12345678", "local"
-        )
+        deletion_log_provider.create_tombstone("mood_entries", "mood-12345678", "local")
 
-        tombstone = deletion_log_provider.get_tombstone(
-            "mood_entries", "mood-12345678"
-        )
+        tombstone = deletion_log_provider.get_tombstone("mood_entries", "mood-12345678")
         assert tombstone is not None
         assert tombstone["target_table"] == "mood_entries"
         assert tombstone["record_id"] == "mood-12345678"
         assert tombstone["source"] == "local"
 
-    def test_get_tombstone_returns_none_when_not_exists(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstone_returns_none_when_not_exists(self, deletion_log_provider):
         """get_tombstone 在记录不存在时返回 None"""
-        tombstone = deletion_log_provider.get_tombstone(
-            "mood_entries", "non-existent-id"
-        )
+        tombstone = deletion_log_provider.get_tombstone("mood_entries", "non-existent-id")
         assert tombstone is None
 
-    def test_get_tombstone_distinguishes_by_target_table(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstone_distinguishes_by_target_table(self, deletion_log_provider):
         """get_tombstone 应区分不同 target_table（即使 record_id 相同）"""
         # 同一 record_id 但不同 target_table
         deletion_log_provider.create_tombstone("mood_entries", "shared-id", "local")
@@ -478,9 +456,7 @@ class TestGetTombstone:
         assert todo_tombstone is not None
         assert todo_tombstone["target_table"] == "todo_list"
 
-    def test_get_tombstone_unique_constraint_ensures_at_most_one(
-        self, deletion_log_provider
-    ):
+    def test_get_tombstone_unique_constraint_ensures_at_most_one(self, deletion_log_provider):
         """UNIQUE(target_table, record_id) 约束保证至多返回一条"""
         # 第一次写入
         deletion_log_provider.create_tombstone("mood_entries", "mood-1", "local")
@@ -499,9 +475,7 @@ class TestGetTombstone:
 class TestCleanupBefore:
     """Seam 6: cleanup_before 清理 created_at <= last_sync_time 的记录"""
 
-    def test_cleanup_before_removes_records_at_or_before_threshold(
-        self, deletion_log_provider
-    ):
+    def test_cleanup_before_removes_records_at_or_before_threshold(self, deletion_log_provider):
         """cleanup_before 清理 created_at <= last_sync_time 的记录"""
         deletion_log_provider.create_tombstone(
             "mood_entries", "mood-old-1", "local", created_at="2026-07-01T00:00:00+00:00"
@@ -521,9 +495,7 @@ class TestCleanupBefore:
         assert len(remaining) == 1
         assert remaining[0]["record_id"] == "mood-new"
 
-    def test_cleanup_before_boundary_condition_includes_equal(
-        self, deletion_log_provider
-    ):
+    def test_cleanup_before_boundary_condition_includes_equal(self, deletion_log_provider):
         """cleanup_before 边界条件：created_at == last_sync_time 也应被清理（<=）"""
         threshold = "2026-07-15T00:00:00+00:00"
         deletion_log_provider.create_tombstone(
@@ -533,9 +505,7 @@ class TestCleanupBefore:
         affected = deletion_log_provider.cleanup_before(threshold)
         assert affected == 1
 
-    def test_cleanup_before_returns_zero_when_no_records_match(
-        self, deletion_log_provider
-    ):
+    def test_cleanup_before_returns_zero_when_no_records_match(self, deletion_log_provider):
         """无匹配记录时返回 0"""
         deletion_log_provider.create_tombstone(
             "mood_entries", "mood-future", "local", created_at="2026-07-22T00:00:00+00:00"
@@ -544,9 +514,7 @@ class TestCleanupBefore:
         affected = deletion_log_provider.cleanup_before("2026-07-01T00:00:00+00:00")
         assert affected == 0
 
-    def test_cleanup_before_does_not_write_tombstone_for_itself(
-        self, deletion_log_provider
-    ):
+    def test_cleanup_before_does_not_write_tombstone_for_itself(self, deletion_log_provider):
         """cleanup_before 清理 deletion_log 表时不写墓碑（清理是内部操作）"""
         deletion_log_provider.create_tombstone(
             "mood_entries", "mood-1", "local", created_at="2026-07-01T00:00:00+00:00"
@@ -565,16 +533,12 @@ class TestCleanupBefore:
 class TestSourceValidation:
     """Seam 7: source 字段在 Provider 层校验"""
 
-    def test_create_tombstone_invalid_source_raises_validation_error(
-        self, deletion_log_provider
-    ):
+    def test_create_tombstone_invalid_source_raises_validation_error(self, deletion_log_provider):
         """create_tombstone 非法 source 应抛 ValidationError"""
         from lifeprism.utils.exceptions import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
-            deletion_log_provider.create_tombstone(
-                "mood_entries", "mood-1", source="invalid"
-            )
+            deletion_log_provider.create_tombstone("mood_entries", "mood-1", source="invalid")
 
         assert exc_info.value.code == "INVALID_SOURCE"
         assert "invalid" in exc_info.value.message
@@ -649,16 +613,10 @@ class TestOnConflictIgnore:
         assert tombstone["source"] == "local"
         assert tombstone["created_at"] == "2026-07-22T10:00:00+00:00"
 
-    def test_different_target_table_allows_same_record_id(
-        self, deletion_log_provider
-    ):
+    def test_different_target_table_allows_same_record_id(self, deletion_log_provider):
         """不同 target_table 但相同 record_id 应允许分别写入（UNIQUE 是复合约束）"""
-        deletion_log_provider.create_tombstone(
-            "mood_entries", "shared-id", "local"
-        )
-        deletion_log_provider.create_tombstone(
-            "todo_list", "shared-id", "local"
-        )
+        deletion_log_provider.create_tombstone("mood_entries", "shared-id", "local")
+        deletion_log_provider.create_tombstone("todo_list", "shared-id", "local")
 
         mood_tombstone = deletion_log_provider.get_tombstone("mood_entries", "shared-id")
         todo_tombstone = deletion_log_provider.get_tombstone("todo_list", "shared-id")
@@ -666,16 +624,10 @@ class TestOnConflictIgnore:
         assert mood_tombstone is not None
         assert todo_tombstone is not None
 
-    def test_different_record_id_allows_same_target_table(
-        self, deletion_log_provider
-    ):
+    def test_different_record_id_allows_same_target_table(self, deletion_log_provider):
         """同 target_table 但不同 record_id 应允许分别写入"""
-        deletion_log_provider.create_tombstone(
-            "mood_entries", "mood-1", "local"
-        )
-        deletion_log_provider.create_tombstone(
-            "mood_entries", "mood-2", "local"
-        )
+        deletion_log_provider.create_tombstone("mood_entries", "mood-1", "local")
+        deletion_log_provider.create_tombstone("mood_entries", "mood-2", "local")
 
         results = deletion_log_provider.get_tombstones_since("")
         assert len(results) == 2

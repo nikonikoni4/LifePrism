@@ -88,8 +88,7 @@ class TestSyncTablesStatic:
 
         # Assert: SYNC_TABLES 数量与期望清单一致（避免额外表混入）
         assert len(SYNC_TABLES) == len(EXPECTED_STATIC_TABLES), (
-            f"SYNC_TABLES 应包含 {len(EXPECTED_STATIC_TABLES)} 张表，"
-            f"实际 {len(SYNC_TABLES)} 张"
+            f"SYNC_TABLES 应包含 {len(EXPECTED_STATIC_TABLES)} 张表，实际 {len(SYNC_TABLES)} 张"
         )
 
 

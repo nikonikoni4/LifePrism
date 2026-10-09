@@ -1794,9 +1794,7 @@ class TestIssue4Diff3LLMSerialFlow:
         with (
             patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
             patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
-            patch(
-                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe"
-            ) as mock_rcts,
+            patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe") as mock_rcts,
         ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
@@ -1942,9 +1940,7 @@ class TestIssue4RetryAndDegradation:
         with (
             patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
             patch.object(sync_client, "_fetch_remote_base_content", return_value=None),
-            patch(
-                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe"
-            ) as mock_rcts,
+            patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe") as mock_rcts,
         ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
@@ -2035,9 +2031,7 @@ class TestIssue4RetryAndDegradation:
             )
         )
 
-        mock_futures = [
-            MagicMock(result=MagicMock(return_value=invalid_resp)) for _ in range(3)
-        ]
+        mock_futures = [MagicMock(result=MagicMock(return_value=invalid_resp)) for _ in range(3)]
         mock_futures.append(MagicMock(result=MagicMock(return_value=valid_resp)))
 
         with (

@@ -57,9 +57,7 @@ def backup_data_path(tmp_path):
     agent_dir.mkdir()
     (agent_dir / "behavior.md").write_text("行为记录", encoding="utf-8")
     # chat_history.json 应被排除
-    (agent_dir / "chat_history.json").write_text(
-        '{"history":[]}', encoding="utf-8"
-    )
+    (agent_dir / "chat_history.json").write_text('{"history":[]}', encoding="utf-8")
     # bootstrap.md 应被排除
     (agent_dir / "bootstrap.md").write_text("启动引导", encoding="utf-8")
 
@@ -252,9 +250,7 @@ class TestBackupDocuments:
         service = BackupService()
 
         # Mock 校验方法返回 False，模拟校验失败
-        with patch.object(
-            BackupService, "_verify_docs_backup", return_value=False
-        ):
+        with patch.object(BackupService, "_verify_docs_backup", return_value=False):
             await service.backup_documents()
 
         docs_root = backup_data_path / "backups" / "docs"
@@ -264,9 +260,7 @@ class TestBackupDocuments:
             assert len(sub_dirs) == 0, "校验失败的备份目录应被删除"
 
     @pytest.mark.asyncio
-    async def test_retention_keeps_latest_three(
-        self, patched_settings, backup_data_path
-    ):
+    async def test_retention_keeps_latest_three(self, patched_settings, backup_data_path):
         """保留最新 3 份，旧备份被删除"""
         from lifeprism.server.services.backup_service import BackupService
 
@@ -342,9 +336,7 @@ class TestBackupDatabase:
     """backup_database 数据库全量备份（SQLite Online Backup API）"""
 
     @pytest.mark.asyncio
-    async def test_creates_db_file_under_backups_db(
-        self, patched_settings, backup_data_path
-    ):
+    async def test_creates_db_file_under_backups_db(self, patched_settings, backup_data_path):
         """备份文件创建在 backups/db/ 下，命名为 lifewatch_ai-{timestamp}.db"""
         from lifeprism.server.services.backup_service import BackupService
 
@@ -357,9 +349,7 @@ class TestBackupDatabase:
         assert len(db_files) == 1, "应创建一个 lifewatch_ai-{timestamp}.db 文件"
 
     @pytest.mark.asyncio
-    async def test_uses_sqlite_online_backup_api(
-        self, patched_settings, backup_data_path
-    ):
+    async def test_uses_sqlite_online_backup_api(self, patched_settings, backup_data_path):
         """使用 SQLite Online Backup API（source.backup(target)）
 
         sqlite3.Connection.backup 是 C 实现的不可变类型方法，无法直接 patch。
@@ -393,9 +383,7 @@ class TestBackupDatabase:
             f"应至少创建 2 个 sqlite3 连接（source + target），实际 {len(connect_targets)}"
         )
         # 验证 source 连接（dataset/lifewatch_ai.db）
-        source_conns = [
-            t for t in connect_targets if "dataset" in t.replace("\\", "/")
-        ]
+        source_conns = [t for t in connect_targets if "dataset" in t.replace("\\", "/")]
         assert len(source_conns) >= 1, "应创建到源数据库的连接"
         # 验证 target 连接（backups/db/lifewatch_ai-*.db）
         target_conns = [
@@ -406,9 +394,7 @@ class TestBackupDatabase:
         assert len(target_conns) >= 1, "应创建到目标备份数据库的连接"
 
     @pytest.mark.asyncio
-    async def test_backup_db_is_valid_sqlite(
-        self, patched_settings, backup_data_path
-    ):
+    async def test_backup_db_is_valid_sqlite(self, patched_settings, backup_data_path):
         """备份数据库是有效的 SQLite 文件，内容与源数据库一致"""
         from lifeprism.server.services.backup_service import BackupService
 
@@ -428,9 +414,9 @@ class TestBackupDatabase:
 
             cursor.execute("SELECT name FROM test_table")
             rows = cursor.fetchall()
-            assert rows == [("test_value",)] or rows == [
-                (1, "test_value")
-            ], "备份应包含源数据库的数据"
+            assert rows == [("test_value",)] or rows == [(1, "test_value")], (
+                "备份应包含源数据库的数据"
+            )
         finally:
             conn.close()
 
@@ -455,18 +441,14 @@ class TestBackupDatabase:
             conn.close()
 
     @pytest.mark.asyncio
-    async def test_corrupted_db_backup_is_deleted(
-        self, patched_settings, backup_data_path
-    ):
+    async def test_corrupted_db_backup_is_deleted(self, patched_settings, backup_data_path):
         """完整性校验失败时删除损坏的数据库备份"""
         from lifeprism.server.services.backup_service import BackupService
 
         service = BackupService()
 
         # Mock 校验方法返回 False
-        with patch.object(
-            BackupService, "_verify_db_backup", return_value=False
-        ):
+        with patch.object(BackupService, "_verify_db_backup", return_value=False):
             await service.backup_database()
 
         db_root = backup_data_path / "backups" / "db"
@@ -530,19 +512,13 @@ class TestSameTimestampConflictProtection:
         stale_dir = docs_root / fixed_timestamp
         stale_dir.mkdir(parents=True, exist_ok=True)
         # 残留文件：源中已不存在的文件，会污染本次备份
-        (stale_dir / "stale_session.jsonl").write_text(
-            '{"old": "data"}', encoding="utf-8"
-        )
+        (stale_dir / "stale_session.jsonl").write_text('{"old": "data"}', encoding="utf-8")
         # 残留子目录
         (stale_dir / "deleted_dir").mkdir(exist_ok=True)
-        (stale_dir / "deleted_dir" / "old_file.md").write_text(
-            "old content", encoding="utf-8"
-        )
+        (stale_dir / "deleted_dir" / "old_file.md").write_text("old content", encoding="utf-8")
 
         # 固定时间戳为已存在的目录名，触发同秒冲突
-        with patch.object(
-            BackupService, "_get_local_timestamp", return_value=fixed_timestamp
-        ):
+        with patch.object(BackupService, "_get_local_timestamp", return_value=fixed_timestamp):
             await service.backup_documents()
 
         # 验证：备份目录存在且不含残留文件
@@ -570,25 +546,19 @@ class TestSameTimestampConflictProtection:
         (stale_dir / "stale.txt").write_text("stale", encoding="utf-8")
 
         with (
-            patch.object(
-                BackupService, "_get_local_timestamp", return_value=fixed_timestamp
-            ),
+            patch.object(BackupService, "_get_local_timestamp", return_value=fixed_timestamp),
             caplog.at_level("WARNING"),
         ):
             await service.backup_documents()
 
         # 应记录 WARNING 日志，包含时间戳和路径
-        warning_records = [
-            r for r in caplog.records if r.levelname == "WARNING"
-        ]
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
         conflict_warnings = [
             r
             for r in warning_records
             if "已存在" in r.getMessage() and fixed_timestamp in r.getMessage()
         ]
-        assert len(conflict_warnings) >= 1, (
-            f"应记录 WARNING 日志，实际 {warning_records}"
-        )
+        assert len(conflict_warnings) >= 1, f"应记录 WARNING 日志，实际 {warning_records}"
 
     @pytest.mark.asyncio
     async def test_documents_backup_cleaned_directory_passes_verification(
@@ -606,20 +576,14 @@ class TestSameTimestampConflictProtection:
         # 残留文件会导致 _verify_docs_backup 数量校验失败
         (stale_dir / "stale.txt").write_text("stale", encoding="utf-8")
 
-        with patch.object(
-            BackupService, "_get_local_timestamp", return_value=fixed_timestamp
-        ):
+        with patch.object(BackupService, "_get_local_timestamp", return_value=fixed_timestamp):
             await service.backup_documents()
 
         # 清理后重建的备份应通过校验，目录保留
-        assert stale_dir.exists(), (
-            "清理残留后重建的备份应通过校验，目录应保留"
-        )
+        assert stale_dir.exists(), "清理残留后重建的备份应通过校验，目录应保留"
 
     @pytest.mark.asyncio
-    async def test_database_backup_cleans_existing_file(
-        self, patched_settings, backup_data_path
-    ):
+    async def test_database_backup_cleans_existing_file(self, patched_settings, backup_data_path):
         """数据库备份：目标文件已存在时先删除再备份"""
         from lifeprism.server.services.backup_service import BackupService
 
@@ -638,9 +602,7 @@ class TestSameTimestampConflictProtection:
         conn.close()
 
         # 固定时间戳，触发同秒冲突
-        with patch.object(
-            BackupService, "_get_local_timestamp", return_value=fixed_timestamp
-        ):
+        with patch.object(BackupService, "_get_local_timestamp", return_value=fixed_timestamp):
             await service.backup_database()
 
         # 验证：备份文件存在且是有效的 SQLite（不是残留的旧文件）
@@ -679,24 +641,18 @@ class TestSameTimestampConflictProtection:
         stale_db.write_bytes(b"stale content")
 
         with (
-            patch.object(
-                BackupService, "_get_local_timestamp", return_value=fixed_timestamp
-            ),
+            patch.object(BackupService, "_get_local_timestamp", return_value=fixed_timestamp),
             caplog.at_level("WARNING"),
         ):
             await service.backup_database()
 
-        warning_records = [
-            r for r in caplog.records if r.levelname == "WARNING"
-        ]
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
         conflict_warnings = [
             r
             for r in warning_records
             if "已存在" in r.getMessage() and fixed_timestamp in r.getMessage()
         ]
-        assert len(conflict_warnings) >= 1, (
-            f"应记录 WARNING 日志，实际 {warning_records}"
-        )
+        assert len(conflict_warnings) >= 1, f"应记录 WARNING 日志，实际 {warning_records}"
 
     @pytest.mark.asyncio
     async def test_database_backup_no_conflict_when_file_not_exists(
@@ -712,12 +668,8 @@ class TestSameTimestampConflictProtection:
             await service.backup_database()
 
         # 不应有"已存在"的 WARNING 日志
-        warning_records = [
-            r for r in caplog.records if r.levelname == "WARNING"
-        ]
-        conflict_warnings = [
-            r for r in warning_records if "已存在" in r.getMessage()
-        ]
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        conflict_warnings = [r for r in warning_records if "已存在" in r.getMessage()]
         assert len(conflict_warnings) == 0, (
             f"正常路径不应记录冲突 WARNING，实际 {conflict_warnings}"
         )
@@ -730,9 +682,7 @@ class TestRunModeGuard:
     """run_mode 守卫：run_mode != "full" 时跳过备份"""
 
     @pytest.mark.asyncio
-    async def test_skip_backup_documents_in_agent_only_mode(
-        self, backup_data_path
-    ):
+    async def test_skip_backup_documents_in_agent_only_mode(self, backup_data_path):
         """agent_only 模式下跳过文档备份"""
         from lifeprism.config.settings_manager import settings
         from lifeprism.server.services.backup_service import BackupService
@@ -757,9 +707,7 @@ class TestRunModeGuard:
         assert not (backup_data_path / "backups" / "docs").exists()
 
     @pytest.mark.asyncio
-    async def test_skip_backup_database_in_agent_only_mode(
-        self, backup_data_path
-    ):
+    async def test_skip_backup_database_in_agent_only_mode(self, backup_data_path):
         """agent_only 模式下跳过数据库备份"""
         from lifeprism.config.settings_manager import settings
         from lifeprism.server.services.backup_service import BackupService
@@ -783,9 +731,7 @@ class TestRunModeGuard:
         assert not (backup_data_path / "backups" / "db").exists()
 
     @pytest.mark.asyncio
-    async def test_skip_backup_documents_in_web_demo_mode(
-        self, backup_data_path
-    ):
+    async def test_skip_backup_documents_in_web_demo_mode(self, backup_data_path):
         """web_demo 模式下跳过文档备份"""
         from lifeprism.config.settings_manager import settings
         from lifeprism.server.services.backup_service import BackupService

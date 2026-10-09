@@ -480,9 +480,7 @@ class TestSSHTunnelIntegration:
 
     # ===== Test 2: SSH 模式 + 隧道连接失败 → sync_once 跳过 + 记录 ERROR =====
 
-    async def test_ssh_mode_tunnel_failed_logs_error_and_skips_sync(
-        self, ssh_sync_client, caplog
-    ):
+    async def test_ssh_mode_tunnel_failed_logs_error_and_skips_sync(self, ssh_sync_client, caplog):
         """connection_mode=ssh + 隧道连接失败 → 记录 ERROR + sync_once 跳过"""
         client = ssh_sync_client
         caplog.set_level(logging.ERROR, logger="lifeprism.sync.sync_client")
@@ -509,9 +507,7 @@ class TestSSHTunnelIntegration:
             await client._start_ssh_tunnel()
 
             # 2. 验证 ERROR 日志
-            error_messages = [
-                r.getMessage() for r in caplog.records if r.levelno == logging.ERROR
-            ]
+            error_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
             assert any("SSH 隧道启动失败" in m for m in error_messages), (
                 f"未找到 'SSH 隧道启动失败' ERROR 日志，实际: {error_messages}"
             )
@@ -566,9 +562,7 @@ class TestSSHTunnelIntegration:
 
     # ===== Test 5: 隧道未就绪 → sync_once 跳过 + 记录 WARNING =====
 
-    async def test_tunnel_not_ready_sync_once_skipped_with_warning(
-        self, ssh_sync_client, caplog
-    ):
+    async def test_tunnel_not_ready_sync_once_skipped_with_warning(self, ssh_sync_client, caplog):
         """SSH 模式 + 隧道未就绪 → sync_once 跳过 + 记录 WARNING"""
         client = ssh_sync_client
         # _ssh_tunnel 为 None（隧道未启动）
@@ -586,9 +580,7 @@ class TestSSHTunnelIntegration:
         ):
             # 1. 验证 _read_remote_url 返回空字符串
             remote_url = client._read_remote_url()
-            assert remote_url == "", (
-                f"SSH 模式 + 隧道未就绪时应返回空字符串，实际: {remote_url}"
-            )
+            assert remote_url == "", f"SSH 模式 + 隧道未就绪时应返回空字符串，实际: {remote_url}"
 
             # 2. 验证 sync_once 跳过（不抛 ValidationError）+ WARNING 日志
             client.sync_once(tables=[], directories=[])
@@ -632,9 +624,7 @@ class TestSSHTunnelIntegration:
 
     # ===== Test 8: close() 抛异常 → 不阻塞 + 仍清理引用 =====
 
-    async def test_stop_ssh_tunnel_handles_close_exception(
-        self, ssh_sync_client, caplog
-    ):
+    async def test_stop_ssh_tunnel_handles_close_exception(self, ssh_sync_client, caplog):
         """tunnel.close() 抛异常时不阻塞流程，_ssh_tunnel 仍被置 None"""
         client = ssh_sync_client
         caplog.set_level(logging.WARNING, logger="lifeprism.sync.sync_client")
@@ -652,9 +642,7 @@ class TestSSHTunnelIntegration:
             "close() 抛异常后 _ssh_tunnel 仍应被置 None（finally 兜底）"
         )
 
-        warning_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.WARNING
-        ]
+        warning_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert any("关闭 SSH 隧道时出错" in m for m in warning_messages), (
             f"未找到 '关闭 SSH 隧道时出错' WARNING 日志，实际: {warning_messages}"
         )
@@ -686,9 +674,7 @@ class TestSSHTunnelIntegration:
 
     # ===== Test 10: keep-alive 任务超时 → 强制取消 =====
 
-    async def test_stop_ssh_tunnel_force_cancels_on_timeout(
-        self, ssh_sync_client, caplog
-    ):
+    async def test_stop_ssh_tunnel_force_cancels_on_timeout(self, ssh_sync_client, caplog):
         """keep-alive 任务超时未退出 → 被 force cancel"""
         client = ssh_sync_client
         caplog.set_level(logging.WARNING, logger="lifeprism.sync.sync_client")
@@ -726,9 +712,7 @@ class TestSSHTunnelIntegration:
         )
 
         # 3. 验证 WARNING 日志
-        warning_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.WARNING
-        ]
+        warning_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert any("强制取消" in m for m in warning_messages), (
             f"未找到 '强制取消' WARNING 日志，实际: {warning_messages}"
         )
@@ -789,9 +773,7 @@ class TestReadRemoteUrlAudit:
         from lifeprism.sync.sync_client import SyncClient
 
         docstring = SyncClient._read_remote_url.__doc__ or ""
-        assert "警告" in docstring, (
-            "_read_remote_url docstring 应包含 '警告' 关键字（参考规则 6）"
-        )
+        assert "警告" in docstring, "_read_remote_url docstring 应包含 '警告' 关键字（参考规则 6）"
         assert "get_setting" in docstring, (
             "_read_remote_url docstring 应说明禁止直接调用 get_setting（参考规则 6）"
         )

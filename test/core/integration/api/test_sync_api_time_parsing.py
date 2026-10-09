@@ -47,6 +47,7 @@ def initialized_settings(test_data_path):
 
     # 备份原始 sync_api_key
     import keyring
+
     _KEYRING_USERNAME = "sync_api_key"
     original_key = None
     try:

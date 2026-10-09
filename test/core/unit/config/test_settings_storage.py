@@ -623,9 +623,7 @@ class TestSshTunnelPrivateKeyStorageRoute:
         ):
             pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
             settings.set_storage_key("ssh_tunnel_private_key", pem)
-            mock_set.assert_called_once_with(
-                KEYRING_SERVICE_NAME, "ssh_tunnel_private_key", pem
-            )
+            mock_set.assert_called_once_with(KEYRING_SERVICE_NAME, "ssh_tunnel_private_key", pem)
 
     def test_get_ssh_tunnel_private_key_from_keyring_in_full_mode(self, tmp_path):
         """full 模式下 get_storage_key('ssh_tunnel_private_key') 从 keyring 读取"""
@@ -640,9 +638,7 @@ class TestSshTunnelPrivateKeyStorageRoute:
             assert result == pem
             mock_kr.assert_called_once_with(KEYRING_SERVICE_NAME, "ssh_tunnel_private_key")
 
-    def test_get_ssh_tunnel_private_key_returns_none_in_agent_only_when_not_exist(
-        self, tmp_path
-    ):
+    def test_get_ssh_tunnel_private_key_returns_none_in_agent_only_when_not_exist(self, tmp_path):
         """agent_only 模式下 storage.yaml 无此字段时返回 None"""
         # storage.yaml 不存在，模拟云端未配置 SSH 隧道场景
         with (
@@ -711,9 +707,7 @@ class TestSshTunnelPrivateKeyStorageRoute:
             settings.set("ssh_tunnel_private_key", pem)
 
             # keyring 被调用（走 storage 路由）
-            mock_kr_set.assert_called_once_with(
-                KEYRING_SERVICE_NAME, "ssh_tunnel_private_key", pem
-            )
+            mock_kr_set.assert_called_once_with(KEYRING_SERVICE_NAME, "ssh_tunnel_private_key", pem)
             # config.yaml 不应包含私钥字段（仍只有普通配置）
             assert config_path.exists()
             with open(config_path, encoding="utf-8") as f:
@@ -727,9 +721,7 @@ class TestSshTunnelPrivateKeyStorageRoute:
         pem = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----"
         with (
             patch.object(settings, "_runtime_config", {"run_mode": "full"}),
-            patch(
-                "lifeprism.config.settings_manager.keyring.get_password", return_value=pem
-            ),
+            patch("lifeprism.config.settings_manager.keyring.get_password", return_value=pem),
         ):
             result = settings.get("ssh_tunnel_private_key")
             assert result == pem

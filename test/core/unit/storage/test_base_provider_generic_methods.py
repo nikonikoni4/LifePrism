@@ -349,9 +349,7 @@ class TestGenericUpdate:
             # 查询更新后的 updated_at
             with mock_provider.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT updated_at FROM test_table WHERE id = 'test-utc-change'"
-                )
+                cursor.execute("SELECT updated_at FROM test_table WHERE id = 'test-utc-change'")
                 new_updated_at = cursor.fetchone()[0]
 
             # 验证：updated_at 已变化（与原值不同）
@@ -768,9 +766,7 @@ class TestGenericInsertHashIdFallback:
         # 验证：hash_id 应该被自动生成
         with hash_id_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT hash_id FROM test_hash_id_table WHERE id = ?", (record_id,)
-            )
+            cursor.execute("SELECT hash_id FROM test_hash_id_table WHERE id = ?", (record_id,))
             row = cursor.fetchone()
 
         assert row is not None, "应该查询到刚插入的记录"
@@ -778,9 +774,7 @@ class TestGenericInsertHashIdFallback:
         assert hash_id is not None, "hash_id 应该被自动生成（未传入时兜底生成）"
 
         # 测试表中前缀为 "mi-"（通过 monkeypatch 注入 HASH_ID_PREFIXES）
-        assert hash_id.startswith("mi-"), (
-            f"hash_id 应该以 'mi-' 前缀开头，实际值: {hash_id}"
-        )
+        assert hash_id.startswith("mi-"), f"hash_id 应该以 'mi-' 前缀开头，实际值: {hash_id}"
 
         # 验证长度：前缀(3) + 12 位 hex = 15
         assert len(hash_id) == 15, (
@@ -805,9 +799,7 @@ class TestGenericInsertHashIdFallback:
         # 验证：hash_id 应该是传入的值，未被覆盖
         with hash_id_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT hash_id FROM test_hash_id_table WHERE id = ?", (record_id,)
-            )
+            cursor.execute("SELECT hash_id FROM test_hash_id_table WHERE id = ?", (record_id,))
             row = cursor.fetchone()
 
         assert row is not None, "应该查询到刚插入的记录"
@@ -832,9 +824,7 @@ class TestGenericInsertHashIdFallback:
             cursor = conn.cursor()
             cursor.execute("PRAGMA table_info(test_text_pk_table)")
             columns = [col[1] for col in cursor.fetchall()]
-            cursor.execute(
-                "SELECT id, name FROM test_text_pk_table WHERE id = ?", ("test-001",)
-            )
+            cursor.execute("SELECT id, name FROM test_text_pk_table WHERE id = ?", ("test-001",))
             row = cursor.fetchone()
 
         assert "hash_id" not in columns, "TEXT 主键表不应该有 hash_id 字段"
@@ -1071,9 +1061,7 @@ class TestGenericDeleteTombstone:
         # 验证：记录仍存在（DELETE 也回滚）
         with provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM test_text_pk_table WHERE id = ?", (pk_value,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM test_text_pk_table WHERE id = ?", (pk_value,))
             assert cursor.fetchone()[0] == 1, "DELETE 失败时记录不应被删除"
 
     def test_repeat_delete_preserves_old_tombstone(self, sync_text_pk_provider):
@@ -1154,9 +1142,7 @@ class TestGenericBatchDelete:
         # 验证：所有记录已从表中消失
         with provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM test_text_pk_table WHERE id IN (?, ?, ?)", ids
-            )
+            cursor.execute("SELECT COUNT(*) FROM test_text_pk_table WHERE id IN (?, ?, ?)", ids)
             remaining = cursor.fetchone()[0]
         assert remaining == 0, "所有记录应已删除"
 
@@ -1215,8 +1201,6 @@ class TestGenericBatchDelete:
         # 验证：记录仍存在（DELETE 也回滚）
         with provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM test_text_pk_table WHERE id IN (?, ?, ?)", ids
-            )
+            cursor.execute("SELECT COUNT(*) FROM test_text_pk_table WHERE id IN (?, ?, ?)", ids)
             remaining = cursor.fetchone()[0]
         assert remaining == 3, "DELETE 失败时记录不应被删除（全部回滚）"

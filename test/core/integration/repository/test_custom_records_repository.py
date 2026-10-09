@@ -1505,6 +1505,7 @@ class TestUpdateEntry:
 
         # Act: 空字典更新
         import time as _time
+
         _time.sleep(1.1)  # 确保 updated_at 时间戳不同
         result = repository.update_entry(
             type_id=type_id,
@@ -1912,6 +1913,7 @@ class TestUpdateEntry:
 
         # Act: 等待 1.1 秒后调 update_entry（确保时间戳不同）
         import time as _time
+
         _time.sleep(1.1)
         result = repository.update_entry(
             type_id=type_id,

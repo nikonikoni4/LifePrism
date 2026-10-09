@@ -542,9 +542,7 @@ class TestCleanupExpiredConflictBackups:
         from lifeprism.sync.conflict_backup import cleanup_expired_conflict_backups
 
         # 创建一个 100 天前的目录（确保任何运行时刻都视为过期）
-        very_old_ts = (datetime.now(timezone.utc) - timedelta(days=100)).strftime(
-            "%Y%m%d_%H%M%S"
-        )
+        very_old_ts = (datetime.now(timezone.utc) - timedelta(days=100)).strftime("%Y%m%d_%H%M%S")
         old_dir = tmp_path / "sync_conflict" / very_old_ts
         old_dir.mkdir(parents=True)
         (old_dir / "test.md.local.md").write_text("x", encoding="utf-8")
@@ -717,11 +715,15 @@ class TestBackwardCompatibility:
         # 两种结构共存
         old_backup_file = tmp_path / "sync_conflict" / old_ts / "agent" / "behavior.md"
         new_local_file = (
-            tmp_path / "sync_conflict" / now.strftime("%Y%m%d_%H%M%S")
+            tmp_path
+            / "sync_conflict"
+            / now.strftime("%Y%m%d_%H%M%S")
             / "agent__behavior.md.local.md"
         )
         new_remote_file = (
-            tmp_path / "sync_conflict" / now.strftime("%Y%m%d_%H%M%S")
+            tmp_path
+            / "sync_conflict"
+            / now.strftime("%Y%m%d_%H%M%S")
             / "agent__behavior.md.remote.md"
         )
 
@@ -739,9 +741,7 @@ class TestBackwardCompatibility:
 
         # 旧结构的深层嵌套（近期，保留）
         recent_ts = (now - timedelta(days=3)).strftime("%Y%m%d_%H%M%S")
-        deep_old_dir = (
-            tmp_path / "sync_conflict" / recent_ts / "agent" / "subdir"
-        )
+        deep_old_dir = tmp_path / "sync_conflict" / recent_ts / "agent" / "subdir"
         deep_old_dir.mkdir(parents=True)
         (deep_old_dir / "file.md").write_text("深层旧结构", encoding="utf-8")
 
@@ -762,9 +762,7 @@ class TestBackwardCompatibility:
 
         # 旧结构的深层嵌套（过期，60 天前）
         old_ts = (now - timedelta(days=60)).strftime("%Y%m%d_%H%M%S")
-        deep_old_dir = (
-            tmp_path / "sync_conflict" / old_ts / "agent" / "subdir"
-        )
+        deep_old_dir = tmp_path / "sync_conflict" / old_ts / "agent" / "subdir"
         deep_old_dir.mkdir(parents=True)
         (deep_old_dir / "file.md").write_text("深层旧结构", encoding="utf-8")
 

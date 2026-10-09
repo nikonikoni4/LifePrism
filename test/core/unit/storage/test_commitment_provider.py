@@ -126,9 +126,7 @@ class TestCommitmentProviderBaseline:
         commitment_id = commitment_provider.create_commitment(sample_commitment_data)
 
         assert commitment_id is not None
-        assert commitment_id.startswith("cmt-"), (
-            f"ID 应以 'cmt-' 开头，实际: {commitment_id}"
-        )
+        assert commitment_id.startswith("cmt-"), f"ID 应以 'cmt-' 开头，实际: {commitment_id}"
         # cmt- (4 字符) + 8 位 hex = 12 字符
         assert len(commitment_id) == 12, f"ID 长度应为 12，实际: {len(commitment_id)}"
 
@@ -199,7 +197,9 @@ class TestCommitmentProviderBaseline:
         empty = commitment_provider.get_commitments(value_id="val-no-match")
         assert empty == []
 
-    def test_get_commitments_by_value_returns_list(self, commitment_provider, sample_commitment_data):
+    def test_get_commitments_by_value_returns_list(
+        self, commitment_provider, sample_commitment_data
+    ):
         """获取某价值下所有承诺（不 JOIN，用于 ValueDetailItem）"""
         commitment_provider.create_commitment(sample_commitment_data)
         commitment_provider.create_commitment(
@@ -216,17 +216,13 @@ class TestCommitmentProviderBaseline:
         assert "status" in commitments[0]
         assert "value_keywords" not in commitments[0]
 
-    def test_get_commitments_by_value_returns_empty_for_no_match(
-        self, commitment_provider
-    ):
+    def test_get_commitments_by_value_returns_empty_for_no_match(self, commitment_provider):
         """没有匹配的 value_id 返回空列表"""
         commitments = commitment_provider.get_commitments_by_value("val-no-match")
 
         assert commitments == []
 
-    def test_update_commitment_updates_fields(
-        self, commitment_provider, sample_commitment_data
-    ):
+    def test_update_commitment_updates_fields(self, commitment_provider, sample_commitment_data):
         """更新承诺字段成功"""
         commitment_id = commitment_provider.create_commitment(sample_commitment_data)
 
@@ -258,9 +254,7 @@ class TestCommitmentProviderBaseline:
 
         assert result is False
 
-    def test_delete_commitment_removes_record(
-        self, commitment_provider, sample_commitment_data
-    ):
+    def test_delete_commitment_removes_record(self, commitment_provider, sample_commitment_data):
         """删除承诺后记录消失"""
         commitment_id = commitment_provider.create_commitment(sample_commitment_data)
 

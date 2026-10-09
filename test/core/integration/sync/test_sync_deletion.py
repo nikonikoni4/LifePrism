@@ -186,10 +186,11 @@ def _get_tombstones(db, target_table=None):
                 (target_table,),
             )
         else:
-            cursor.execute(
-                "SELECT target_table, record_id, source FROM deletion_log"
-            )
-        return [dict(zip(["target_table", "record_id", "source"], row, strict=False)) for row in cursor.fetchall()]
+            cursor.execute("SELECT target_table, record_id, source FROM deletion_log")
+        return [
+            dict(zip(["target_table", "record_id", "source"], row, strict=False))
+            for row in cursor.fetchall()
+        ]
 
 
 def _count_records(db, table, where_field=None, where_value=None):
@@ -209,9 +210,7 @@ def _count_records(db, table, where_field=None, where_value=None):
 class TestTombstonePush:
     """墓碑 Push 同步测试"""
 
-    def test_text_pk_table_delete_pushes_tombstone(
-        self, initialized_db, sync_client, clean_tables
-    ):
+    def test_text_pk_table_delete_pushes_tombstone(self, initialized_db, sync_client, clean_tables):
         """场景 1: TEXT 主键表删除 → Push 同步传播"""
         from lifeprism.repository import mood_repository
 
@@ -235,7 +234,9 @@ class TestTombstonePush:
         # Assert: httpx 被调用，payload 含 1 条墓碑
         mock_post.assert_called_once()
         call_args = mock_post.call_args
-        assert "/push-deletion-log" in call_args[1]["url"] or "/push-deletion-log" in call_args[0][0]
+        assert (
+            "/push-deletion-log" in call_args[1]["url"] or "/push-deletion-log" in call_args[0][0]
+        )
         payload = call_args[1].get("json") or call_args[0].get("json")
         assert len(payload["tombstones"]) == 1
         assert payload["tombstones"][0]["target_table"] == "mood_entries"
@@ -264,9 +265,7 @@ class TestTombstonePush:
         # 查询 hash_id
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT hash_id FROM timeline_custom_block WHERE id = ?", (block_id,)
-            )
+            cursor.execute("SELECT hash_id FROM timeline_custom_block WHERE id = ?", (block_id,))
             hash_id = cursor.fetchone()[0]
 
         # 删除（写墓碑，record_id = hash_id）
@@ -468,16 +467,12 @@ class TestTombstoneOrdering:
 class TestLWWAndFailure:
     """LWW 与失败处理测试"""
 
-    def test_lww_skip_when_local_tombstone_exists(
-        self, initialized_db, sync_client, clean_tables
-    ):
+    def test_lww_skip_when_local_tombstone_exists(self, initialized_db, sync_client, clean_tables):
         """场景 6: LWW 跳过（本地已有墓碑）"""
         from lifeprism.repository import deletion_log_repository
 
         # Arrange: 本地预先写入墓碑（source=local）
-        deletion_log_repository.create_tombstone(
-            "mood_entries", "mood-lww01", source="local"
-        )
+        deletion_log_repository.create_tombstone("mood_entries", "mood-lww01", source="local")
 
         # mock httpx 返回同 (target_table, record_id) 的云端墓碑
         cloud_tombstone = {
@@ -500,9 +495,7 @@ class TestLWWAndFailure:
         assert len(tombstones) == 1
         assert tombstones[0]["source"] == "local"  # 仍是本地旧墓碑
 
-    def test_pull_failure_rolls_back_transaction(
-        self, initialized_db, sync_client, clean_tables
-    ):
+    def test_pull_failure_rolls_back_transaction(self, initialized_db, sync_client, clean_tables):
         """场景 7: Pull 失败事务回滚
 
         使用 sqlite3.OperationalError 模拟真实 DB 失败。
@@ -621,9 +614,7 @@ class TestTombstoneCleanup:
         last_sync_time = "2026-07-22T00:00:00+00:00"
 
         with patch("lifeprism.sync.sync_client.httpx.post") as mock_post:
-            mock_post.return_value = _make_mock_response(
-                {"success": True, "cleaned_count": 1}
-            )
+            mock_post.return_value = _make_mock_response({"success": True, "cleaned_count": 1})
 
             # Act
             sync_client._cleanup_deletion_log("http://remote", "api-key", last_sync_time)
@@ -645,9 +636,7 @@ class TestTombstoneCleanup:
 class TestDynamicAndCascade:
     """动态表与级联删除测试"""
 
-    def test_dynamic_table_delete_writes_tombstone(
-        self, initialized_db, clean_custom_records
-    ):
+    def test_dynamic_table_delete_writes_tombstone(self, initialized_db, clean_custom_records):
         """场景 10: 动态表删除写墓碑（custom_record_aggregator）"""
         from lifeprism.repository import custom_record_repository
 
@@ -698,9 +687,7 @@ class TestDynamicAndCascade:
         tombstones = _get_tombstones(initialized_db, "custom_testorphan")
         assert len(tombstones) == 0
 
-    def test_cascade_delete_propagates_all_tables(
-        self, initialized_db, sync_client, clean_tables
-    ):
+    def test_cascade_delete_propagates_all_tables(self, initialized_db, sync_client, clean_tables):
         """场景 12: 级联删除同步传播所有级联表"""
         from lifeprism.repository import habit_repository
 
@@ -771,12 +758,8 @@ class TestEdgeCases:
         from lifeprism.repository import deletion_log_repository
 
         # Arrange: 插入若干墓碑
-        deletion_log_repository.create_tombstone(
-            "mood_entries", "mood-reset01", source="local"
-        )
-        deletion_log_repository.create_tombstone(
-            "mood_entries", "mood-reset02", source="cloud"
-        )
+        deletion_log_repository.create_tombstone("mood_entries", "mood-reset01", source="local")
+        deletion_log_repository.create_tombstone("mood_entries", "mood-reset02", source="cloud")
 
         # Act: last_sync_time="" 模拟重置
         with patch("lifeprism.sync.sync_client.httpx.post") as mock_post:
@@ -828,9 +811,7 @@ class TestEdgeCases:
 class TestBatchDelete:
     """多表批量删除测试"""
 
-    def test_multi_table_batch_delete_sync(
-        self, initialized_db, sync_client, clean_tables
-    ):
+    def test_multi_table_batch_delete_sync(self, initialized_db, sync_client, clean_tables):
         """场景 15: 多表批量删除同步"""
         from lifeprism.repository import mood_repository, custom_block_repository
 
@@ -853,6 +834,7 @@ class TestBatchDelete:
 
         _insert_diary(initialized_db, date_str="2026-07-23")
         from lifeprism.repository import diary_repository
+
         diary_repository.delete_diary("2026-07-23")
 
         # Act: Push
@@ -878,9 +860,7 @@ class TestBatchDelete:
 class TestEmptyScenarios:
     """空场景测试"""
 
-    def test_empty_tombstone_pull_and_push(
-        self, initialized_db, sync_client, clean_tables
-    ):
+    def test_empty_tombstone_pull_and_push(self, initialized_db, sync_client, clean_tables):
         """场景 16: 空墓碑 Pull/Push 不报错"""
         # Pull: mock httpx 返回空 tombstones
         with patch("lifeprism.sync.sync_client.httpx.post") as mock_post:

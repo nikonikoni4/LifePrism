@@ -38,9 +38,7 @@ def _make_monitor(monkeypatch, afk_timeout=180.0, afk_timeout_media=3600.0):
         "afk_timeout": afk_timeout,
         "afk_timeout_media": afk_timeout_media,
     }.get(key, default)
-    monkeypatch.setattr(
-        "lifeprism.monitor.windows_monitor.monitor.settings", mock_settings
-    )
+    monkeypatch.setattr("lifeprism.monitor.windows_monitor.monitor.settings", mock_settings)
     from lifeprism.monitor.windows_monitor.monitor import WindowMonitor
 
     return WindowMonitor(provider=MagicMock())

@@ -21,12 +21,10 @@ class RagSearchTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "检索用户个人资料和日记，返回原文片段与来源文件。默认只使用 vec 语义检索。"
-            "只有查询包含明确关键词，例如人名、项目名、具体术语或需精确匹配的词语时，"
-            "才设置 use_bm25=true 增加关键词检索；概括性或语义性问题保持 false。"
-            "问题涉及多个方面时可拆成不同角度分别检索，结果不足时换词重试。"
-            "结果来自每日索引快照，可能尚未包含最新修改；不要将未检索到解释为事实不存在。"
-            "回答应引用来源文件；来源行号是清洗后文本位置，不是原文件行号。"
+            "工具描述：用于检索个人资料和日记的工具，心情等其他内容不包含在rag检索之内"
+            "使用情况：可用于检索dairy、user文件夹下的文档时有限使用rag_search"
+            "结果返回: 返回最终匹配的前k个内容"
+            "可使用的场景：1. 用户主动询问相关内容 2. 对于用户当前消息的回应需要结合个人资料和日记回答"
         )
 
     @property
@@ -37,13 +35,19 @@ class RagSearchTool(Tool):
                 "query": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "单个主题的自然语言检索词",
+                    "description": "单个主题的自然语言检索词；查询时，对问题进行query改写，一个问题可以经过多个改写来进行多次查询； 问题涉及多个方面时可拆成不同角度分别检索，结果不足时换词重试",
                 },
-                "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+                "k": {
+                    "type": "integer",
+                    "description": "当需要大范围查询时增大k的数量，当不需要大范围查询时减小k的数量",
+                    "minimum": 3,
+                    "maximum": 20,
+                    "default": 5,
+                },
                 "use_bm25": {
                     "type": "boolean",
                     "default": False,
-                    "description": "仅有明确关键词时才启用 own_bm25 通道；默认 false，只用 vec",
+                    "description": "只有查询包含明确关键词，例如人名、项目名、具体术语或需精确匹配的词语时才启用 bm25 通道；默认 false，只用 vec",
                 },
             },
             "required": ["query"],
@@ -58,10 +62,7 @@ class RagSearchTool(Tool):
                 return "未检索到相关内容。"
             blocks = []
             for i, hit in enumerate(results, 1):
-                sources = "\n".join(
-                    f"来源：{s.path}（清洗后文本行 {s.start_line + 1}–{s.end_line + 1}）"
-                    for s in hit.sources
-                )
+                sources = "\n".join(f"来源：{s.path}" for s in hit.sources)
                 blocks.append(f"[{i}]\n{hit.content}\n{sources}")
             return "\n\n".join(blocks)
         except Exception as exc:

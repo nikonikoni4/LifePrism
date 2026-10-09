@@ -43,8 +43,7 @@ class TestHashIdPrefixes:
         from lifeprism.sync.constants import HASH_ID_PREFIXES
 
         assert isinstance(HASH_ID_PREFIXES, dict), (
-            "HASH_ID_PREFIXES 应为 dict，实际为 "
-            f"{type(HASH_ID_PREFIXES).__name__}"
+            f"HASH_ID_PREFIXES 应为 dict，实际为 {type(HASH_ID_PREFIXES).__name__}"
         )
 
     def test_dict_contains_exactly_six_tables(self):
@@ -75,8 +74,7 @@ class TestHashIdPrefixes:
 
         assert table_name in HASH_ID_PREFIXES, f"缺少表 {table_name}"
         assert HASH_ID_PREFIXES[table_name] == expected_prefix, (
-            f"{table_name} 的前缀应为 {expected_prefix!r}, "
-            f"实际 {HASH_ID_PREFIXES[table_name]!r}"
+            f"{table_name} 的前缀应为 {expected_prefix!r}, 实际 {HASH_ID_PREFIXES[table_name]!r}"
         )
 
     def test_all_prefixes_are_non_empty_strings(self):
@@ -84,9 +82,7 @@ class TestHashIdPrefixes:
         from lifeprism.sync.constants import HASH_ID_PREFIXES
 
         for table, prefix in HASH_ID_PREFIXES.items():
-            assert isinstance(prefix, str), (
-                f"{table} 前缀应为 str，实际 {type(prefix).__name__}"
-            )
+            assert isinstance(prefix, str), f"{table} 前缀应为 str，实际 {type(prefix).__name__}"
             assert len(prefix) > 0, f"{table} 前缀不应为空字符串"
 
     def test_all_prefixes_end_with_dash(self):
@@ -94,6 +90,4 @@ class TestHashIdPrefixes:
         from lifeprism.sync.constants import HASH_ID_PREFIXES
 
         for table, prefix in HASH_ID_PREFIXES.items():
-            assert prefix.endswith("-"), (
-                f"{table} 前缀 {prefix!r} 应以 '-' 结尾"
-            )
+            assert prefix.endswith("-"), f"{table} 前缀 {prefix!r} 应以 '-' 结尾"

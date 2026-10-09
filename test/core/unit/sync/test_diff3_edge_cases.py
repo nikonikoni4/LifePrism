@@ -126,7 +126,7 @@ def test_all_empty():
 
 def test_chinese_english_mixed():
     base = "今天心情不错\nI feel good\n明天计划\n"
-    ours = "今天心情很好\nI feel good\n明天计划\n"      # changed Chinese line 1
+    ours = "今天心情很好\nI feel good\n明天计划\n"  # changed Chinese line 1
     theirs = "今天心情不错\nI feel good\n明天计划-修改\n"  # changed Chinese line 3
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, f"expected auto-merge, got {r['merged']!r}"
@@ -150,7 +150,9 @@ def test_markdown_special_chars():
     """Markdown with #, -, |, *, >, ` should merge by line correctly."""
     base = "# Title\n\n| Col1 | Col2 |\n| --- | --- |\n| a | b |\n\n- item 1\n- item 2\n"
     ours = "# Title MODIFIED\n\n| Col1 | Col2 |\n| --- | --- |\n| a | b |\n\n- item 1\n- item 2\n"
-    theirs = "# Title\n\n| Col1 | Col2 |\n| --- | --- |\n| a | b |\n\n- item 1\n- item 2\n- item 3\n"
+    theirs = (
+        "# Title\n\n| Col1 | Col2 |\n| --- | --- |\n| a | b |\n\n- item 1\n- item 2\n- item 3\n"
+    )
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, f"expected auto-merge, got {r['merged']!r}"
     assert "# Title MODIFIED" in r["merged"], "ours title change lost"
@@ -172,7 +174,7 @@ def test_markdown_conflict():
 
 def test_emoji_content():
     base = "心情 😊\n工作 💻\n休息 🛌\n"
-    ours = "心情 😄\n工作 💻\n休息 🛌\n"     # changed emoji line 1
+    ours = "心情 😄\n工作 💻\n休息 🛌\n"  # changed emoji line 1
     theirs = "心情 😊\n工作 💻\n休息 🛌\n运动 🏃\n"  # added emoji line
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, f"expected auto-merge, got {r['merged']!r}"
@@ -186,9 +188,9 @@ def test_no_trailing_newline():
     Uses non-adjacent changes (lines 2 and 4) so auto-merge is expected;
     adjacent changes would (correctly) conflict like git.
     """
-    base = "a\nb\nc\nd\ne"     # no trailing \n
-    ours = "a\nB\nc\nd\ne"     # change line 2
-    theirs = "a\nb\nc\nD\ne"   # change line 4
+    base = "a\nb\nc\nd\ne"  # no trailing \n
+    ours = "a\nB\nc\nd\ne"  # change line 2
+    theirs = "a\nb\nc\nD\ne"  # change line 4
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, f"expected auto-merge, got {r['merged']!r}"
     assert "B" in r["merged"] and "D" in r["merged"]
@@ -214,8 +216,8 @@ def test_crlf_line_endings():
     Uses non-adjacent changes (lines 2 and 4) so auto-merge is expected.
     """
     base = "a\r\nb\r\nc\r\nd\r\ne\r\n"
-    ours = "a\r\nB\r\nc\r\nd\r\ne\r\n"     # change line 2
-    theirs = "a\r\nb\r\nc\r\nD\r\ne\r\n"   # change line 4
+    ours = "a\r\nB\r\nc\r\nd\r\ne\r\n"  # change line 2
+    theirs = "a\r\nb\r\nc\r\nD\r\ne\r\n"  # change line 4
     r = merge(base, ours, theirs, LOCAL, REMOTE)
     assert r["success"] is True, f"expected auto-merge, got {r['merged']!r}"
     assert "B\r\n" in r["merged"], "ours CRLF change lost"

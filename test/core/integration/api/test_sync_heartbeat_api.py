@@ -51,6 +51,7 @@ def initialized_db(test_data_path):
 
     # 设置测试用 sync_api_key，先备份原始值
     import keyring
+
     _KEYRING_USERNAME = "sync_api_key"
     original_key = None
     try:

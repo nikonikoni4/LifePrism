@@ -68,16 +68,27 @@ def git_merge(base: str, ours: str, theirs: str):
             with open(path, "wb") as f:
                 f.write(content.encode("utf-8"))
         proc = subprocess.run(
-            ["git", "merge-file", "-p",
-             "-L", "ours", "-L", "base", "-L", "theirs",
-             p_ours, p_base, p_theirs],
+            [
+                "git",
+                "merge-file",
+                "-p",
+                "-L",
+                "ours",
+                "-L",
+                "base",
+                "-L",
+                "theirs",
+                p_ours,
+                p_base,
+                p_theirs,
+            ],
             capture_output=True,
         )
         merged = proc.stdout.decode("utf-8")
         code = proc.returncode
         if code < 0:
             raise RuntimeError(f"git merge-file error: {proc.stderr.decode('utf-8')}")
-        success = (code == 0)
+        success = code == 0
         conflicts = code if code > 0 else 0
         return success, conflicts, merged
     finally:
@@ -154,10 +165,26 @@ def classify_case(base: str, ours: str, theirs: str) -> dict:
 # Random test data generation
 # --------------------------------------------------------------------------
 VOCAB = [
-    "apple", "banana", "cherry", "date", "elderberry",
-    "fig", "grape", "honeydew", "kiwi", "lemon",
-    "mango", "nectarine", "orange", "papaya", "quince",
-    "raspberry", "strawberry", "tangerine", "watermelon", "x",
+    "apple",
+    "banana",
+    "cherry",
+    "date",
+    "elderberry",
+    "fig",
+    "grape",
+    "honeydew",
+    "kiwi",
+    "lemon",
+    "mango",
+    "nectarine",
+    "orange",
+    "papaya",
+    "quince",
+    "raspberry",
+    "strawberry",
+    "tangerine",
+    "watermelon",
+    "x",
 ]
 
 
@@ -195,34 +222,38 @@ def mutate(text: str, rng: random.Random, n_ops: int) -> str:
 # Fixed PRD scenarios as oracle cases too (direct git vs ours)
 # --------------------------------------------------------------------------
 PRD_CASES = [
-    ("s1-different-regions",
-     "L1\nL2\nL3\nL4\nL5\n",
-     "L1\nL2-OURS\nL3\nL4\nL5\n",
-     "L1\nL2\nL3\nL4-THEIRS\nL5\n"),
-    ("s2-same-line",
-     "header\nmiddle line\nfooter\n",
-     "header\nOURS version\nfooter\n",
-     "header\nTHEIRS version\nfooter\n"),
-    ("s3-delete-vs-modify",
-     "keep1\ntarget\nkeep2\n",
-     "keep1\nkeep2\n",
-     "keep1\ntarget-MOD\nkeep2\n"),
-    ("s4-empty-vs-content",
-     "original line 1\noriginal line 2\n",
-     "",
-     "original line 1\noriginal line 2\nNEW\n"),
-    ("s5-add-different-pos",
-     "head\nmid\ntail\n",
-     "HEAD-NEW\nhead\nmid\ntail\n",
-     "head\nmid\ntail\nTAIL-NEW\n"),
-    ("s6-add-same-pos",
-     "anchor\n",
-     "anchor\nOURS-ADD\n",
-     "anchor\nTHEIRS-ADD\n"),
-    ("s7-block-move",
-     "A\nB\nC\nD\nE\n",
-     "A\nE\nB\nC\nD\n",
-     "A\nB\nC\nD\nE\n"),
+    (
+        "s1-different-regions",
+        "L1\nL2\nL3\nL4\nL5\n",
+        "L1\nL2-OURS\nL3\nL4\nL5\n",
+        "L1\nL2\nL3\nL4-THEIRS\nL5\n",
+    ),
+    (
+        "s2-same-line",
+        "header\nmiddle line\nfooter\n",
+        "header\nOURS version\nfooter\n",
+        "header\nTHEIRS version\nfooter\n",
+    ),
+    (
+        "s3-delete-vs-modify",
+        "keep1\ntarget\nkeep2\n",
+        "keep1\nkeep2\n",
+        "keep1\ntarget-MOD\nkeep2\n",
+    ),
+    (
+        "s4-empty-vs-content",
+        "original line 1\noriginal line 2\n",
+        "",
+        "original line 1\noriginal line 2\nNEW\n",
+    ),
+    (
+        "s5-add-different-pos",
+        "head\nmid\ntail\n",
+        "HEAD-NEW\nhead\nmid\ntail\n",
+        "head\nmid\ntail\nTAIL-NEW\n",
+    ),
+    ("s6-add-same-pos", "anchor\n", "anchor\nOURS-ADD\n", "anchor\nTHEIRS-ADD\n"),
+    ("s7-block-move", "A\nB\nC\nD\nE\n", "A\nE\nB\nC\nD\n", "A\nB\nC\nD\nE\n"),
 ]
 
 
@@ -239,12 +270,14 @@ def oracle_cases():
 
     # 7 PRD scenarios
     for name, base, ours, theirs in PRD_CASES:
-        cases.append({
-            "name": name,
-            "base": base,
-            "ours": ours,
-            "theirs": theirs,
-        })
+        cases.append(
+            {
+                "name": name,
+                "base": base,
+                "ours": ours,
+                "theirs": theirs,
+            }
+        )
 
     # 60 random cases (deterministic seed for reproducibility)
     rng = random.Random(RANDOM_SEED)
@@ -253,12 +286,14 @@ def oracle_cases():
         base = gen_base(rng, n_lines)
         ours = mutate(base, rng, rng.randint(1, 4))
         theirs = mutate(base, rng, rng.randint(1, 4))
-        cases.append({
-            "name": f"random-{i:02d}",
-            "base": base,
-            "ours": ours,
-            "theirs": theirs,
-        })
+        cases.append(
+            {
+                "name": f"random-{i:02d}",
+                "base": base,
+                "ours": ours,
+                "theirs": theirs,
+            }
+        )
 
     return cases
 
@@ -374,15 +409,16 @@ def test_oracle_no_data_loss(oracle_cases):
         missing_theirs = [l for l in theirs_unique if l not in merged]
 
         if missing_ours or missing_theirs:
-            failed.append({
-                "name": case["name"],
-                "missing_ours": missing_ours,
-                "missing_theirs": missing_theirs,
-            })
+            failed.append(
+                {
+                    "name": case["name"],
+                    "missing_ours": missing_ours,
+                    "missing_theirs": missing_theirs,
+                }
+            )
 
     assert not failed, (
-        f"数据丢失检测失败：{len(failed)} 个用例存在数据丢失。"
-        f"前 3 个失败用例: {failed[:3]}"
+        f"数据丢失检测失败：{len(failed)} 个用例存在数据丢失。前 3 个失败用例: {failed[:3]}"
     )
 
 

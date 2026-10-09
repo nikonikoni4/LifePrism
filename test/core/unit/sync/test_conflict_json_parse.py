@@ -93,12 +93,12 @@ class TestParseLLMJsonResponse:
         from lifeprism.sync.conflict_resolution import parse_llm_json_response
 
         raw = (
-            '```json\n'
+            "```json\n"
             '{"conflict_id": 1, '
             '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #1", '
             '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #1", '
             '"replacement": "合并后的内容"}\n'
-            '```'
+            "```"
         )
         result = parse_llm_json_response(raw)
         assert result is not None
@@ -1003,11 +1003,7 @@ class TestParseConflictBlocksRecovery:
         """
         from lifeprism.sync.conflict_resolution import parse_conflict_blocks
 
-        merged = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours content\n"
-            "no separator till end of file\n"
-        )
+        merged = "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours content\nno separator till end of file\n"
         blocks = parse_conflict_blocks(merged)
         assert blocks == []
 
@@ -1047,13 +1043,7 @@ class TestParseConflictBlocksRecovery:
         """缺少 >>>>>>> 结束标记且到文件末尾 → 跳过该冲突块"""
         from lifeprism.sync.conflict_resolution import parse_conflict_blocks
 
-        merged = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours1\n"
-            "=======\n"
-            "theirs1\n"
-            "no end marker\n"
-        )
+        merged = "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours1\n=======\ntheirs1\nno end marker\n"
         blocks = parse_conflict_blocks(merged)
         assert blocks == []
 
@@ -1068,11 +1058,7 @@ class TestParseConflictBlocksRecovery:
         """无冲突标记的普通文本 → 返回空列表"""
         from lifeprism.sync.conflict_resolution import parse_conflict_blocks
 
-        merged = (
-            "# 日记\n"
-            "今天天气很好\n"
-            "心情不错\n"
-        )
+        merged = "# 日记\n今天天气很好\n心情不错\n"
         blocks = parse_conflict_blocks(merged)
         assert blocks == []
 
@@ -1081,11 +1067,7 @@ class TestParseConflictBlocksRecovery:
         from lifeprism.sync.conflict_resolution import parse_conflict_blocks
 
         merged = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "=======\n"
-            "theirs\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\n=======\ntheirs\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         blocks = parse_conflict_blocks(merged)
         assert len(blocks) == 1
@@ -1171,11 +1153,7 @@ class TestMatchMarkers:
         from lifeprism.sync.conflict_resolution import match_markers
 
         content = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "=======\n"
-            "theirs\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\n=======\ntheirs\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         result = match_markers(
             file_content=content,
@@ -1230,11 +1208,7 @@ class TestMatchMarkers:
         from lifeprism.sync.conflict_resolution import match_markers
 
         content = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "=======\n"
-            "theirs\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\n=======\ntheirs\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         result = match_markers(
             file_content=content,
@@ -1279,11 +1253,7 @@ class TestMatchMarkers:
         """只有 start_marker，无 end_marker → 返回 None"""
         from lifeprism.sync.conflict_resolution import match_markers
 
-        content = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "no end marker\n"
-        )
+        content = "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\nno end marker\n"
         result = match_markers(
             file_content=content,
             start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
@@ -1295,11 +1265,7 @@ class TestMatchMarkers:
         """只有 end_marker，无 start_marker → 返回 None"""
         from lifeprism.sync.conflict_resolution import match_markers
 
-        content = (
-            "no start marker\n"
-            "ours\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
-        )
+        content = "no start marker\nours\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         result = match_markers(
             file_content=content,
             start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",

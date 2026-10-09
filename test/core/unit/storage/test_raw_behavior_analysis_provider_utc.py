@@ -55,6 +55,7 @@ def sample_records():
 @pytest.fixture
 def cleanup_records(provider, sample_records):
     """清理测试数据（前后各清一次，保证重复运行幂等）"""
+
     def _delete():
         with provider.db.get_connection() as conn:
             cursor = conn.cursor()

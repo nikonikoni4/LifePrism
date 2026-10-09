@@ -249,8 +249,7 @@ class TestFileFilterHashConsistency:
         scanned_hash = compute_file_hash(template_content)
 
         assert scanned_hash in template_hashes, (
-            "template_hashes 中的 hash 必须与扫描时计算的 hash 一致，"
-            "否则过滤逻辑失效"
+            "template_hashes 中的 hash 必须与扫描时计算的 hash 一致，否则过滤逻辑失效"
         )
 
 

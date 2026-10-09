@@ -43,9 +43,7 @@ def journal_provider(test_data_path):
             )
             """
         )
-        cursor.execute(
-            "INSERT OR IGNORE INTO goal (id) VALUES (?)", ("goal-test-001",)
-        )
+        cursor.execute("INSERT OR IGNORE INTO goal (id) VALUES (?)", ("goal-test-001",))
         # goal_journal 表（参考 GOAL_JOURNAL_CONFIG schema）
         cursor.execute(
             """
@@ -125,15 +123,11 @@ class TestJournalProviderBaseline:
         journal_id = journal_provider.create_journal(sample_journal_data)
 
         assert journal_id is not None
-        assert journal_id.startswith("journal-"), (
-            f"ID 应以 'journal-' 开头，实际: {journal_id}"
-        )
+        assert journal_id.startswith("journal-"), f"ID 应以 'journal-' 开头，实际: {journal_id}"
         # journal- (8 字符) + 8 位 hex = 16 字符
         assert len(journal_id) == 16, f"ID 长度应为 16，实际: {len(journal_id)}"
 
-    def test_get_journal_by_id_returns_created_journal(
-        self, journal_provider, sample_journal_data
-    ):
+    def test_get_journal_by_id_returns_created_journal(self, journal_provider, sample_journal_data):
         """按 ID 查询返回新创建的日志"""
         journal_id = journal_provider.create_journal(sample_journal_data)
 

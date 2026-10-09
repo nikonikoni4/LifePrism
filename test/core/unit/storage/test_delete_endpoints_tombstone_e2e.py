@@ -209,9 +209,7 @@ class TestMoodEntryDeleteWritesTombstone:
 
     def test_delete_mood_entry_writes_tombstone(self, mood_providers_fixture):
         entry_provider, _, _ = mood_providers_fixture
-        entry_id = entry_provider.create_mood_entry(
-            {"mood_type_id": "mt-test01", "score": 80}
-        )
+        entry_id = entry_provider.create_mood_entry({"mood_type_id": "mt-test01", "score": 80})
 
         assert entry_provider.get_mood_entry_by_id(entry_id) is not None
 
@@ -329,9 +327,7 @@ class TestTodoDeleteWritesTombstone:
 
     def test_delete_todo_writes_tombstone(self, todo_provider_fixture):
         provider = todo_provider_fixture
-        todo_id = provider.create_todo(
-            {"content": "测试任务", "order_index": 0}
-        )
+        todo_id = provider.create_todo({"content": "测试任务", "order_index": 0})
 
         assert provider.get_todo_by_id(todo_id) is not None
 
@@ -420,9 +416,7 @@ class TestGoalDeleteWritesTombstone:
         # 验证关联存在
         with provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT link_to_goal_id FROM todo_list WHERE id = ?", ("t-test01",)
-            )
+            cursor.execute("SELECT link_to_goal_id FROM todo_list WHERE id = ?", ("t-test01",))
             assert cursor.fetchone()[0] == goal_id
 
         result = provider.delete_goal(goal_id)
@@ -440,9 +434,7 @@ class TestGoalDeleteWritesTombstone:
         # 验证副作用：link_to_goal_id 已被清除为 NULL
         with provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT link_to_goal_id FROM todo_list WHERE id = ?", ("t-test01",)
-            )
+            cursor.execute("SELECT link_to_goal_id FROM todo_list WHERE id = ?", ("t-test01",))
             assert cursor.fetchone()[0] is None
 
 
@@ -629,9 +621,7 @@ class TestCategoryDeleteWritesTombstone:
 
     def test_delete_category_writes_tombstone(self, category_providers_fixture):
         cat_provider, _ = category_providers_fixture
-        cat_provider.create_category(
-            {"id": "cat-test01", "name": "工作", "color": "#5B8FF9"}
-        )
+        cat_provider.create_category({"id": "cat-test01", "name": "工作", "color": "#5B8FF9"})
 
         assert cat_provider.get_category_by_id("cat-test01") is not None
 
@@ -777,19 +767,15 @@ class TestCommitmentDeleteWritesTombstone:
 class TestCommitmentDeleteByValueIdWritesTombstones:
     """验证 CommitmentProvider.delete_by_value_id 批量写墓碑（TEXT 主键表, 批量删除）"""
 
-    def test_delete_by_value_id_writes_tombstones_for_each(self, value_commitment_providers_fixture):
+    def test_delete_by_value_id_writes_tombstones_for_each(
+        self, value_commitment_providers_fixture
+    ):
         _, commitment_provider = value_commitment_providers_fixture
         value_id = "val-cascade01"
 
-        cmt1 = commitment_provider.create_commitment(
-            {"content": "承诺1", "value_id": value_id}
-        )
-        cmt2 = commitment_provider.create_commitment(
-            {"content": "承诺2", "value_id": value_id}
-        )
-        cmt3 = commitment_provider.create_commitment(
-            {"content": "承诺3", "value_id": value_id}
-        )
+        cmt1 = commitment_provider.create_commitment({"content": "承诺1", "value_id": value_id})
+        cmt2 = commitment_provider.create_commitment({"content": "承诺2", "value_id": value_id})
+        cmt3 = commitment_provider.create_commitment({"content": "承诺3", "value_id": value_id})
 
         deleted = commitment_provider.delete_by_value_id(value_id)
         assert deleted == 3
@@ -827,9 +813,7 @@ class TestCommitmentNullValueIdNoTombstone:
         _, commitment_provider = value_commitment_providers_fixture
         value_id = "val-nulltest01"
 
-        cmt_id = commitment_provider.create_commitment(
-            {"content": "承诺", "value_id": value_id}
-        )
+        cmt_id = commitment_provider.create_commitment({"content": "承诺", "value_id": value_id})
 
         updated = commitment_provider.null_value_id(value_id)
         assert updated == 1
@@ -1215,9 +1199,7 @@ class TestComputerUsageDeleteWritesTombstone:
         assert tombstone[3] == "local"
 
         # 不应有以自增 id 为 record_id 的墓碑
-        tombstone_by_pk = _get_tombstone(
-            provider.db, "user_app_behavior_log", record_id
-        )
+        tombstone_by_pk = _get_tombstone(provider.db, "user_app_behavior_log", record_id)
         assert tombstone_by_pk is None
 
 
@@ -1238,8 +1220,8 @@ class TestComputerUsageBatchDeleteWritesTombstone:
         for i in range(3):
             record = provider.create_computer_usage(
                 {
-                    "start_time": f"2026-07-23T{i+10}:00:00+00:00",
-                    "end_time": f"2026-07-23T{i+11}:00:00+00:00",
+                    "start_time": f"2026-07-23T{i + 10}:00:00+00:00",
+                    "end_time": f"2026-07-23T{i + 11}:00:00+00:00",
                     "duration": 3600,
                     "app": f"app{i}.exe",
                     "title": f"App {i}",
@@ -1414,9 +1396,7 @@ class TestCustomRecordDeleteEntryWritesTombstone:
         )
         assert tombstone[3] == "local", f"墓碑 source 应为 'local'，实际: {tombstone[3]}"
 
-    def test_delete_entry_nonexistent_raises_not_found(
-        self, custom_record_repository_fixture
-    ):
+    def test_delete_entry_nonexistent_raises_not_found(self, custom_record_repository_fixture):
         """删除不存在的记录抛 EntityNotFoundError，不写墓碑"""
         from lifeprism.repository.exceptions import EntityNotFoundError
 

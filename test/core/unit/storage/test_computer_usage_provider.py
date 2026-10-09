@@ -212,9 +212,7 @@ class TestBatchUpdateComputerUsageProvider:
         验证 sub_category_id 保持原值不变（None=跳过，不是清除为 NULL）。
         """
         provider = provider_fixture
-        rid = _insert_record(
-            provider, category_id="cat-original", sub_category_id="sub-original"
-        )
+        rid = _insert_record(provider, category_id="cat-original", sub_category_id="sub-original")
         affected = provider.batch_update_computer_usage(
             [str(rid)], {"category_id": "cat-new", "sub_category_id": None}
         )
@@ -230,9 +228,7 @@ class TestBatchUpdateComputerUsageProvider:
         provider = provider_fixture
         rid = _insert_record(provider)
         with pytest.raises((ValueError, Exception)):
-            provider.batch_update_computer_usage(
-                [str(rid)], {"invalid_field": "value"}
-            )
+            provider.batch_update_computer_usage([str(rid)], {"invalid_field": "value"})
 
     def test_batch_update_partial_match(self, provider_fixture):
         """部分 ID 不存在时只更新存在的记录"""
@@ -260,9 +256,7 @@ class TestBatchUpdateComputerUsageAggregator:
             )
             ids.append(str(rid))
 
-        affected = aggregator.batch_update_computer_usage(
-            ids, {"category_id": "cat-agg"}
-        )
+        affected = aggregator.batch_update_computer_usage(ids, {"category_id": "cat-agg"})
         assert affected == 2
 
         # 验证字段已通过委托更新
@@ -344,9 +338,7 @@ class TestBatchDeleteComputerUsageAggregator:
             assert aggregator.get_computer_usage_by_id(rid) is None
 
         # 验证墓碑已写入
-        count = _count_tombstones(
-            aggregator.computer_usage_provider.db, "user_app_behavior_log"
-        )
+        count = _count_tombstones(aggregator.computer_usage_provider.db, "user_app_behavior_log")
         assert count == 2
 
 
@@ -359,15 +351,30 @@ class TestUpdateByFilterProvider:
     def test_update_by_filter_basic(self, provider_fixture):
         """基本条件更新：按 app 更新 category_id"""
         provider = provider_fixture
-        _insert_record(provider, app="chrome.exe", title="Tab1", category_id="cat-old",
-                       start_time="2026-07-23T10:00:00.000000+00:00",
-                       end_time="2026-07-23T10:30:00.000000+00:00")
-        _insert_record(provider, app="chrome.exe", title="Tab2", category_id="cat-old",
-                       start_time="2026-07-23T11:00:00.000000+00:00",
-                       end_time="2026-07-23T11:30:00.000000+00:00")
-        _insert_record(provider, app="firefox.exe", title="Tab1", category_id="cat-old",
-                       start_time="2026-07-23T12:00:00.000000+00:00",
-                       end_time="2026-07-23T12:30:00.000000+00:00")
+        _insert_record(
+            provider,
+            app="chrome.exe",
+            title="Tab1",
+            category_id="cat-old",
+            start_time="2026-07-23T10:00:00.000000+00:00",
+            end_time="2026-07-23T10:30:00.000000+00:00",
+        )
+        _insert_record(
+            provider,
+            app="chrome.exe",
+            title="Tab2",
+            category_id="cat-old",
+            start_time="2026-07-23T11:00:00.000000+00:00",
+            end_time="2026-07-23T11:30:00.000000+00:00",
+        )
+        _insert_record(
+            provider,
+            app="firefox.exe",
+            title="Tab1",
+            category_id="cat-old",
+            start_time="2026-07-23T12:00:00.000000+00:00",
+            end_time="2026-07-23T12:30:00.000000+00:00",
+        )
 
         affected = provider.update_by_filter(
             set_fields={"category_id": "cat-new"},
@@ -378,16 +385,12 @@ class TestUpdateByFilterProvider:
         # 验证 chrome 的记录已更新
         from lifeprism.repository.providers.common_query_options import QueryOptions
 
-        records, _ = provider.query_computer_usage(
-            QueryOptions(filters={"app": "chrome.exe"})
-        )
+        records, _ = provider.query_computer_usage(QueryOptions(filters={"app": "chrome.exe"}))
         for r in records:
             assert r["category_id"] == "cat-new"
 
         # firefox 不受影响
-        records_ff, _ = provider.query_computer_usage(
-            QueryOptions(filters={"app": "firefox.exe"})
-        )
+        records_ff, _ = provider.query_computer_usage(QueryOptions(filters={"app": "firefox.exe"}))
         for r in records_ff:
             assert r["category_id"] == "cat-old"
 
@@ -404,14 +407,12 @@ class TestUpdateByFilterProvider:
 
         from lifeprism.repository.providers.common_query_options import QueryOptions
 
-        records, _ = provider.query_computer_usage(
-            QueryOptions(filters={"app": "code.exe"})
-        )
+        records, _ = provider.query_computer_usage(QueryOptions(filters={"app": "code.exe"}))
         assert len(records) == 1
         assert records[0]["link_to_goal_id"] is None, "link_to_goal_id 应被清除为 NULL"
 
     def test_update_by_filter_operator_suffix_ge(self, provider_fixture):
-        """支持操作符后缀 'start_time >=' """
+        """支持操作符后缀 'start_time >='"""
         provider = provider_fixture
         _insert_record(
             provider,
@@ -432,15 +433,16 @@ class TestUpdateByFilterProvider:
 
         affected = provider.update_by_filter(
             set_fields={"category_id": "cat-afternoon"},
-            where_conditions={"app": "slack.exe", "start_time >=": "2026-07-23T12:00:00.000000+00:00"},
+            where_conditions={
+                "app": "slack.exe",
+                "start_time >=": "2026-07-23T12:00:00.000000+00:00",
+            },
         )
         assert affected == 1, f"应只更新 1 条下午记录，实际: {affected}"
 
         from lifeprism.repository.providers.common_query_options import QueryOptions
 
-        records, _ = provider.query_computer_usage(
-            QueryOptions(filters={"app": "slack.exe"})
-        )
+        records, _ = provider.query_computer_usage(QueryOptions(filters={"app": "slack.exe"}))
         for r in records:
             if r["title"] == "Afternoon":
                 assert r["category_id"] == "cat-afternoon"
@@ -469,7 +471,10 @@ class TestUpdateByFilterProvider:
 
         affected = provider.update_by_filter(
             set_fields={"category_id": "cat-morning"},
-            where_conditions={"app": "zoom.exe", "start_time <=": "2026-07-23T12:00:00.000000+00:00"},
+            where_conditions={
+                "app": "zoom.exe",
+                "start_time <=": "2026-07-23T12:00:00.000000+00:00",
+            },
         )
         assert affected == 1, f"应只更新 1 条上午记录，实际: {affected}"
 
@@ -497,17 +502,26 @@ class TestUpdateByFilterProvider:
         """多条件组合更新"""
         provider = provider_fixture
         _insert_record(
-            provider, app="code.exe", title="Project A", category_id="cat-old",
+            provider,
+            app="code.exe",
+            title="Project A",
+            category_id="cat-old",
             start_time="2026-07-23T10:00:00.000000+00:00",
             end_time="2026-07-23T10:30:00.000000+00:00",
         )
         _insert_record(
-            provider, app="code.exe", title="Project B", category_id="cat-old",
+            provider,
+            app="code.exe",
+            title="Project B",
+            category_id="cat-old",
             start_time="2026-07-23T11:00:00.000000+00:00",
             end_time="2026-07-23T11:30:00.000000+00:00",
         )
         _insert_record(
-            provider, app="code.exe", title="Project A", category_id="cat-other",
+            provider,
+            app="code.exe",
+            title="Project A",
+            category_id="cat-other",
             start_time="2026-07-23T12:00:00.000000+00:00",
             end_time="2026-07-23T12:30:00.000000+00:00",
         )
@@ -713,20 +727,40 @@ class TestGetTopGroupsByDurationProvider:
         """按 app 分组聚合"""
         provider = provider_fixture
         # app1: 100 + 200 = 300
-        _insert_record(provider, app="app1.exe", title="T1", duration=100,
-                       start_time="2026-07-23T10:00:00.000000+00:00",
-                       end_time="2026-07-23T10:01:40.000000+00:00")
-        _insert_record(provider, app="app1.exe", title="T2", duration=200,
-                       start_time="2026-07-23T11:00:00.000000+00:00",
-                       end_time="2026-07-23T11:03:20.000000+00:00")
+        _insert_record(
+            provider,
+            app="app1.exe",
+            title="T1",
+            duration=100,
+            start_time="2026-07-23T10:00:00.000000+00:00",
+            end_time="2026-07-23T10:01:40.000000+00:00",
+        )
+        _insert_record(
+            provider,
+            app="app1.exe",
+            title="T2",
+            duration=200,
+            start_time="2026-07-23T11:00:00.000000+00:00",
+            end_time="2026-07-23T11:03:20.000000+00:00",
+        )
         # app2: 500
-        _insert_record(provider, app="app2.exe", title="T3", duration=500,
-                       start_time="2026-07-23T12:00:00.000000+00:00",
-                       end_time="2026-07-23T12:08:20.000000+00:00")
+        _insert_record(
+            provider,
+            app="app2.exe",
+            title="T3",
+            duration=500,
+            start_time="2026-07-23T12:00:00.000000+00:00",
+            end_time="2026-07-23T12:08:20.000000+00:00",
+        )
         # app3: 50
-        _insert_record(provider, app="app3.exe", title="T4", duration=50,
-                       start_time="2026-07-23T13:00:00.000000+00:00",
-                       end_time="2026-07-23T13:00:50.000000+00:00")
+        _insert_record(
+            provider,
+            app="app3.exe",
+            title="T4",
+            duration=50,
+            start_time="2026-07-23T13:00:00.000000+00:00",
+            end_time="2026-07-23T13:00:50.000000+00:00",
+        )
 
         result = provider.get_top_groups_by_duration(
             "app",
@@ -744,16 +778,31 @@ class TestGetTopGroupsByDurationProvider:
         """按 title 分组聚合"""
         provider = provider_fixture
         # TitleA: 100 + 300 = 400
-        _insert_record(provider, app="a.exe", title="TitleA", duration=100,
-                       start_time="2026-07-23T10:00:00.000000+00:00",
-                       end_time="2026-07-23T10:01:40.000000+00:00")
-        _insert_record(provider, app="b.exe", title="TitleA", duration=300,
-                       start_time="2026-07-23T11:00:00.000000+00:00",
-                       end_time="2026-07-23T11:05:00.000000+00:00")
+        _insert_record(
+            provider,
+            app="a.exe",
+            title="TitleA",
+            duration=100,
+            start_time="2026-07-23T10:00:00.000000+00:00",
+            end_time="2026-07-23T10:01:40.000000+00:00",
+        )
+        _insert_record(
+            provider,
+            app="b.exe",
+            title="TitleA",
+            duration=300,
+            start_time="2026-07-23T11:00:00.000000+00:00",
+            end_time="2026-07-23T11:05:00.000000+00:00",
+        )
         # TitleB: 200
-        _insert_record(provider, app="c.exe", title="TitleB", duration=200,
-                       start_time="2026-07-23T12:00:00.000000+00:00",
-                       end_time="2026-07-23T12:03:20.000000+00:00")
+        _insert_record(
+            provider,
+            app="c.exe",
+            title="TitleB",
+            duration=200,
+            start_time="2026-07-23T12:00:00.000000+00:00",
+            end_time="2026-07-23T12:03:20.000000+00:00",
+        )
 
         result = provider.get_top_groups_by_duration(
             "title",

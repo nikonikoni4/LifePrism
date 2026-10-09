@@ -65,7 +65,7 @@ class TestQueryCustomRecordEntriesTool:
         assert result.startswith(SUCCESS)
 
         # 解析返回的 JSON
-        payload = json.loads(result[len(SUCCESS):])
+        payload = json.loads(result[len(SUCCESS) :])
         # 修复后应返回 dict（含 entries 和 total），而非裸 list
         assert isinstance(payload, dict)
         assert payload["total"] == 2
@@ -86,7 +86,7 @@ class TestQueryCustomRecordEntriesTool:
             result = await tool.execute(type_id="crt-967af5cc")
 
         assert result.startswith(SUCCESS)
-        payload = json.loads(result[len(SUCCESS):])
+        payload = json.loads(result[len(SUCCESS) :])
         assert payload["total"] == 0
         assert payload["entries"] == []
 
@@ -166,7 +166,11 @@ class TestQueryEntriesFilters:
                 details={
                     "invalid_keys": ["wrong_field"],
                     "valid_fields": [
-                        {"field_key": "heart_rate", "field_name": "心率(bpm)", "field_type": "integer"}
+                        {
+                            "field_key": "heart_rate",
+                            "field_name": "心率(bpm)",
+                            "field_type": "integer",
+                        }
                     ],
                 },
             )
@@ -177,7 +181,7 @@ class TestQueryEntriesFilters:
             )
 
         assert result.is_error
-        payload = json.loads(result.content[len(ERROR):])
+        payload = json.loads(result.content[len(ERROR) :])
         assert payload["error"] == "INVALID_FIELD_KEY"
         assert payload["valid_fields"][0]["field_key"] == "heart_rate"
 
@@ -205,7 +209,7 @@ class TestQueryEntriesFilters:
             )
 
         assert result.is_error
-        payload = json.loads(result.content[len(ERROR):])
+        payload = json.loads(result.content[len(ERROR) :])
         assert payload["error"] == "INVALID_FILTER_OP"
         assert "contains" not in payload["allowed_ops"]
         assert "gte" in payload["allowed_ops"]
@@ -234,7 +238,7 @@ class TestQueryEntriesFilters:
             )
 
         assert result.is_error
-        payload = json.loads(result.content[len(ERROR):])
+        payload = json.loads(result.content[len(ERROR) :])
         assert payload["error"] == "INVALID_FIELD_VALUE"
         assert payload["invalid_fields"][0]["field_key"] == "heart_rate"
 

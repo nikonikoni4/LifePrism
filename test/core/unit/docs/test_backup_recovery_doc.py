@@ -61,11 +61,7 @@ def _read_doc() -> str:
 
 def _get_h2_headers(content: str) -> list[str]:
     """提取所有 ## 二级标题文本（去掉前导 #）"""
-    return [
-        line.lstrip("#").strip()
-        for line in content.splitlines()
-        if line.startswith("## ")
-    ]
+    return [line.lstrip("#").strip() for line in content.splitlines() if line.startswith("## ")]
 
 
 # ==================== Seam 1: 文档存在性 ====================
@@ -124,10 +120,9 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"备份位置"或"备份文件存在"或"备份位置说明"
-        assert any(
-            "备份位置" in h or "备份文件存在" in h or "备份存在" in h
-            for h in h2_headers
-        ), f"应有备份位置说明章节，实际章节：{h2_headers}"
+        assert any("备份位置" in h or "备份文件存在" in h or "备份存在" in h for h in h2_headers), (
+            f"应有备份位置说明章节，实际章节：{h2_headers}"
+        )
         assert "{lifeprism_data_path}/backups" in content
 
     def test_has_docs_backup_structure_section(self):
@@ -135,10 +130,9 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"文档备份"或"备份结构"
-        assert any(
-            "文档备份" in h or "备份结构" in h or "文档备份结构" in h
-            for h in h2_headers
-        ), f"应有文档备份结构说明章节，实际章节：{h2_headers}"
+        assert any("文档备份" in h or "备份结构" in h or "文档备份结构" in h for h in h2_headers), (
+            f"应有文档备份结构说明章节，实际章节：{h2_headers}"
+        )
         assert "backups/docs/" in content
         assert "{timestamp}" in content or "时间戳" in content
 
@@ -147,9 +141,9 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"数据库备份"或"数据库备份结构"
-        assert any(
-            "数据库备份" in h or "数据库备份结构" in h for h in h2_headers
-        ), f"应有数据库备份结构说明章节，实际章节：{h2_headers}"
+        assert any("数据库备份" in h or "数据库备份结构" in h for h in h2_headers), (
+            f"应有数据库备份结构说明章节，实际章节：{h2_headers}"
+        )
         assert "backups/db/" in content
         assert "lifewatch_ai" in content
         assert "{timestamp}" in content or "时间戳" in content
@@ -159,9 +153,9 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"文档恢复"或"恢复文档"
-        assert any(
-            "文档恢复" in h or "恢复文档" in h for h in h2_headers
-        ), f"应有文档恢复操作步骤章节，实际章节：{h2_headers}"
+        assert any("文档恢复" in h or "恢复文档" in h for h in h2_headers), (
+            f"应有文档恢复操作步骤章节，实际章节：{h2_headers}"
+        )
         assert "复制" in content
 
     def test_has_db_recovery_steps_section(self):
@@ -169,19 +163,17 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"数据库恢复"或"恢复数据库"
-        assert any(
-            "数据库恢复" in h or "恢复数据库" in h for h in h2_headers
-        ), f"应有数据库恢复操作步骤章节，实际章节：{h2_headers}"
+        assert any("数据库恢复" in h or "恢复数据库" in h for h in h2_headers), (
+            f"应有数据库恢复操作步骤章节，实际章节：{h2_headers}"
+        )
         # 必须明确说明停服要求
-        assert any(
-            kw in content for kw in ["关闭", "停止", "停服", "停机"]
-        ), "数据库恢复必须明确说明停服要求"
+        assert any(kw in content for kw in ["关闭", "停止", "停服", "停机"]), (
+            "数据库恢复必须明确说明停服要求"
+        )
         # 替换 .db 文件
         assert ".db" in content
         # 重启服务
-        assert any(
-            kw in content for kw in ["重启", "重新启动"]
-        ), "数据库恢复必须说明重启服务"
+        assert any(kw in content for kw in ["重启", "重新启动"]), "数据库恢复必须说明重启服务"
 
     def test_has_pre_restore_backup_advice_section(self):
         """章节6：恢复前手动备份建议（backups/pre_restore-{ts}/）
@@ -192,8 +184,7 @@ class TestBackupRecoveryDocSections:
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"恢复前"或"手动备份"或"pre_restore"
         assert any(
-            "恢复前" in h or "手动备份" in h or "pre_restore" in h.lower()
-            or "预恢复" in h
+            "恢复前" in h or "手动备份" in h or "pre_restore" in h.lower() or "预恢复" in h
             for h in h2_headers
         ), f"应有恢复前手动备份建议章节，实际章节：{h2_headers}"
         assert "pre_restore" in content
@@ -221,9 +212,9 @@ class TestBackupRecoveryDocSections:
         assert "file_sync_state" in content
         assert "CONFLICT" in content or "冲突" in content
         # 预期行为
-        assert any(
-            kw in content for kw in ["预期", "正常", "expected", "符合预期"]
-        ), "文档应说明这是预期行为"
+        assert any(kw in content for kw in ["预期", "正常", "expected", "符合预期"]), (
+            "文档应说明这是预期行为"
+        )
 
     def test_has_sync_conflict_dir_section(self):
         """章节8：sync_conflict/ 目录说明（保留 30 天）
@@ -234,10 +225,7 @@ class TestBackupRecoveryDocSections:
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"sync_conflict"或"冲突备份"或"冲突目录"
         assert any(
-            "sync_conflict" in h.lower()
-            or "冲突备份" in h
-            or "冲突目录" in h
-            for h in h2_headers
+            "sync_conflict" in h.lower() or "冲突备份" in h or "冲突目录" in h for h in h2_headers
         ), f"应有 sync_conflict/ 目录说明章节，实际章节：{h2_headers}"
         assert "sync_conflict" in content
         # 必须明确说明保留 30 天
@@ -249,9 +237,9 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"FAQ"或"常见问题"
-        assert any(
-            "FAQ" in h or "常见问题" in h for h in h2_headers
-        ), f"应有 FAQ 章节，实际章节：{h2_headers}"
+        assert any("FAQ" in h or "常见问题" in h for h in h2_headers), (
+            f"应有 FAQ 章节，实际章节：{h2_headers}"
+        )
         # 至少 6 个 Q（Q1-Q6）
         q_numbers = set()
         for m in re.finditer(r"Q\s*0*(\d+)", content):
@@ -265,9 +253,9 @@ class TestBackupRecoveryDocSections:
         content = _read_doc()
         h2_headers = _get_h2_headers(content)
         # 必须有标题包含"附录"或"技术"
-        assert any(
-            "附录" in h or "技术" in h for h in h2_headers
-        ), f"应有技术附录章节，实际章节：{h2_headers}"
+        assert any("附录" in h or "技术" in h for h in h2_headers), (
+            f"应有技术附录章节，实际章节：{h2_headers}"
+        )
         # SQLite Online Backup API
         assert "Online Backup" in content or "source.backup" in content
         # PRAGMA integrity_check
@@ -296,9 +284,8 @@ class TestBackupRecoveryDocKeyContent:
     def test_contains_db_backup_path(self):
         """包含数据库备份结构 backups/db/lifewatch_ai-{timestamp}.db"""
         content = _read_doc()
-        assert (
-            "lifewatch_ai-{timestamp}.db" in content
-            or ("lifewatch_ai-" in content and ".db" in content)
+        assert "lifewatch_ai-{timestamp}.db" in content or (
+            "lifewatch_ai-" in content and ".db" in content
         )
 
     def test_contains_docs_recovery_copy_single_file(self):
@@ -407,9 +394,7 @@ class TestBackupRecoveryDocAgentReadability:
             or "Agent 可读" in content
             or "Agent 读取" in content
             or "Agent 通过" in content
-        ), (
-            "文档必须明确说明面向 Agent 可读，未来可通过 ReadFileTool 读取以指导用户手工恢复操作"
-        )
+        ), "文档必须明确说明面向 Agent 可读，未来可通过 ReadFileTool 读取以指导用户手工恢复操作"
 
     def test_doc_mentions_agent_in_context(self):
         """文档应在合适位置提到 Agent（说明本文档面向 Agent 可读）"""
@@ -420,17 +405,13 @@ class TestBackupRecoveryDocAgentReadability:
         """文档有清晰的章节结构（## 标题可被 ReadFileTool 解析）"""
         content = _read_doc()
         headers = re.findall(r"^#{1,2}\s+\S", content, re.MULTILINE)
-        assert len(headers) >= 10, (
-            f"应有至少 10 个章节标题（## 或 #），实际 {len(headers)}"
-        )
+        assert len(headers) >= 10, f"应有至少 10 个章节标题（## 或 #），实际 {len(headers)}"
 
     def test_doc_has_at_least_10_h2_sections(self):
         """文档应至少有 10 个二级标题（##）按章节组织"""
         content = _read_doc()
         h2_headers = re.findall(r"^##\s+\S", content, re.MULTILINE)
-        assert len(h2_headers) >= 10, (
-            f"应有至少 10 个 ## 章节标题，实际 {len(h2_headers)}"
-        )
+        assert len(h2_headers) >= 10, f"应有至少 10 个 ## 章节标题，实际 {len(h2_headers)}"
 
     def test_doc_has_power_shell_or_command_examples(self):
         """文档应包含 PowerShell 或命令行示例（Refactor 阶段要求）

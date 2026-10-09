@@ -42,9 +42,7 @@ def journal_provider(test_data_path):
             )
             """
         )
-        cursor.execute(
-            "INSERT OR IGNORE INTO goal (id) VALUES (?)", ("goal-test-001",)
-        )
+        cursor.execute("INSERT OR IGNORE INTO goal (id) VALUES (?)", ("goal-test-001",))
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS goal_journal (
@@ -174,9 +172,7 @@ class TestCreateJournalUsesGenericInsert:
         journal_id = journal_provider.create_journal(sample_journal_data)
 
         assert journal_id is not None
-        assert journal_id.startswith("journal-"), (
-            f"ID 应以 'journal-' 开头，实际: {journal_id}"
-        )
+        assert journal_id.startswith("journal-"), f"ID 应以 'journal-' 开头，实际: {journal_id}"
         assert len(journal_id) == 16, f"ID 长度应为 16，实际: {len(journal_id)}"
 
         # 查询验证完整记录
@@ -238,9 +234,7 @@ class TestUpdateJournalUsesGenericUpdate:
         # 获取原始 updated_at
         with journal_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM goal_journal WHERE id = ?", (journal_id,)
-            )
+            cursor.execute("SELECT updated_at FROM goal_journal WHERE id = ?", (journal_id,))
             original_updated_at = cursor.fetchone()[0]
 
         # 等待以确保时间戳不同
@@ -305,9 +299,7 @@ class TestDeleteJournalUsesGenericDelete:
         # 删除前确认记录存在
         with journal_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM goal_journal WHERE id = ?", (journal_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM goal_journal WHERE id = ?", (journal_id,))
             assert cursor.fetchone()[0] == 1, "删除前记录应存在"
 
         # 删除
@@ -318,9 +310,7 @@ class TestDeleteJournalUsesGenericDelete:
         # 验证记录已从 goal_journal 表消失
         with journal_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM goal_journal WHERE id = ?", (journal_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM goal_journal WHERE id = ?", (journal_id,))
             assert cursor.fetchone()[0] == 0, "删除后记录应消失"
 
         # 验证墓碑已写入 deletion_log
@@ -341,9 +331,7 @@ class TestDeleteJournalUsesGenericDelete:
         assert tombstone[1] == journal_id, (
             f"墓碑 record_id 应为主键值 '{journal_id}'，实际: {tombstone[1]}"
         )
-        assert tombstone[2] == "local", (
-            f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
-        )
+        assert tombstone[2] == "local", f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
 
 
 # ==================== 异常处理抛出 DataAccessError 测试（Slice F）====================
@@ -413,9 +401,7 @@ class TestJournalProviderRaisesDataAccessError:
                 cursor.execute("DROP TRIGGER IF EXISTS prevent_delete_journal")
                 conn.commit()
 
-    def test_get_journals_by_goal_raises_data_access_error_on_db_failure(
-        self, journal_provider
-    ):
+    def test_get_journals_by_goal_raises_data_access_error_on_db_failure(self, journal_provider):
         """get_journals_by_goal 在数据库失败时抛出 DataAccessError（而非返回空列表）"""
         from lifeprism.utils.exceptions import DataAccessError
 
@@ -452,9 +438,7 @@ class TestJournalProviderRaisesDataAccessError:
                 )
                 conn.commit()
 
-    def test_get_journal_by_id_raises_data_access_error_on_db_failure(
-        self, journal_provider
-    ):
+    def test_get_journal_by_id_raises_data_access_error_on_db_failure(self, journal_provider):
         """get_journal_by_id 在数据库失败时抛出 DataAccessError（而非返回 None）"""
         from lifeprism.utils.exceptions import DataAccessError
 

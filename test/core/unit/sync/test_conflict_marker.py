@@ -223,10 +223,7 @@ class TestParseConflictBlocks:
         from lifeprism.sync.conflict_resolution import parse_conflict_blocks
 
         merged = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "=======\n"
-            "theirs added\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n=======\ntheirs added\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         blocks = parse_conflict_blocks(merged)
         assert len(blocks) == 1
@@ -278,11 +275,7 @@ class TestMatchMarkers:
         from lifeprism.sync.conflict_resolution import match_markers
 
         file_content = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "=======\n"
-            "theirs\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\n=======\ntheirs\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         # hash 错误：a3f8b2c1 → deadbeef
         result = match_markers(
@@ -297,11 +290,7 @@ class TestMatchMarkers:
         from lifeprism.sync.conflict_resolution import match_markers
 
         file_content = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "=======\n"
-            "theirs\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\n=======\ntheirs\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         # 序号错误：#1 → #99
         result = match_markers(
@@ -332,11 +321,7 @@ class TestMatchMarkers:
         from lifeprism.sync.conflict_resolution import match_markers
 
         file_content = (
-            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
-            "ours\n"
-            "=======\n"
-            "theirs\n"
-            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\nours\n=======\ntheirs\n>>>>>>> LP-REMOTE-7e9d4f2b #1\n"
         )
         # LLM 输出多了一个空格
         result = match_markers(

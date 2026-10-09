@@ -118,13 +118,9 @@ class TestBeingProviderBaseline:
     仅覆盖 being_service 实际使用的方法（这些方法签名迁移后不变）。
     """
 
-    def test_create_new_version_returns_record_dict(
-        self, being_provider, sample_content
-    ):
+    def test_create_new_version_returns_record_dict(self, being_provider, sample_content):
         """create_new_version 返回包含完整字段的记录 dict"""
-        record = being_provider.create_new_version(
-            user_id=1, mode="past", content=sample_content
-        )
+        record = being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
 
         assert record is not None
         assert isinstance(record, dict)
@@ -136,20 +132,14 @@ class TestBeingProviderBaseline:
         assert isinstance(record["content"], dict)
         assert record["content"] == sample_content
 
-    def test_create_new_version_increments_version(
-        self, being_provider, sample_content
-    ):
+    def test_create_new_version_increments_version(self, being_provider, sample_content):
         """create_new_version 自动递增版本号"""
         # 创建第一个版本
-        record1 = being_provider.create_new_version(
-            user_id=1, mode="past", content=sample_content
-        )
+        record1 = being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
         assert record1["version"] == 1
 
         # 创建第二个版本
-        record2 = being_provider.create_new_version(
-            user_id=1, mode="past", content=sample_content
-        )
+        record2 = being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
         assert record2["version"] == 2
 
         # 不同 mode 的版本号独立
@@ -167,28 +157,20 @@ class TestBeingProviderBaseline:
         assert record is not None
         assert record["ai_abstract"] == "AI 总结"
 
-    def test_get_by_user_mode_version_returns_record(
-        self, being_provider, sample_content
-    ):
+    def test_get_by_user_mode_version_returns_record(self, being_provider, sample_content):
         """按 (user_id, mode, version) 查询返回记录"""
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
 
-        record = being_provider.get_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
 
         assert record is not None
         assert record["user_id"] == 1
         assert record["mode"] == "past"
         assert record["version"] == 1
 
-    def test_get_by_user_mode_version_returns_none_for_nonexistent(
-        self, being_provider
-    ):
+    def test_get_by_user_mode_version_returns_none_for_nonexistent(self, being_provider):
         """查询不存在的 (user_id, mode, version) 返回 None"""
-        record = being_provider.get_by_user_mode_version(
-            user_id=999, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=999, mode="past", version=1)
 
         assert record is None
 
@@ -198,9 +180,7 @@ class TestBeingProviderBaseline:
         """获取用户某模式所有版本，按 version DESC 排序"""
         # 创建 3 个版本
         for _ in range(3):
-            being_provider.create_new_version(
-                user_id=1, mode="past", content=sample_content
-            )
+            being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
 
         records = being_provider.get_all_by_user_mode(user_id=1, mode="past")
 
@@ -210,9 +190,7 @@ class TestBeingProviderBaseline:
         versions = [r["version"] for r in records]
         assert versions == [3, 2, 1], f"应按 version DESC 排序，实际: {versions}"
 
-    def test_get_all_by_user_mode_returns_empty_for_no_match(
-        self, being_provider
-    ):
+    def test_get_all_by_user_mode_returns_empty_for_no_match(self, being_provider):
         """没有匹配的 (user_id, mode) 返回空列表"""
         records = being_provider.get_all_by_user_mode(user_id=999, mode="past")
 
@@ -233,9 +211,7 @@ class TestBeingProviderBaseline:
 
         assert latest == 0
 
-    def test_get_latest_record_returns_highest_version(
-        self, being_provider, sample_content
-    ):
+    def test_get_latest_record_returns_highest_version(self, being_provider, sample_content):
         """获取最新版本记录"""
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
@@ -251,9 +227,7 @@ class TestBeingProviderBaseline:
 
         assert record is None
 
-    def test_update_by_user_mode_version_updates_content(
-        self, being_provider, sample_content
-    ):
+    def test_update_by_user_mode_version_updates_content(self, being_provider, sample_content):
         """按复合键更新 content 字段"""
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
         new_content = {"updated": True}
@@ -263,14 +237,10 @@ class TestBeingProviderBaseline:
         )
 
         assert result is True
-        record = being_provider.get_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
         assert record["content"] == new_content
 
-    def test_update_by_user_mode_version_returns_false_for_nonexistent(
-        self, being_provider
-    ):
+    def test_update_by_user_mode_version_returns_false_for_nonexistent(self, being_provider):
         """更新不存在的记录返回 False"""
         result = being_provider.update_by_user_mode_version(
             user_id=999, mode="past", version=1, data={"content": {"x": 1}}
@@ -278,35 +248,23 @@ class TestBeingProviderBaseline:
 
         assert result is False
 
-    def test_delete_by_user_mode_version_removes_record(
-        self, being_provider, sample_content
-    ):
+    def test_delete_by_user_mode_version_removes_record(self, being_provider, sample_content):
         """按复合键删除记录后查询返回 None"""
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
 
-        result = being_provider.delete_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        result = being_provider.delete_by_user_mode_version(user_id=1, mode="past", version=1)
 
         assert result is True
-        record = being_provider.get_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
         assert record is None
 
-    def test_delete_by_user_mode_version_returns_false_for_nonexistent(
-        self, being_provider
-    ):
+    def test_delete_by_user_mode_version_returns_false_for_nonexistent(self, being_provider):
         """删除不存在的记录返回 False"""
-        result = being_provider.delete_by_user_mode_version(
-            user_id=999, mode="past", version=1
-        )
+        result = being_provider.delete_by_user_mode_version(user_id=999, mode="past", version=1)
 
         assert result is False
 
-    def test_upsert_updates_existing_record(
-        self, being_provider, sample_content
-    ):
+    def test_upsert_updates_existing_record(self, being_provider, sample_content):
         """upsert 对已存在记录执行更新（UPDATE 路径）
 
         upsert 采用"先查 hash_id 再 update/create"方案：
@@ -323,8 +281,6 @@ class TestBeingProviderBaseline:
         )
 
         assert result is True
-        record = being_provider.get_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
         assert record["content"] == new_content
         assert record["ai_abstract"] == "AI"

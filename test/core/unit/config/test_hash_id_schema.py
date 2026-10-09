@@ -40,17 +40,14 @@ class TestHashIdFieldExists:
 
         config = TABLE_CONFIGS[table_name]
         assert "hash_id" in config["columns"], (
-            f"{table_name} 缺少 hash_id 字段，当前列: "
-            f"{sorted(config['columns'].keys())}"
+            f"{table_name} 缺少 hash_id 字段，当前列: {sorted(config['columns'].keys())}"
         )
 
     def test_all_six_target_tables_have_hash_id(self):
         """一次性验证 6 张表全部都有 hash_id（聚合视图，便于回归排查）"""
         from lifeprism.config.database import TABLE_CONFIGS
 
-        missing = [
-            t for t in TARGET_TABLES if "hash_id" not in TABLE_CONFIGS[t]["columns"]
-        ]
+        missing = [t for t in TARGET_TABLES if "hash_id" not in TABLE_CONFIGS[t]["columns"]]
         assert missing == [], f"以下表缺少 hash_id 字段: {missing}"
 
 
@@ -78,8 +75,7 @@ class TestHashIdFieldConstraints:
 
         column = TABLE_CONFIGS[table_name]["columns"]["hash_id"]
         assert column["constraints"] == ["NOT NULL", "UNIQUE"], (
-            f"{table_name}.hash_id 约束应为 ['NOT NULL', 'UNIQUE']，"
-            f"实际 {column['constraints']!r}"
+            f"{table_name}.hash_id 约束应为 ['NOT NULL', 'UNIQUE']，实际 {column['constraints']!r}"
         )
 
     @pytest.mark.parametrize("table_name", TARGET_TABLES)
@@ -98,9 +94,7 @@ class TestHashIdFieldConstraints:
         from lifeprism.config.database import TABLE_CONFIGS
 
         constraints = TABLE_CONFIGS[table_name]["columns"]["hash_id"]["constraints"]
-        assert "UNIQUE" in constraints, (
-            f"{table_name}.hash_id 缺少 UNIQUE 约束: {constraints!r}"
-        )
+        assert "UNIQUE" in constraints, f"{table_name}.hash_id 缺少 UNIQUE 约束: {constraints!r}"
 
 
 class TestHashIdFieldComment:

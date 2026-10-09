@@ -136,8 +136,7 @@ class TestValueProviderMetadata:
         # _UPDATE_FIELDS 应包含允许更新的字段（不含 id/created_at/updated_at）
         expected_update_fields = {"keywords", "content_positive", "content_negative", "sort_order"}
         assert ValueProvider._UPDATE_FIELDS == expected_update_fields, (
-            f"_UPDATE_FIELDS 应为 {expected_update_fields}，"
-            f"实际: {ValueProvider._UPDATE_FIELDS}"
+            f"_UPDATE_FIELDS 应为 {expected_update_fields}，实际: {ValueProvider._UPDATE_FIELDS}"
         )
         # id 不应在 _UPDATE_FIELDS 中（主键不应被更新）
         assert "id" not in ValueProvider._UPDATE_FIELDS, (
@@ -175,9 +174,7 @@ class TestCreateValueUsesGenericInsert:
         value_id = value_provider.create_value(sample_value_data)
 
         assert value_id is not None
-        assert value_id.startswith("val-"), (
-            f"ID 应以 'val-' 开头，实际: {value_id}"
-        )
+        assert value_id.startswith("val-"), f"ID 应以 'val-' 开头，实际: {value_id}"
         assert len(value_id) == 12, f"ID 长度应为 12，实际: {len(value_id)}"
 
         # 查询验证完整记录
@@ -240,9 +237,7 @@ class TestUpdateValueUsesGenericUpdate:
         # 获取原始 updated_at
         with value_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM user_values WHERE id = ?", (value_id,)
-            )
+            cursor.execute("SELECT updated_at FROM user_values WHERE id = ?", (value_id,))
             original_updated_at = cursor.fetchone()[0]
 
         # 等待以确保时间戳不同
@@ -256,9 +251,7 @@ class TestUpdateValueUsesGenericUpdate:
         # 验证 updated_at 已更新
         with value_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT keywords, updated_at FROM user_values WHERE id = ?", (value_id,)
-            )
+            cursor.execute("SELECT keywords, updated_at FROM user_values WHERE id = ?", (value_id,))
             row = cursor.fetchone()
 
         assert row[0] == "成长;自律;专注"
@@ -292,9 +285,7 @@ class TestUpdateValueUsesGenericUpdate:
         value_id = value_provider.create_value(sample_value_data)
 
         with pytest.raises(ValueError, match="Invalid update fields"):
-            value_provider.update_value(
-                value_id, {"created_at": "2020-01-01T00:00:00+00:00"}
-            )
+            value_provider.update_value(value_id, {"created_at": "2020-01-01T00:00:00+00:00"})
 
 
 # ==================== delete_value 走 _generic_delete 写墓碑测试 ====================
@@ -315,18 +306,14 @@ class TestDeleteValueUsesGenericDelete:
     级联协调上移到 value_service。
     """
 
-    def test_delete_value_writes_tombstone_to_deletion_log(
-        self, value_provider, sample_value_data
-    ):
+    def test_delete_value_writes_tombstone_to_deletion_log(self, value_provider, sample_value_data):
         """delete_value 写墓碑到 deletion_log（_generic_delete 的行为）"""
         value_id = value_provider.create_value(sample_value_data)
 
         # 删除前确认记录存在
         with value_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM user_values WHERE id = ?", (value_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM user_values WHERE id = ?", (value_id,))
             assert cursor.fetchone()[0] == 1, "删除前记录应存在"
 
         # 删除
@@ -337,9 +324,7 @@ class TestDeleteValueUsesGenericDelete:
         # 验证记录已从 user_values 表消失
         with value_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM user_values WHERE id = ?", (value_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM user_values WHERE id = ?", (value_id,))
             assert cursor.fetchone()[0] == 0, "删除后记录应消失"
 
         # 验证墓碑已写入 deletion_log
@@ -360,13 +345,9 @@ class TestDeleteValueUsesGenericDelete:
         assert tombstone[1] == value_id, (
             f"墓碑 record_id 应为主键值 '{value_id}'，实际: {tombstone[1]}"
         )
-        assert tombstone[2] == "local", (
-            f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
-        )
+        assert tombstone[2] == "local", f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
 
-    def test_delete_value_is_single_table_only_no_cascade(
-        self, value_provider, sample_value_data
-    ):
+    def test_delete_value_is_single_table_only_no_cascade(self, value_provider, sample_value_data):
         """delete_value 只删除 user_values 表，不级联删除 commitments
 
         重构点：原 delete_value_with_cascade 在 Provider 层直接 DELETE FROM commitments，
@@ -411,9 +392,7 @@ class TestDeleteValueUsesGenericDelete:
             )
             row = cursor.fetchone()
 
-        assert row is not None, (
-            "commitment 记录应仍然存在（ValueProvider.delete_value 不级联删除）"
-        )
+        assert row is not None, "commitment 记录应仍然存在（ValueProvider.delete_value 不级联删除）"
         assert row[0] == "cmt-test-001"
         assert row[1] == "每天阅读 30 分钟"
         # value_id 保持原值：因 database_manager 未开启外键约束，ON DELETE SET NULL
@@ -516,9 +495,7 @@ class TestValueServiceCascadeCoordination:
                 commitment_ids,
             )
             remaining = cursor.fetchone()[0]
-        assert remaining == 0, (
-            f"cascade=True 应删除所有关联承诺，实际剩余: {remaining}"
-        )
+        assert remaining == 0, f"cascade=True 应删除所有关联承诺，实际剩余: {remaining}"
 
         # 验证写入了墓碑：user_values 墓碑 + 2 条 commitments 墓碑
         with value_provider.db.get_connection() as conn:
@@ -571,13 +548,9 @@ class TestValueServiceCascadeCoordination:
             )
             rows = cursor.fetchall()
 
-        assert len(rows) == 2, (
-            f"cascade=False 不应删除承诺记录，实际剩余: {len(rows)}"
-        )
+        assert len(rows) == 2, f"cascade=False 不应删除承诺记录，实际剩余: {len(rows)}"
         for row in rows:
-            assert row[1] is None, (
-                f"承诺 {row[0]} 的 value_id 应被置空，实际: {row[1]}"
-            )
+            assert row[1] is None, f"承诺 {row[0]} 的 value_id 应被置空，实际: {row[1]}"
 
         # 验证只写入 user_values 墓碑，不写入 commitments 墓碑
         with value_provider.db.get_connection() as conn:

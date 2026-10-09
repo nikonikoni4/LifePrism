@@ -402,9 +402,7 @@ class TestGetTopTitle:
         from lifeprism.server.providers import server_lw_data_provider
 
         def _explode(*args, **kwargs):
-            raise RuntimeError(
-                "server_lw_data_provider.get_top_title / get_active_time 不应被调用"
-            )
+            raise RuntimeError("server_lw_data_provider.get_top_title / get_active_time 不应被调用")
 
         monkeypatch.setattr(server_lw_data_provider, "get_top_title", _explode)
         monkeypatch.setattr(server_lw_data_provider, "get_active_time", _explode)
@@ -458,9 +456,7 @@ class TestBuildActivitySummary:
             app="app1.exe",
         )
 
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 0, None, None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 0, None, None)
 
         assert len(result.daily_activities) == 1
         assert result.daily_activities[0].date == "2026-07-12"
@@ -497,17 +493,14 @@ class TestBuildActivitySummary:
             app="cross_tz.exe",
         )
 
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 0, None, None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 0, None, None)
 
         # 应归属本地 2026-07-12，不是 2026-07-11
         assert len(result.daily_activities) == 1, (
             f"应只有 1 天的数据，实际 {len(result.daily_activities)}: {result.daily_activities}"
         )
         assert result.daily_activities[0].date == "2026-07-12", (
-            f"UTC 20:00 的事件应归属本地次日 2026-07-12，"
-            f"实际归属 {result.daily_activities[0].date}"
+            f"UTC 20:00 的事件应归属本地次日 2026-07-12，实际归属 {result.daily_activities[0].date}"
         )
         # 3600 * 100 / 86400 = 4.166... → int = 4
         assert result.daily_activities[0].active_time_percentage == 4
@@ -533,9 +526,7 @@ class TestBuildActivitySummary:
         )
 
         # 中心日期 2026-07-12，0 历史天数，1 未来天数 → 范围 [2026-07-12, 2026-07-13]
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 1, None, None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 1, None, None)
 
         assert len(result.daily_activities) == 2
         assert result.daily_activities[0].date == "2026-07-12"
@@ -545,9 +536,7 @@ class TestBuildActivitySummary:
 
     def test_empty_range_returns_zeros(self, stats_fixture):
         """无数据时所有日期补 0（保持完整日期数组）"""
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 0, None, None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 0, None, None)
 
         assert len(result.daily_activities) == 1
         assert result.daily_activities[0].date == "2026-07-12"
@@ -566,9 +555,7 @@ class TestBuildActivitySummary:
             app="app1.exe",
         )
 
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 1, None, None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 1, None, None)
 
         assert len(result.daily_activities) == 2
         # 2026-07-12 无数据，补 0
@@ -600,9 +587,7 @@ class TestBuildActivitySummary:
         )
 
         # 查询 cat-1
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 0, "cat-1", None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 0, "cat-1", None)
 
         assert len(result.daily_activities) == 1
         assert result.daily_activities[0].date == "2026-07-12"
@@ -631,9 +616,7 @@ class TestBuildActivitySummary:
             sub_category_id="sub-2",
         )
 
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 0, None, "sub-1"
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 0, None, "sub-1")
 
         assert len(result.daily_activities) == 1
         # 只有 sub-1 的 3600 秒
@@ -648,9 +631,7 @@ class TestBuildActivitySummary:
         from lifeprism.server.providers import server_lw_data_provider
 
         def _explode(*args, **kwargs):
-            raise RuntimeError(
-                "server_lw_data_provider.get_daily_active_time 不应被调用"
-            )
+            raise RuntimeError("server_lw_data_provider.get_daily_active_time 不应被调用")
 
         monkeypatch.setattr(server_lw_data_provider, "get_daily_active_time", _explode)
 
@@ -664,9 +645,7 @@ class TestBuildActivitySummary:
         )
 
         # 如果仍走 server_lw_data_provider，会抛 RuntimeError
-        result = activity_stats_builder.build_activity_summary(
-            "2026-07-12", 0, 0, None, None
-        )
+        result = activity_stats_builder.build_activity_summary("2026-07-12", 0, 0, None, None)
         assert len(result.daily_activities) == 1
         assert result.daily_activities[0].date == "2026-07-12"
         assert result.daily_activities[0].active_time_percentage == 4

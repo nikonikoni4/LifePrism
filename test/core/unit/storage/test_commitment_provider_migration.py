@@ -167,9 +167,7 @@ class TestCreateCommitmentUsesGenericInsert:
         commitment_id = commitment_provider.create_commitment(sample_commitment_data)
 
         assert commitment_id is not None
-        assert commitment_id.startswith("cmt-"), (
-            f"ID 应以 'cmt-' 开头，实际: {commitment_id}"
-        )
+        assert commitment_id.startswith("cmt-"), f"ID 应以 'cmt-' 开头，实际: {commitment_id}"
         assert len(commitment_id) == 12, f"ID 长度应为 12，实际: {len(commitment_id)}"
 
         # 查询验证完整记录
@@ -227,9 +225,7 @@ class TestUpdateCommitmentUsesGenericUpdate:
         # 获取原始 updated_at
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM commitments WHERE id = ?", (commitment_id,)
-            )
+            cursor.execute("SELECT updated_at FROM commitments WHERE id = ?", (commitment_id,))
             original_updated_at = cursor.fetchone()[0]
 
         # 等待以确保时间戳不同
@@ -310,9 +306,7 @@ class TestDeleteCommitmentUsesGenericDelete:
         # 删除前确认记录存在
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM commitments WHERE id = ?", (commitment_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM commitments WHERE id = ?", (commitment_id,))
             assert cursor.fetchone()[0] == 1, "删除前记录应存在"
 
         # 删除
@@ -323,9 +317,7 @@ class TestDeleteCommitmentUsesGenericDelete:
         # 验证记录已从 commitments 表消失
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM commitments WHERE id = ?", (commitment_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM commitments WHERE id = ?", (commitment_id,))
             assert cursor.fetchone()[0] == 0, "删除后记录应消失"
 
         # 验证墓碑已写入 deletion_log
@@ -346,9 +338,7 @@ class TestDeleteCommitmentUsesGenericDelete:
         assert tombstone[1] == commitment_id, (
             f"墓碑 record_id 应为主键值 '{commitment_id}'，实际: {tombstone[1]}"
         )
-        assert tombstone[2] == "local", (
-            f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
-        )
+        assert tombstone[2] == "local", f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
 
 
 # ==================== delete_by_value_id 级联删除测试 ====================
@@ -361,9 +351,7 @@ class TestDeleteByValueId:
     走 _generic_batch_delete 通道，含写墓碑到 deletion_log。
     """
 
-    def test_delete_by_value_id_removes_all_commitments_for_value(
-        self, commitment_provider
-    ):
+    def test_delete_by_value_id_removes_all_commitments_for_value(self, commitment_provider):
         """delete_by_value_id 删除某价值下所有承诺，返回删除数"""
         # 创建 3 条承诺关联 val-test-001
         for i in range(3):
@@ -371,9 +359,7 @@ class TestDeleteByValueId:
                 {"content": f"承诺 {i}", "value_id": "val-test-001"}
             )
         # 创建 1 条承诺关联其他价值（不应被删除）
-        commitment_provider.create_commitment(
-            {"content": "其他承诺", "value_id": "val-other"}
-        )
+        commitment_provider.create_commitment({"content": "其他承诺", "value_id": "val-other"})
 
         deleted_count = commitment_provider.delete_by_value_id("val-test-001")
 
@@ -387,9 +373,7 @@ class TestDeleteByValueId:
         other = commitment_provider.get_commitments_by_value("val-other")
         assert len(other) == 1, "其他价值的承诺不应被删除"
 
-    def test_delete_by_value_id_writes_tombstones_for_all_deleted(
-        self, commitment_provider
-    ):
+    def test_delete_by_value_id_writes_tombstones_for_all_deleted(self, commitment_provider):
         """delete_by_value_id 为每条删除的承诺写墓碑到 deletion_log"""
         # 创建 2 条承诺
         cid1 = commitment_provider.create_commitment(
@@ -411,9 +395,7 @@ class TestDeleteByValueId:
             )
             tombstones = [row[0] for row in cursor.fetchall()]
 
-        assert len(tombstones) == 2, (
-            f"应写入 2 条墓碑，实际: {len(tombstones)}"
-        )
+        assert len(tombstones) == 2, f"应写入 2 条墓碑，实际: {len(tombstones)}"
         assert set(tombstones) == {cid1, cid2}, (
             f"墓碑 record_id 应为 {cid1} 和 {cid2}，实际: {tombstones}"
         )
@@ -435,9 +417,7 @@ class TestNullValueId:
     供 ValueProvider 删除价值时选择"置空关联"而非"级联删除"。
     """
 
-    def test_null_value_id_sets_value_id_to_null_for_all_matches(
-        self, commitment_provider
-    ):
+    def test_null_value_id_sets_value_id_to_null_for_all_matches(self, commitment_provider):
         """null_value_id 将某价值下所有承诺的 value_id 置空，返回更新数"""
         # 创建 3 条承诺关联 val-test-001
         for i in range(3):
@@ -445,9 +425,7 @@ class TestNullValueId:
                 {"content": f"承诺 {i}", "value_id": "val-test-001"}
             )
         # 创建 1 条承诺关联其他价值（不应被置空）
-        commitment_provider.create_commitment(
-            {"content": "其他承诺", "value_id": "val-other"}
-        )
+        commitment_provider.create_commitment({"content": "其他承诺", "value_id": "val-other"})
 
         updated_count = commitment_provider.null_value_id("val-test-001")
 
@@ -456,13 +434,9 @@ class TestNullValueId:
         # 验证 val-test-001 下的承诺 value_id 已全部置空
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT value_id FROM commitments WHERE value_id IS NULL"
-            )
+            cursor.execute("SELECT value_id FROM commitments WHERE value_id IS NULL")
             null_rows = cursor.fetchall()
-        assert len(null_rows) == 3, (
-            f"应有 3 条承诺 value_id 为 NULL，实际: {len(null_rows)}"
-        )
+        assert len(null_rows) == 3, f"应有 3 条承诺 value_id 为 NULL，实际: {len(null_rows)}"
 
         # 验证其他价值的承诺不受影响
         other = commitment_provider.get_commitments_by_value("val-other")
@@ -479,9 +453,7 @@ class TestNullValueId:
         # 获取原始 updated_at
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM commitments WHERE id = ?", (commitment_id,)
-            )
+            cursor.execute("SELECT updated_at FROM commitments WHERE id = ?", (commitment_id,))
             original_updated_at = cursor.fetchone()[0]
 
         time.sleep(0.01)
@@ -491,9 +463,7 @@ class TestNullValueId:
         # 验证 updated_at 已更新
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM commitments WHERE id = ?", (commitment_id,)
-            )
+            cursor.execute("SELECT updated_at FROM commitments WHERE id = ?", (commitment_id,))
             new_updated_at = cursor.fetchone()[0]
 
         assert new_updated_at != original_updated_at, (
@@ -543,19 +513,20 @@ class TestCountByValue:
     def test_count_by_value_excludes_null_value_id(self, commitment_provider):
         """count_by_value 不统计 value_id 为 NULL 的承诺"""
         # 创建 2 条关联 val-test-001 的承诺
-        commitment_provider.create_commitment(
-            {"content": "承诺 1", "value_id": "val-test-001"}
-        )
-        commitment_provider.create_commitment(
-            {"content": "承诺 2", "value_id": "val-test-001"}
-        )
+        commitment_provider.create_commitment({"content": "承诺 1", "value_id": "val-test-001"})
+        commitment_provider.create_commitment({"content": "承诺 2", "value_id": "val-test-001"})
         # 创建 1 条 value_id 为 NULL 的承诺（直接 SQL 插入，绕过 create_commitment 的必填校验）
         with commitment_provider.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO commitments (id, content, value_id, status, created_at, updated_at) "
                 "VALUES (?, ?, NULL, 'active', ?, ?)",
-                ("cmt-manual-1", "无关联承诺", "2026-07-23T00:00:00+00:00", "2026-07-23T00:00:00+00:00"),
+                (
+                    "cmt-manual-1",
+                    "无关联承诺",
+                    "2026-07-23T00:00:00+00:00",
+                    "2026-07-23T00:00:00+00:00",
+                ),
             )
             conn.commit()
 
@@ -567,12 +538,8 @@ class TestCountByValue:
 
     def test_count_by_value_only_counts_specified_value(self, commitment_provider):
         """count_by_value 只统计指定 value_id 的承诺，不统计其他价值"""
-        commitment_provider.create_commitment(
-            {"content": "承诺 A", "value_id": "val-test-001"}
-        )
-        commitment_provider.create_commitment(
-            {"content": "承诺 B", "value_id": "val-other"}
-        )
+        commitment_provider.create_commitment({"content": "承诺 A", "value_id": "val-test-001"})
+        commitment_provider.create_commitment({"content": "承诺 B", "value_id": "val-other"})
 
         count = commitment_provider.count_by_value("val-test-001")
 

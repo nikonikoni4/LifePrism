@@ -395,6 +395,4 @@ def test_setup_sync_logging_does_not_add_handler_to_child_logger(clean_sync_logg
     setup_sync_logging(tmp_path)
 
     child_logger = logging.getLogger("lifeprism.sync.sync_client")
-    assert len(child_logger.handlers) == 0, (
-        "子 logger 不应直接持有 handler，应通过 propagate 传播"
-    )
+    assert len(child_logger.handlers) == 0, "子 logger 不应直接持有 handler，应通过 propagate 传播"

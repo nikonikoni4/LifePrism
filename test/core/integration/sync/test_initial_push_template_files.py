@@ -94,7 +94,9 @@ class TestInitialPushIncludesTemplateFiles:
         # 验证前提：agent.md 的 hash 确实命中 template_hashes
         template_hashes = sync_client_bare._get_template_hashes()
         agent_md_hash = compute_file_hash(templates_agent_md)
-        assert agent_md_hash in template_hashes, "测试前提失败：agent.md hash 应命中 template_hashes"
+        assert agent_md_hash in template_hashes, (
+            "测试前提失败：agent.md hash 应命中 template_hashes"
+        )
 
         # Act: 调用 _initial_push_files（mock 掉 HTTP）
         pushed_paths = []
@@ -105,13 +107,18 @@ class TestInitialPushIncludesTemplateFiles:
                 new_callable=lambda: property(lambda self: temp_data_path),
             ),
             patch.object(
-                sync_client_bare, "_scan_sync_files",
+                sync_client_bare,
+                "_scan_sync_files",
                 return_value=["agent/chat/agent.md", "agent/chat/user_note.md"],
             ),
             patch(
                 "lifeprism.repository.providers.file_sync_state_provider.FileSyncStateProvider"
             ) as MockProvider,
-            patch.object(sync_client_bare, "_push_files", side_effect=lambda url, key, paths: pushed_paths.extend(paths)),
+            patch.object(
+                sync_client_bare,
+                "_push_files",
+                side_effect=lambda url, key, paths: pushed_paths.extend(paths),
+            ),
             patch.object(sync_client_bare, "_advance_local_parent_after_initial_sync"),
         ):
             mock_provider = MagicMock()
@@ -126,15 +133,11 @@ class TestInitialPushIncludesTemplateFiles:
         assert "agent/chat/agent.md" in result, (
             "BUG 复现：首次同步未推送 agent.md（被 template_hashes 过滤）"
         )
-        assert "agent/chat/agent.md" in pushed_paths, (
-            "BUG 复现：agent.md 未实际推送到云端"
-        )
+        assert "agent/chat/agent.md" in pushed_paths, "BUG 复现：agent.md 未实际推送到云端"
         # 对照组：非 template 文件正常推送
         assert "agent/chat/user_note.md" in result
 
-    def test_initial_push_includes_soul_and_tool_md(
-        self, temp_data_path, sync_client_bare
-    ):
+    def test_initial_push_includes_soul_and_tool_md(self, temp_data_path, sync_client_bare):
         """首次同步应推送 soul.md 和 tool.md（系统提示词三件套）
 
         这三个文件是云端 Agent 工作所必需的，缺一不可。
@@ -153,7 +156,8 @@ class TestInitialPushIncludesTemplateFiles:
                 new_callable=lambda: property(lambda self: temp_data_path),
             ),
             patch.object(
-                sync_client_bare, "_scan_sync_files",
+                sync_client_bare,
+                "_scan_sync_files",
                 return_value=["agent/chat/soul.md", "agent/chat/tool.md"],
             ),
             patch(
@@ -200,9 +204,7 @@ class TestIncrementalSyncStillFiltersTemplateFiles:
         templates_agent_md = Path("templates/agent/chat/agent.md").read_bytes()
         (temp_data_path / "agent" / "chat" / "agent.md").write_bytes(templates_agent_md)
         # user_note.md 非 template（hash 不命中）
-        (temp_data_path / "agent" / "chat" / "user_note.md").write_bytes(
-            b"# user custom note"
-        )
+        (temp_data_path / "agent" / "chat" / "user_note.md").write_bytes(b"# user custom note")
 
         with (
             patch.object(
@@ -211,7 +213,8 @@ class TestIncrementalSyncStillFiltersTemplateFiles:
                 new_callable=lambda: property(lambda self: temp_data_path),
             ),
             patch.object(
-                sync_client_bare, "_scan_sync_files",
+                sync_client_bare,
+                "_scan_sync_files",
                 return_value=["agent/chat/agent.md", "agent/chat/user_note.md"],
             ),
             patch(

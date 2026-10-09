@@ -272,7 +272,7 @@ class TestHashIdFormat:
             for table, prefix in HASH_ID_PREFIXES.items():
                 cursor.execute(f"SELECT hash_id FROM {table}")
                 for (hash_id,) in cursor.fetchall():
-                    suffix = hash_id[len(prefix):]
+                    suffix = hash_id[len(prefix) :]
                     assert hex_pattern.match(suffix), (
                         f"表 {table} 的 hash_id '{hash_id}' 后缀 '{suffix}' 不是 12 位 hex"
                     )
@@ -370,9 +370,7 @@ class TestIdempotency:
             assert after_ids == existing_ids
 
             # 新行 hash_id 已回填（非 NULL）
-            cursor.execute(
-                "SELECT hash_id FROM mood_impacts WHERE name = 'new-after-migration'"
-            )
+            cursor.execute("SELECT hash_id FROM mood_impacts WHERE name = 'new-after-migration'")
             new_hash_id = cursor.fetchone()[0]
             assert new_hash_id is not None
             assert new_hash_id.startswith("mi-")
@@ -390,7 +388,10 @@ class TestIdempotency:
             # 记录 version=15 → True
             cursor.execute(
                 "INSERT INTO schema_version (version, name) VALUES (?, ?)",
-                (m015_add_hash_id_to_autoincrement_tables.VERSION, m015_add_hash_id_to_autoincrement_tables.NAME),
+                (
+                    m015_add_hash_id_to_autoincrement_tables.VERSION,
+                    m015_add_hash_id_to_autoincrement_tables.NAME,
+                ),
             )
             conn.commit()
             assert m015_add_hash_id_to_autoincrement_tables.check_if_applied(cursor) is True
@@ -506,9 +507,7 @@ class TestUniqueness:
                 # 验证索引是 UNIQUE 索引
                 cursor.execute(f'PRAGMA index_info("{index_name}")')
                 index_columns = [row[2] for row in cursor.fetchall()]
-                assert "hash_id" in index_columns, (
-                    f"索引 {index_name} 未覆盖 hash_id 列"
-                )
+                assert "hash_id" in index_columns, f"索引 {index_name} 未覆盖 hash_id 列"
         finally:
             conn.close()
 
@@ -527,9 +526,7 @@ class TestUniqueness:
                 cursor.execute(f"SELECT hash_id FROM {table}")
                 hash_ids = [row[0] for row in cursor.fetchall()]
                 assert len(hash_ids) == 50
-                assert len(set(hash_ids)) == 50, (
-                    f"表 {table} 在 50 行数据下出现 hash_id 碰撞"
-                )
+                assert len(set(hash_ids)) == 50, f"表 {table} 在 50 行数据下出现 hash_id 碰撞"
         finally:
             conn.close()
 
@@ -587,9 +584,7 @@ class TestTransactionProtection:
             for table in HASH_ID_PREFIXES:
                 cursor.execute(f'PRAGMA table_info("{table}")')
                 columns = {row[1] for row in cursor.fetchall()}
-                assert "hash_id" not in columns, (
-                    f"表 {table} rollback 后仍存在 hash_id 列"
-                )
+                assert "hash_id" not in columns, f"表 {table} rollback 后仍存在 hash_id 列"
 
             # 验证：原数据完整保留
             for table in HASH_ID_PREFIXES:

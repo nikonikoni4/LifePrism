@@ -476,9 +476,7 @@ class TestGetDailyActiveTime:
         )
 
         # 查询 cat-1
-        result = provider.get_daily_active_time(
-            "2026-07-12", "2026-07-12", category_id="cat-1"
-        )
+        result = provider.get_daily_active_time("2026-07-12", "2026-07-12", category_id="cat-1")
         assert len(result) == 1
         assert result[0]["date"] == "2026-07-12"
         # 只有 cat-1 的 3600 秒
@@ -505,9 +503,7 @@ class TestGetDailyActiveTime:
             sub_category_id="sub-2",
         )
 
-        result = provider.get_daily_active_time(
-            "2026-07-12", "2026-07-12", sub_category_id="sub-1"
-        )
+        result = provider.get_daily_active_time("2026-07-12", "2026-07-12", sub_category_id="sub-1")
         assert len(result) == 1
         assert result[0]["active_time_percentage"] == 4  # 3600*100/86400
 
@@ -961,7 +957,7 @@ class TestGetTopApplications:
             _insert_log(
                 provider,
                 f"2026-07-12T0{i}:00:00+00:00",
-                f"2026-07-12T0{i+1}:00:00+00:00",
+                f"2026-07-12T0{i + 1}:00:00+00:00",
                 3600,
                 f"app{i}.exe",
             )

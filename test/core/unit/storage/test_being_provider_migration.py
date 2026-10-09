@@ -106,9 +106,7 @@ def sample_content():
 @pytest.fixture
 def created_record(being_provider, sample_content):
     """创建一条记录并返回完整 dict（包含 hash_id）"""
-    return being_provider.create_new_version(
-        user_id=1, mode="past", content=sample_content
-    )
+    return being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
 
 
 # ==================== 元数据定义测试 ====================
@@ -142,8 +140,7 @@ class TestBeingProviderMetadata:
         # _FILTER_FIELDS 应包含复合键字段（user_id, mode, version）
         expected_filter_fields = {"user_id", "mode", "version"}
         assert expected_filter_fields.issubset(BeingProvider._FILTER_FIELDS), (
-            f"_FILTER_FIELDS 应包含 {expected_filter_fields}，"
-            f"实际: {BeingProvider._FILTER_FIELDS}"
+            f"_FILTER_FIELDS 应包含 {expected_filter_fields}，实际: {BeingProvider._FILTER_FIELDS}"
         )
 
     def test_no_legacy_table_name_constant(self):
@@ -173,9 +170,7 @@ class TestCreateUsesGenericInsert:
     依据 issue: 04-being-provider-migration（create 必须走 _generic_insert 以保证 hash_id 生成）
     """
 
-    def test_create_auto_generates_hash_id_with_tp_prefix(
-        self, being_provider, sample_content
-    ):
+    def test_create_auto_generates_hash_id_with_tp_prefix(self, being_provider, sample_content):
         """create 自动生成 tp- 前缀的 hash_id（_generic_insert 的行为）"""
         data = {
             "user_id": 1,
@@ -191,9 +186,7 @@ class TestCreateUsesGenericInsert:
         assert isinstance(record_id, str), (
             f"create 应返回 hash_id (str)，实际类型: {type(record_id).__name__}"
         )
-        assert record_id.startswith("tp-"), (
-            f"hash_id 应以 'tp-' 开头，实际: {record_id}"
-        )
+        assert record_id.startswith("tp-"), f"hash_id 应以 'tp-' 开头，实际: {record_id}"
         # tp- (3 字符) + 12 位 hex = 15 字符
         assert len(record_id) == 15, (
             f"hash_id 长度应为 15（前缀 'tp-' + 12 位 hex），实际长度: {len(record_id)}"
@@ -204,9 +197,7 @@ class TestCreateUsesGenericInsert:
             f"hash_id 后 12 位应为合法 hex 字符，实际值: {hex_part}"
         )
 
-    def test_create_writes_iso_timestamps_automatically(
-        self, being_provider, sample_content
-    ):
+    def test_create_writes_iso_timestamps_automatically(self, being_provider, sample_content):
         """create 自动写入 ISO 8601 + UTC 时间戳（_generic_insert 的行为）"""
         data = {
             "user_id": 1,
@@ -257,9 +248,7 @@ class TestUpdateUsesGenericUpdate:
     依据 issue: 04-being-provider-migration（update 改用 _generic_update(hash_id, data)）
     """
 
-    def test_update_by_hash_id_auto_updates_updated_at(
-        self, being_provider, created_record
-    ):
+    def test_update_by_hash_id_auto_updates_updated_at(self, being_provider, created_record):
         """update 按 hash_id 更新记录，自动更新 updated_at 为 ISO 8601 + UTC"""
         import time
 
@@ -268,9 +257,7 @@ class TestUpdateUsesGenericUpdate:
         # 获取原始 updated_at
         with being_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM time_paradoxes WHERE hash_id = ?", (hash_id,)
-            )
+            cursor.execute("SELECT updated_at FROM time_paradoxes WHERE hash_id = ?", (hash_id,))
             original_updated_at = cursor.fetchone()[0]
 
         # 等待以确保时间戳不同
@@ -339,9 +326,7 @@ class TestDeleteUsesGenericDelete:
         # 删除前确认记录存在
         with being_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM time_paradoxes WHERE hash_id = ?", (hash_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM time_paradoxes WHERE hash_id = ?", (hash_id,))
             assert cursor.fetchone()[0] == 1, "删除前记录应存在"
 
         # 删除
@@ -352,9 +337,7 @@ class TestDeleteUsesGenericDelete:
         # 验证记录已从 time_paradoxes 表消失
         with being_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM time_paradoxes WHERE hash_id = ?", (hash_id,)
-            )
+            cursor.execute("SELECT COUNT(*) FROM time_paradoxes WHERE hash_id = ?", (hash_id,))
             assert cursor.fetchone()[0] == 0, "删除后记录应消失"
 
         # 验证墓碑已写入 deletion_log
@@ -375,9 +358,7 @@ class TestDeleteUsesGenericDelete:
         assert tombstone[1] == hash_id, (
             f"墓碑 record_id 应为 hash_id '{hash_id}'，实际: {tombstone[1]}"
         )
-        assert tombstone[2] == "local", (
-            f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
-        )
+        assert tombstone[2] == "local", f"墓碑 source 应为 'local'，实际: {tombstone[2]}"
 
     def test_delete_by_hash_id_returns_false_for_nonexistent(self, being_provider):
         """delete 不存在的 hash_id 返回 False（无墓碑写入）"""
@@ -407,9 +388,7 @@ class TestDeleteByUserModeVersionUsesGenericDelete:
         hash_id = created_record["hash_id"]
 
         # 删除
-        result = being_provider.delete_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        result = being_provider.delete_by_user_mode_version(user_id=1, mode="past", version=1)
 
         assert result is True
 
@@ -423,20 +402,14 @@ class TestDeleteByUserModeVersionUsesGenericDelete:
             )
             tombstone = cursor.fetchone()
 
-        assert tombstone is not None, (
-            f"应写入墓碑到 deletion_log，record_id = hash_id '{hash_id}'"
-        )
+        assert tombstone is not None, f"应写入墓碑到 deletion_log，record_id = hash_id '{hash_id}'"
         assert tombstone[1] == hash_id, (
             f"墓碑 record_id 应为 hash_id '{hash_id}'，实际: {tombstone[1]}"
         )
 
-    def test_delete_by_user_mode_version_returns_false_for_nonexistent(
-        self, being_provider
-    ):
+    def test_delete_by_user_mode_version_returns_false_for_nonexistent(self, being_provider):
         """delete_by_user_mode_version 不存在的复合键返回 False"""
-        result = being_provider.delete_by_user_mode_version(
-            user_id=999, mode="past", version=1
-        )
+        result = being_provider.delete_by_user_mode_version(user_id=999, mode="past", version=1)
 
         assert result is False
 
@@ -465,9 +438,7 @@ class TestUpdateByUserModeVersionUsesGenericUpdate:
         # 获取原始 updated_at
         with being_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM time_paradoxes WHERE hash_id = ?", (hash_id,)
-            )
+            cursor.execute("SELECT updated_at FROM time_paradoxes WHERE hash_id = ?", (hash_id,))
             original_updated_at = cursor.fetchone()[0]
 
         time.sleep(0.01)
@@ -483,9 +454,7 @@ class TestUpdateByUserModeVersionUsesGenericUpdate:
         # 验证 updated_at 已更新
         with being_provider.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT updated_at FROM time_paradoxes WHERE hash_id = ?", (hash_id,)
-            )
+            cursor.execute("SELECT updated_at FROM time_paradoxes WHERE hash_id = ?", (hash_id,))
             new_updated_at = cursor.fetchone()[0]
 
         assert new_updated_at != original_updated_at, (
@@ -493,9 +462,7 @@ class TestUpdateByUserModeVersionUsesGenericUpdate:
             f"新值: {new_updated_at}"
         )
 
-    def test_update_by_user_mode_version_returns_false_for_nonexistent(
-        self, being_provider
-    ):
+    def test_update_by_user_mode_version_returns_false_for_nonexistent(self, being_provider):
         """update_by_user_mode_version 不存在的复合键返回 False"""
         result = being_provider.update_by_user_mode_version(
             user_id=999, mode="past", version=1, data={"content": {"x": 1}}
@@ -519,9 +486,7 @@ class TestUpsertUsesGenericMethods:
     - 记录不存在 → 调用 create(data)（走 _generic_insert，生成 tp- 前缀 hash_id）
     """
 
-    def test_upsert_updates_existing_record(
-        self, being_provider, created_record, sample_content
-    ):
+    def test_upsert_updates_existing_record(self, being_provider, created_record, sample_content):
         """upsert 对已存在记录执行 UPDATE（保留原 hash_id）"""
         original_hash_id = created_record["hash_id"]
         new_content = {"upserted": True}
@@ -530,15 +495,12 @@ class TestUpsertUsesGenericMethods:
         )
 
         assert result is True
-        record = being_provider.get_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
         assert record["content"] == new_content
         assert record["ai_abstract"] == "AI"
         # UPDATE 路径应保留原 hash_id（不可变）
         assert record["hash_id"] == original_hash_id, (
-            f"UPDATE 路径应保留原 hash_id '{original_hash_id}'，"
-            f"实际: {record['hash_id']}"
+            f"UPDATE 路径应保留原 hash_id '{original_hash_id}'，实际: {record['hash_id']}"
         )
 
     def test_upsert_inserts_new_record(self, being_provider, sample_content):
@@ -548,9 +510,7 @@ class TestUpsertUsesGenericMethods:
         )
 
         assert result is True
-        record = being_provider.get_by_user_mode_version(
-            user_id=1, mode="past", version=1
-        )
+        record = being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
         assert record is not None, "INSERT 路径应创建新记录"
         assert record["content"] == sample_content
         assert record["ai_abstract"] == "AI"
@@ -572,9 +532,7 @@ class TestGetLatestVersionPreservesNativeSQL:
     依据 issue: 04-being-provider-migration（get_latest_version 保留原生 SQL，基类无 _generic_max）
     """
 
-    def test_get_latest_version_returns_max_version(
-        self, being_provider, sample_content
-    ):
+    def test_get_latest_version_returns_max_version(self, being_provider, sample_content):
         """get_latest_version 返回最新版本号"""
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
         being_provider.create_new_version(user_id=1, mode="past", content=sample_content)
@@ -602,9 +560,7 @@ class TestBeingProviderRaisesDataAccessError:
     依据 issue: 04-being-provider-migration（异常处理抛出 DataAccessError）
     """
 
-    def test_create_raises_data_access_error_on_db_failure(
-        self, being_provider, sample_content
-    ):
+    def test_create_raises_data_access_error_on_db_failure(self, being_provider, sample_content):
         """create 在数据库失败时抛出 DataAccessError（而非返回 None）"""
         from lifeprism.utils.exceptions import DataAccessError
 
@@ -632,9 +588,7 @@ class TestBeingProviderRaisesDataAccessError:
                 cursor.execute("DROP TRIGGER IF EXISTS prevent_insert_being")
                 conn.commit()
 
-    def test_delete_raises_data_access_error_on_db_failure(
-        self, being_provider, created_record
-    ):
+    def test_delete_raises_data_access_error_on_db_failure(self, being_provider, created_record):
         """delete 在数据库失败时抛出 DataAccessError（而非返回 False）"""
         from lifeprism.utils.exceptions import DataAccessError
 
@@ -658,9 +612,7 @@ class TestBeingProviderRaisesDataAccessError:
                 cursor.execute("DROP TRIGGER IF EXISTS prevent_delete_being")
                 conn.commit()
 
-    def test_get_by_user_mode_version_raises_data_access_error_on_db_failure(
-        self, being_provider
-    ):
+    def test_get_by_user_mode_version_raises_data_access_error_on_db_failure(self, being_provider):
         """get_by_user_mode_version 在数据库失败时抛出 DataAccessError（而非返回 None）"""
         from lifeprism.utils.exceptions import DataAccessError
 
@@ -672,9 +624,7 @@ class TestBeingProviderRaisesDataAccessError:
 
         try:
             with pytest.raises(DataAccessError):
-                being_provider.get_by_user_mode_version(
-                    user_id=1, mode="past", version=1
-                )
+                being_provider.get_by_user_mode_version(user_id=1, mode="past", version=1)
         finally:
             # 重建表以避免影响后续测试
             with being_provider.db.get_connection() as conn:
@@ -716,8 +666,7 @@ class TestBeingProviderUsesLazySingleton:
         from lifeprism.utils import LazySingleton
 
         assert isinstance(being_provider, LazySingleton), (
-            f"being_provider 应为 LazySingleton 实例，实际类型: "
-            f"{type(being_provider).__name__}"
+            f"being_provider 应为 LazySingleton 实例，实际类型: {type(being_provider).__name__}"
         )
 
     def test_lazy_singleton_proxies_method_calls(self, being_provider, sample_content):

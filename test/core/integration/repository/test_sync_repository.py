@@ -66,9 +66,15 @@ def initialized_db(test_data_path):
 
         # 先清理 sync 表残留数据（上次失败测试可能留下重复行，会阻止 UNIQUE INDEX 创建）
         _sync_tables = [
-            "mood_entries", "todo_list", "goal", "diary",
-            "timeline_custom_block", "user_app_behavior_log",
-            "category_map_cache", "mood_impacts", "time_paradoxes",
+            "mood_entries",
+            "todo_list",
+            "goal",
+            "diary",
+            "timeline_custom_block",
+            "user_app_behavior_log",
+            "category_map_cache",
+            "mood_impacts",
+            "time_paradoxes",
             "deletion_log",
         ]
         for t_name in _sync_tables:
@@ -84,8 +90,7 @@ def initialized_db(test_data_path):
                 if open_paren == -1 or close_paren == -1:
                     continue
                 unique_fields = [
-                    f.strip()
-                    for f in constraint_stripped[open_paren + 1 : close_paren].split(",")
+                    f.strip() for f in constraint_stripped[open_paren + 1 : close_paren].split(",")
                 ]
                 # 检查是否已有对应的 UNIQUE 索引
                 cursor.execute(f'PRAGMA index_list("{t_name}")')
@@ -102,8 +107,8 @@ def initialized_db(test_data_path):
                     # 用 uq_ 前缀避免与 indexes 配置中的非唯一索引同名（IF NOT EXISTS 按名跳过）
                     index_name = f"uq_{t_name}_" + "_".join(unique_fields)
                     cursor.execute(
-                        f'CREATE UNIQUE INDEX IF NOT EXISTS {index_name} '
-                        f'ON {t_name}({", ".join(unique_fields)})'
+                        f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
+                        f"ON {t_name}({', '.join(unique_fields)})"
                     )
         conn.commit()
 
@@ -635,8 +640,7 @@ class TestUpsertRowsWithLww:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT title, duration FROM user_app_behavior_log "
-                "WHERE hash_id = ?",
+                "SELECT title, duration FROM user_app_behavior_log WHERE hash_id = ?",
                 ("awbl-lww-auto-001",),
             )
             row = cursor.fetchone()
@@ -976,7 +980,9 @@ class TestHashIdSyncDedup:
 
     # ---------- Issue 1 回归测试：不同 hash_id + 相同业务 UNIQUE ----------
 
-    def test_lww_skips_older_data_same_business_unique_diff_hash_id(self, repository, initialized_db):
+    def test_lww_skips_older_data_same_business_unique_diff_hash_id(
+        self, repository, initialized_db
+    ):
         """回归测试 (Issue 1): 不同 hash_id + 相同业务 UNIQUE → LWW 正确跳过旧数据
 
         场景: 两设备独立创建相同业务键、不同 hash_id 的记录
@@ -1025,7 +1031,9 @@ class TestHashIdSyncDedup:
             assert row[0] == "新内容"  # 仍然是新数据
             assert row[1] == "tcb-lww-new-001"  # hash_id 未被覆盖
 
-    def test_lww_writes_newer_data_same_business_unique_diff_hash_id(self, repository, initialized_db):
+    def test_lww_writes_newer_data_same_business_unique_diff_hash_id(
+        self, repository, initialized_db
+    ):
         """回归测试 (Issue 1): 不同 hash_id + 相同业务 UNIQUE → LWW 正确写入新数据
 
         场景: 远程数据更新 → 应替换本地旧数据
@@ -1456,8 +1464,7 @@ class TestHashIdSyncDedup:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id FROM deletion_log "
-                "WHERE target_table = ? AND record_id = ?",
+                "SELECT id FROM deletion_log WHERE target_table = ? AND record_id = ?",
                 ("mood_entries", "mood-xyz"),
             )
             row = cursor.fetchone()

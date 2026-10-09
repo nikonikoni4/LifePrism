@@ -126,15 +126,11 @@ class TestValueProviderBaseline:
         value_id = value_provider.create_value(sample_value_data)
 
         assert value_id is not None
-        assert value_id.startswith("val-"), (
-            f"ID 应以 'val-' 开头，实际: {value_id}"
-        )
+        assert value_id.startswith("val-"), f"ID 应以 'val-' 开头，实际: {value_id}"
         # val- (4 字符) + 8 位 hex = 12 字符
         assert len(value_id) == 12, f"ID 长度应为 12，实际: {len(value_id)}"
 
-    def test_get_value_by_id_returns_created_value(
-        self, value_provider, sample_value_data
-    ):
+    def test_get_value_by_id_returns_created_value(self, value_provider, sample_value_data):
         """按 ID 查询返回新创建的价值"""
         value_id = value_provider.create_value(sample_value_data)
 
@@ -204,9 +200,7 @@ class TestValueProviderBaseline:
         assert value["content_negative"] == "我不想成为停滞不前的人"
         assert value["sort_order"] == 10
 
-    def test_update_value_with_empty_data_returns_true(
-        self, value_provider, sample_value_data
-    ):
+    def test_update_value_with_empty_data_returns_true(self, value_provider, sample_value_data):
         """空数据更新返回 True（无操作）"""
         value_id = value_provider.create_value(sample_value_data)
 

@@ -65,8 +65,7 @@ class TestCustomProviderEnvKey:
         """
         test_key = "sk-test-custom-key-for-bug-c-reproduction"
 
-        with patch("keyring.set_password") as mock_set, \
-             patch("keyring.get_password") as mock_get:
+        with patch("keyring.set_password") as mock_set, patch("keyring.get_password") as mock_get:
             mock_get.return_value = test_key
 
             from lifeprism.config.settings_manager import settings
@@ -176,10 +175,9 @@ class TestUpdateApiKeyValidation:
         修复后：update_api_key 提前检查 env_key，为空时抛 ValueError
         """
         # 模拟一个 env_key 为空的 provider
-        with patch.object(
-            provider_manager, "get_keyring_username", return_value=None
-        ), patch.object(
-            provider_manager, "get_provider_id", return_value="fake_provider"
+        with (
+            patch.object(provider_manager, "get_keyring_username", return_value=None),
+            patch.object(provider_manager, "get_provider_id", return_value="fake_provider"),
         ):
             with pytest.raises(ValueError, match="env_key 未配置"):
                 setting_service.update_api_key("sk-fake-key", "fake_provider")
@@ -190,25 +188,21 @@ class TestUpdateApiKeyValidation:
         修复前：不检查返回值，日志显示"已安全保存"（误导）
         修复后：检查返回值，失败时抛 ValueError
         """
-        with patch.object(
-            provider_manager, "get_keyring_username", return_value="api_key_fake"
-        ), patch.object(
-            provider_manager, "get_provider_id", return_value="fake_provider"
-        ), patch.object(
-            setting_service.settings, "set_api_key", return_value=False
+        with (
+            patch.object(provider_manager, "get_keyring_username", return_value="api_key_fake"),
+            patch.object(provider_manager, "get_provider_id", return_value="fake_provider"),
+            patch.object(setting_service.settings, "set_api_key", return_value=False),
         ):
             with pytest.raises(ValueError, match="保存失败"):
                 setting_service.update_api_key("sk-fake-key", "fake_provider")
 
     def test_update_api_key_success_when_set_api_key_returns_true(self):
         """正常路径：set_api_key 返回 True 时，update_api_key 返回 True"""
-        with patch.object(
-            provider_manager, "get_keyring_username", return_value="api_key_custom"
-        ), patch.object(
-            provider_manager, "get_provider_id", return_value="custom"
-        ), patch.object(
-            setting_service.settings, "set_api_key", return_value=True
-        ) as mock_set:
+        with (
+            patch.object(provider_manager, "get_keyring_username", return_value="api_key_custom"),
+            patch.object(provider_manager, "get_provider_id", return_value="custom"),
+            patch.object(setting_service.settings, "set_api_key", return_value=True) as mock_set,
+        ):
             result = setting_service.update_api_key("sk-real-key", "custom")
             assert result is True
             mock_set.assert_called_once_with("sk-real-key", "custom")

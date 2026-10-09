@@ -66,18 +66,14 @@ class TestDreamingTimeoutDegradation:
     """
 
     @pytest.mark.asyncio
-    async def test_dreaming_timeout_skips_incremental_sync(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_timeout_skips_incremental_sync(self, reset_global_task_state):
         """超时降级：acquired=False 时跳过 incremental_sync"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.backup_service import BackupService
         from lifeprism.server.services.global_task_state import GlobalTaskState
 
         with (
-            patch.object(
-                GlobalTaskState, "try_acquire", return_value=False
-            ),
+            patch.object(GlobalTaskState, "try_acquire", return_value=False),
             patch(
                 "lifeprism.server.services.schedule_service.SyncService"
             ) as mock_sync_service_cls,
@@ -85,12 +81,8 @@ class TestDreamingTimeoutDegradation:
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", new=AsyncMock()
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", new=AsyncMock()),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -102,21 +94,15 @@ class TestDreamingTimeoutDegradation:
         mock_sync_service_cls.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_dreaming_timeout_still_executes_dreaming(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_timeout_still_executes_dreaming(self, reset_global_task_state):
         """超时降级：dreaming 仍执行（不依赖云端）"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.backup_service import BackupService
         from lifeprism.server.services.global_task_state import GlobalTaskState
 
         with (
-            patch.object(
-                GlobalTaskState, "try_acquire", return_value=False
-            ),
-            patch(
-                "lifeprism.server.services.schedule_service.SyncService"
-            ),
+            patch.object(GlobalTaskState, "try_acquire", return_value=False),
+            patch("lifeprism.server.services.schedule_service.SyncService"),
             patch(
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
@@ -125,9 +111,7 @@ class TestDreamingTimeoutDegradation:
                 "lifeprism.server.services.schedule_service.dreaming",
                 new=AsyncMock(),
             ) as mock_dreaming,
-            patch.object(
-                BackupService, "backup_documents", new=AsyncMock()
-            ),
+            patch.object(BackupService, "backup_documents", new=AsyncMock()),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -139,9 +123,7 @@ class TestDreamingTimeoutDegradation:
         mock_dreaming.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_dreaming_timeout_still_executes_backup(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_timeout_still_executes_backup(self, reset_global_task_state):
         """超时降级：backup_documents 仍执行（备份本地数据）"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.backup_service import BackupService
@@ -149,22 +131,14 @@ class TestDreamingTimeoutDegradation:
 
         mock_backup = AsyncMock()
         with (
-            patch.object(
-                GlobalTaskState, "try_acquire", return_value=False
-            ),
-            patch(
-                "lifeprism.server.services.schedule_service.SyncService"
-            ),
+            patch.object(GlobalTaskState, "try_acquire", return_value=False),
+            patch("lifeprism.server.services.schedule_service.SyncService"),
             patch(
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", mock_backup
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", mock_backup),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -176,9 +150,7 @@ class TestDreamingTimeoutDegradation:
         mock_backup.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_dreaming_timeout_does_not_call_release(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_timeout_does_not_call_release(self, reset_global_task_state):
         """关键守卫：acquired=False 时 finally 不调用 release()
 
         验证 ADR 决策 2 执行序列图的超时分支：
@@ -192,25 +164,15 @@ class TestDreamingTimeoutDegradation:
         from lifeprism.server.services.global_task_state import GlobalTaskState
 
         with (
-            patch.object(
-                GlobalTaskState, "try_acquire", return_value=False
-            ),
-            patch.object(
-                GlobalTaskState, "release"
-            ) as mock_release,
-            patch(
-                "lifeprism.server.services.schedule_service.SyncService"
-            ),
+            patch.object(GlobalTaskState, "try_acquire", return_value=False),
+            patch.object(GlobalTaskState, "release") as mock_release,
+            patch("lifeprism.server.services.schedule_service.SyncService"),
             patch(
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", new=AsyncMock()
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", new=AsyncMock()),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -226,17 +188,13 @@ class TestDreamingAcquiredPath:
     """Seam 1: _dreaming 成功获取路径（使用真实 GlobalTaskState 状态）"""
 
     @pytest.mark.asyncio
-    async def test_dreaming_acquired_executes_incremental_sync(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_acquired_executes_incremental_sync(self, reset_global_task_state):
         """成功获取：执行 incremental_sync（真实 IDLE 状态）"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.backup_service import BackupService
 
         mock_sync_service = MagicMock()
-        mock_sync_service.incremental_sync = AsyncMock(
-            return_value={"message": "ok"}
-        )
+        mock_sync_service.incremental_sync = AsyncMock(return_value={"message": "ok"})
 
         with (
             patch(
@@ -247,12 +205,8 @@ class TestDreamingAcquiredPath:
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", new=AsyncMock()
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", new=AsyncMock()),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -282,12 +236,8 @@ class TestDreamingAcquiredPath:
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", new=AsyncMock()
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", new=AsyncMock()),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -308,9 +258,7 @@ class TestDreamingExceptionRelease:
     """
 
     @pytest.mark.asyncio
-    async def test_dreaming_release_on_incremental_sync_exception(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_release_on_incremental_sync_exception(self, reset_global_task_state):
         """异常路径：incremental_sync 抛异常时 release 仍被调用（状态回到 IDLE）"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.backup_service import BackupService
@@ -320,9 +268,7 @@ class TestDreamingExceptionRelease:
         )
 
         mock_sync_service = MagicMock()
-        mock_sync_service.incremental_sync = AsyncMock(
-            side_effect=RuntimeError("sync failed")
-        )
+        mock_sync_service.incremental_sync = AsyncMock(side_effect=RuntimeError("sync failed"))
 
         with (
             patch(
@@ -333,12 +279,8 @@ class TestDreamingExceptionRelease:
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", new=AsyncMock()
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", new=AsyncMock()),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -351,9 +293,7 @@ class TestDreamingExceptionRelease:
         assert global_task_state.current_state == TaskState.IDLE
 
     @pytest.mark.asyncio
-    async def test_dreaming_release_on_backup_exception(
-        self, reset_global_task_state
-    ):
+    async def test_dreaming_release_on_backup_exception(self, reset_global_task_state):
         """异常路径：backup_documents 抛异常时 release 仍被调用（状态回到 IDLE）"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.backup_service import BackupService
@@ -372,12 +312,8 @@ class TestDreamingExceptionRelease:
                 "lifeprism.server.services.schedule_service.generate_diary_ai_summary",
                 new=AsyncMock(),
             ),
-            patch(
-                "lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()
-            ),
-            patch.object(
-                BackupService, "backup_documents", mock_backup
-            ),
+            patch("lifeprism.server.services.schedule_service.dreaming", new=AsyncMock()),
+            patch.object(BackupService, "backup_documents", mock_backup),
             patch("lifeprism.server.services.schedule_service.settings") as mock_settings,
         ):
             mock_settings.auto_diary_summary = True
@@ -400,20 +336,14 @@ class TestProcessSessionMessageTimeout:
     """
 
     @pytest.mark.asyncio
-    async def test_process_session_message_timeout_returns_early(
-        self, reset_global_task_state
-    ):
+    async def test_process_session_message_timeout_returns_early(self, reset_global_task_state):
         """超时：acquired=False 时 early return，不执行 process_session_message"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.global_task_state import GlobalTaskState
 
         with (
-            patch.object(
-                GlobalTaskState, "try_acquire", return_value=False
-            ),
-            patch.object(
-                GlobalTaskState, "release"
-            ) as mock_release,
+            patch.object(GlobalTaskState, "try_acquire", return_value=False),
+            patch.object(GlobalTaskState, "release") as mock_release,
             patch(
                 "lifeprism.server.services.schedule_service.process_session_message",
                 new=AsyncMock(),
@@ -451,9 +381,7 @@ class TestProcessSessionMessageTimeout:
         assert global_task_state.current_state == TaskState.IDLE
 
     @pytest.mark.asyncio
-    async def test_process_session_message_release_on_exception(
-        self, reset_global_task_state
-    ):
+    async def test_process_session_message_release_on_exception(self, reset_global_task_state):
         """异常路径：process_session_message 抛异常时 release 仍被调用（状态回到 IDLE）"""
         from lifeprism.server.services import schedule_service
         from lifeprism.server.services.global_task_state import (
@@ -484,9 +412,7 @@ class TestRunSyncLoopMutex:
     """
 
     @pytest.mark.asyncio
-    async def test_run_sync_loop_calls_ping_when_local_task_active(
-        self, reset_global_task_state
-    ):
+    async def test_run_sync_loop_calls_ping_when_local_task_active(self, reset_global_task_state):
         """LOCAL_TASK 占用时：try_acquire 失败，调 send_ping，不执行 sync_once"""
         from lifeprism.sync.sync_client import SyncClient
         from lifeprism.server.services.global_task_state import (
@@ -508,9 +434,7 @@ class TestRunSyncLoopMutex:
 
         # 使用极短的 sleep 让循环快速执行一次
         with (
-            patch(
-                "lifeprism.config.settings_manager.get_setting", return_value="http://test:8000"
-            ),
+            patch("lifeprism.config.settings_manager.get_setting", return_value="http://test:8000"),
             patch.object(sync_client, "sync_once") as mock_sync_once,
             patch.object(sync_client, "send_ping") as mock_send_ping,
             patch.object(sync_client, "finish_sync"),
@@ -531,9 +455,7 @@ class TestRunSyncLoopMutex:
         mock_send_ping.assert_called()
 
     @pytest.mark.asyncio
-    async def test_run_sync_loop_releases_on_sync_exception(
-        self, reset_global_task_state
-    ):
+    async def test_run_sync_loop_releases_on_sync_exception(self, reset_global_task_state):
         """sync_once 抛异常时 release() 在内层 finally 被调用"""
         from lifeprism.sync.sync_client import SyncClient
         from lifeprism.server.services.global_task_state import (
@@ -550,12 +472,8 @@ class TestRunSyncLoopMutex:
         sync_client.sync_repository = MagicMock()
 
         with (
-            patch(
-                "lifeprism.config.settings_manager.get_setting", return_value="http://test:8000"
-            ),
-            patch.object(
-                sync_client, "sync_once", side_effect=RuntimeError("sync failed")
-            ),
+            patch("lifeprism.config.settings_manager.get_setting", return_value="http://test:8000"),
+            patch.object(sync_client, "sync_once", side_effect=RuntimeError("sync failed")),
             patch.object(sync_client, "send_ping"),
             patch.object(sync_client, "finish_sync"),
         ):
@@ -582,9 +500,7 @@ class TestStartSyncOnStartupMutex:
     """
 
     @pytest.mark.asyncio
-    async def test_start_sync_calls_ping_when_local_task_active(
-        self, reset_global_task_state
-    ):
+    async def test_start_sync_calls_ping_when_local_task_active(self, reset_global_task_state):
         """LOCAL_TASK 占用时：启动同步调 send_ping，不执行 sync_once"""
         from lifeprism.server.main import _start_sync_on_startup
         from lifeprism.server.services.global_task_state import (
@@ -618,9 +534,7 @@ class TestStartSyncOnStartupMutex:
         mock_sync_client.finish_sync.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_sync_executes_sync_when_idle(
-        self, reset_global_task_state
-    ):
+    async def test_start_sync_executes_sync_when_idle(self, reset_global_task_state):
         """IDLE 状态：启动同步正常执行 sync_once + release"""
         from lifeprism.server.main import _start_sync_on_startup
         from lifeprism.server.services.global_task_state import (
@@ -660,9 +574,7 @@ class TestRunSyncBackgroundMutex:
     验证 ADR 决策 4：手动触发同步遇 LOCAL_TASK 放弃 + 调 send_ping
     """
 
-    def test_run_sync_background_calls_ping_when_local_task_active(
-        self, reset_global_task_state
-    ):
+    def test_run_sync_background_calls_ping_when_local_task_active(self, reset_global_task_state):
         """LOCAL_TASK 占用时：手动同步调 send_ping，不执行 sync_once"""
         from lifeprism.server.api.sync_status_api import _run_sync_background
         from lifeprism.server.services.global_task_state import (
@@ -688,9 +600,7 @@ class TestRunSyncBackgroundMutex:
         # Assert: finish_sync 被调用（finally 守卫）
         mock_sync_client.finish_sync.assert_called_once()
 
-    def test_run_sync_background_executes_sync_when_idle(
-        self, reset_global_task_state
-    ):
+    def test_run_sync_background_executes_sync_when_idle(self, reset_global_task_state):
         """IDLE 状态：手动同步正常执行 sync_once + release"""
         from lifeprism.server.api.sync_status_api import _run_sync_background
         from lifeprism.server.services.global_task_state import (
@@ -712,9 +622,7 @@ class TestRunSyncBackgroundMutex:
         # Assert: 状态已释放回 IDLE
         assert global_task_state.current_state == TaskState.IDLE
 
-    def test_run_sync_background_releases_on_sync_exception(
-        self, reset_global_task_state
-    ):
+    def test_run_sync_background_releases_on_sync_exception(self, reset_global_task_state):
         """异常路径：sync_once 抛异常时 release 在 finally 被调用（状态回到 IDLE）"""
         from lifeprism.server.api.sync_status_api import _run_sync_background
         from lifeprism.server.services.global_task_state import (
