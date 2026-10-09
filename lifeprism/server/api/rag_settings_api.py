@@ -6,11 +6,19 @@ from fastapi import APIRouter, HTTPException
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.rag.config import KEYS, RagSettings, RagSettingsPatch, read_settings, validate_update
-from lifeprism.rag.service import RagIndexStatus, get_rag_service
+from lifeprism.rag.service import RagConnectionTestResult, RagIndexStatus, get_rag_service
 from lifeprism.server.schemas.rag_schemas import RagKeyRequest
 from lifeprism.server.services.rag_index_service import start_manual_index
 
 router = APIRouter(prefix="/settings/rag", tags=["RAG Settings"])
+
+
+@router.post(
+    "/test/{purpose}", response_model=RagConnectionTestResult, summary="独立测试 RAG 模型连接"
+)
+async def test_rag_connection(purpose: Literal["embedding", "rerank"]) -> RagConnectionTestResult:
+    """使用已保存地址与密钥，固定测试文本，不构建索引或修改开关。"""
+    return await get_rag_service().test_connection(purpose)
 
 
 @router.get("/index", response_model=RagIndexStatus, summary="读取 RAG 索引状态")
@@ -41,7 +49,7 @@ async def get_rag_settings() -> RagSettings:
     return read_settings(settings)
 
 
-@router.patch("", response_model=RagSettings, summary="修改 RAG 开关和索引目录")
+@router.patch("", response_model=RagSettings, summary="修改 RAG 开关、索引目录和模型地址")
 async def update_rag_settings(request: RagSettingsPatch) -> RagSettings:
     """只更新提供的可编辑字段，凭据不足时拒绝开启。"""
     try:

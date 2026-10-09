@@ -35,6 +35,7 @@ import yaml
 
 from lifeprism.config.provider_manager import provider_manager
 from lifeprism.config.settings_manager import settings
+from lifeprism.rag.config import EMBEDDING_BASE_URL, RERANK_BASE_URL
 from lifeprism.sync.sync_config import get_sync_api_key, set_sync_api_key
 from lifeprism.utils import get_logger
 
@@ -196,6 +197,10 @@ class CloudConfigGenerator:
                     "enabled": settings.get("rag.enabled", False),
                     "rerank_enabled": settings.get("rag.rerank_enabled", False),
                     "index_directories": settings.get("rag.index_directories", ["user", "diary"]),
+                    "embedding_base_url": settings.get(
+                        "rag.embedding_base_url", EMBEDDING_BASE_URL
+                    ),
+                    "rerank_base_url": settings.get("rag.rerank_base_url", RERANK_BASE_URL),
                 },
             },
         }

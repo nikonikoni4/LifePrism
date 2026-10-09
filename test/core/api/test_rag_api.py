@@ -63,6 +63,98 @@ async def test_settings_fixed_models_and_key_clear_disables_feature(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_editable_urls_fixed_models_and_independent_connection_tests(monkeypatch, tmp_path):
+    from lifeprism.rag.service import RagService
+    from lifeprism.server.api import rag_settings_api as api
+
+    settings = MemorySettings()
+    settings.run_mode = "full"
+    settings.set_storage_key("rag_embedding_api_key", "synthetic-embed")
+    settings.set_storage_key("rag_rerank_api_key", "synthetic-rerank")
+    calls = []
+
+    class Embedding:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def embed(self, parts, dimensions=None):
+            calls.append("embedding")
+            return SimpleNamespace(dense=np.ones(dimensions, dtype=np.float32))
+
+    class Rerank:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def rerank(self, query, documents, top_n=None):
+            calls.append("rerank")
+            return [SimpleNamespace(chunk_id=documents[0].chunk_id)]
+
+    service = RagService(tmp_path, settings, embedding_factory=Embedding, rerank_factory=Rerank)
+    monkeypatch.setattr(api, "settings", settings)
+    monkeypatch.setattr(api, "get_rag_service", lambda: service)
+    app = FastAPI()
+    app.include_router(api.router)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        result = await client.patch(
+            "/settings/rag",
+            json={
+                "embedding_base_url": "https://embedding.example/api/v3",
+                "rerank_base_url": "https://rerank.example/full-endpoint",
+            },
+        )
+        assert result.status_code == 200
+        assert result.json()["embedding"]["base_url"] == "https://embedding.example/api/v3"
+        assert result.json()["embedding"]["model"] == "doubao-embedding-vision"
+        assert (
+            await client.patch("/settings/rag", json={"embedding_model": "other"})
+        ).status_code == 422
+        assert (
+            await client.patch("/settings/rag", json={"rerank_base_url": "file:///x"})
+        ).status_code == 422
+        assert (await client.post("/settings/rag/test/rerank")).json()["success"]
+        assert calls == ["rerank"]  # 不依赖 embedding，也不要求开启 RAG/rerank。
+        assert (await client.post("/settings/rag/test/embedding")).json()["success"]
+        assert calls == ["rerank", "embedding"]
+        assert service.current() is None
+        real_factory = RagService(tmp_path, settings)
+        assert real_factory._embedding()._config.api_base == "https://embedding.example/api/v3"
+        assert real_factory._reranker()._config.api_base == "https://rerank.example/full-endpoint"
+        assert not settings.get("rag.enabled", False)
+
+
+@pytest.mark.asyncio
+async def test_connection_failure_is_explicit_redacted_and_does_not_require_embedding(
+    tmp_path, caplog
+):
+    from lifeprism.rag.service import RagService
+
+    settings = MemorySettings()
+    settings.set_storage_key("rag_rerank_api_key", "private-rerank-key")
+
+    class BrokenRerank:
+        async def __aenter__(self):
+            raise ConnectionError("connection refused private-rerank-key")
+
+        async def __aexit__(self, *args):
+            pass
+
+    service = RagService(tmp_path, settings, rerank_factory=BrokenRerank)
+    result = await service.test_connection("rerank")
+    assert not result.success
+    assert "connection refused" in result.message
+    assert "private-rerank-key" not in result.message + caplog.text
+    assert service.current() is None
+
+
+@pytest.mark.asyncio
 async def test_real_snapshot_upload_auth_validation_and_idempotence(monkeypatch, tmp_path):
     from lifeprism.rag.service import RagService
     from lifeprism.server.api import rag_sync_api as module

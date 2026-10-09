@@ -11,6 +11,7 @@ vi.mock('../ragApi', () => ({
     saveKey: vi.fn(),
     indexStatus: vi.fn(),
     buildIndex: vi.fn(),
+    testConnection: vi.fn(),
   },
 }));
 
@@ -31,6 +32,37 @@ const defaults = {
 };
 
 describe('RagConfigSection', () => {
+  it('edits base URL while model stays fixed and runs each connection probe independently', async () => {
+    vi.mocked(RagAPI.get).mockResolvedValue({
+      ...defaults,
+      embedding: { ...defaults.embedding, configured: true },
+      rerank: { ...defaults.rerank, configured: true },
+    });
+    vi.mocked(RagAPI.update).mockResolvedValue({
+      ...defaults,
+      embedding: { ...defaults.embedding, configured: true, base_url: 'https://custom.example/v3' },
+      rerank: { ...defaults.rerank, configured: true },
+    });
+    vi.mocked(RagAPI.testConnection).mockResolvedValue({ success: true, message: '连接成功' });
+    render(<RagConfigSection />);
+    fireEvent.change(await screen.findByLabelText('豆包嵌入地址'), {
+      target: { value: 'https://custom.example/v3' },
+    });
+    expect(screen.getByLabelText('豆包嵌入模型')).toHaveAttribute('readonly');
+    fireEvent.click(screen.getByRole('button', { name: '保存豆包嵌入地址' }));
+    await waitFor(() =>
+      expect(RagAPI.update).toHaveBeenCalledWith({
+        embedding_base_url: 'https://custom.example/v3',
+      })
+    );
+    fireEvent.click(screen.getByRole('button', { name: '测试豆包嵌入连接' }));
+    await waitFor(() => expect(RagAPI.testConnection).toHaveBeenCalledWith('embedding'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '测试阿里云重排连接' })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole('button', { name: '测试阿里云重排连接' }));
+    await waitFor(() => expect(RagAPI.testConnection).toHaveBeenCalledWith('rerank'));
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(RagAPI.get).mockResolvedValue(defaults);

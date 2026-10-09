@@ -14,7 +14,12 @@ export interface RagSettings {
 }
 export type RagSettingsPatch = Partial<
   Pick<RagSettings, 'enabled' | 'rerank_enabled' | 'index_directories'>
->;
+> & { embedding_base_url?: string; rerank_base_url?: string };
+
+export interface RagConnectionTestResult {
+  success: boolean;
+  message: string;
+}
 
 export interface RagIndexStatus {
   last_index_time: string | null;
@@ -41,6 +46,8 @@ async function request<T = RagSettings>(path: string, init?: RequestInit): Promi
 }
 
 export const RagAPI = {
+  testConnection: (purpose: 'embedding' | 'rerank') =>
+    request<RagConnectionTestResult>(`/test/${purpose}`, { method: 'POST' }),
   indexStatus: () => request<RagIndexStatus>('/index'),
   buildIndex: () => request<RagIndexStatus>('/index', { method: 'POST' }),
   get: () => request(''),

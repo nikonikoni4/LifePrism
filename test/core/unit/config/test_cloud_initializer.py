@@ -141,6 +141,8 @@ def test_rag_cloud_import_keeps_keys_separate(setup_paths, cloud_init_data):
         "enabled": True,
         "rerank_enabled": True,
         "index_directories": ["user", "diary"],
+        "embedding_base_url": "https://embed.example/v3",
+        "rerank_base_url": "https://rerank.example/endpoint",
     }
     cloud_init_data["storage"].update(
         rag_embedding_api_key="synthetic-embedding", rag_rerank_api_key="synthetic-rerank"
@@ -153,6 +155,8 @@ def test_rag_cloud_import_keeps_keys_separate(setup_paths, cloud_init_data):
     assert config["rag.enabled"] is True
     assert config["rag.rerank_enabled"] is True
     assert config["rag.index_directories"] == ["user", "diary"]
+    assert config["rag.embedding_base_url"] == "https://embed.example/v3"
+    assert config["rag.rerank_base_url"] == "https://rerank.example/endpoint"
     assert "rag_embedding_api_key" not in config
     assert storage["rag_embedding_api_key"] == "synthetic-embedding"
     assert storage["rag_rerank_api_key"] == "synthetic-rerank"

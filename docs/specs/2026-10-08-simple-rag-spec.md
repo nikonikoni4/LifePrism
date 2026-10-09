@@ -1,8 +1,8 @@
 ---
-version: 1.2
+version: 1.3
 created_at: 2026-10-08
-updated_at: 2026-10-08
-last_updated: 增加设置页上次成功索引时间与本地手动后台索引
+updated_at: 2026-10-09
+last_updated: 模型 ID 固定而地址可编辑，增加独立连接测试和分阶段脱敏失败日志
 abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和阿里云重排模型、默认 vec 检索、可选 BM25、每日记忆更新后独立单向同步完整 SQLite 快照。
 ---
 
@@ -15,6 +15,7 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 | 1.0 | 设置、原生检索工具、每日完整构建与云端快照发布 |
 | 1.1 | 接通独立 agent_only 启动入口；验证实际 HTTP 上传、确认失败重试与 SSH 地址选择；补齐代理上传限制 |
 | 1.2 | 设置页显示成功索引时间，支持手动后台重建与状态轮询，复用全局任务互斥 |
+| 1.3 | 可编辑两个 base URL、独立模型连接测试、包含阶段与调用链的脱敏错误日志 |
 
 ## Overview
 
@@ -27,7 +28,8 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 ## Functional Checklist
 
 - [x] RAG、rerank 默认关闭，默认索引目录为 `user`、`diary`。
-- [x] 模型和 base_url 固定，独立密钥只写安全存储，读取接口仅返回配置状态。
+- [x] 模型 ID 固定，base URL 可编辑；独立密钥只写安全存储，读取接口仅返回配置状态。
+- [x] 嵌入模型和 rerank 模型独立连接测试，不依赖索引和功能开关。
 - [x] 构建 vec 和 own_bm25；工具默认只检索 vec，显式关键词可启用 BM25。
 - [x] 完整重建移除已删除来源；构建和校验失败保留旧索引。
 - [x] 每日记忆更新后构建，再独立上传；上传失败复用当日索引重试。
@@ -45,12 +47,14 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 | rag.enabled | bool | false；开启前需 embedding key |
 | rag.rerank_enabled | bool | false；开启前需 rerank key |
 | rag.index_directories | string[] | user、diary；至少一个、安全相对目录、不重复且不互相包含 |
+| rag.embedding_base_url | string | 默认下表豆包地址，可编辑；填写基础地址，客户端追加 /embeddings/multimodal |
+| rag.rerank_base_url | string | 默认下表阿里云地址，可编辑；填写完整 rerank 端点 |
 | rag_embedding_api_key | string | 独立安全存储；空值表示删除并关闭 RAG |
 | rag_rerank_api_key | string | 独立安全存储；空值表示删除并关闭 rerank |
 
 目录相对于 `lifeprism_data_path`，只收集递归 `*.md`。绝对路径、上级路径及通过符号链接逃出数据根的来源被拒绝。`rag`、`config`、`logs`、`database`、`screenshots` 不可作为索引根。
 
-| 用途 | 固定模型 | 固定 base_url |
+| 用途 | 固定模型 | 默认 base_url（可编辑） |
 |------|----------|----------------|
 | embedding | doubao-embedding-vision（2048 维） | https://ark.cn-beijing.volces.com/api/plan/v3 |
 | rerank | qwen3.7-text-rerank | https://llm-v1wy4r670fcws401.cn-beijing.maas.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank |
@@ -60,12 +64,17 @@ abstract: 个人资料与日记的版本化 RAG 索引；固定豆包嵌入和�
 | 方法与路径 | 请求 | 响应 | 路由处理函数 |
 |------------|------|------|--------------|
 | GET /api/v2/settings/rag | 无 | RagSettings | get_rag_settings |
-| PATCH /api/v2/settings/rag | 可选 enabled、rerank_enabled、index_directories | RagSettings | update_rag_settings |
+| PATCH /api/v2/settings/rag | 可选 enabled、rerank_enabled、index_directories、embedding_base_url、rerank_base_url | RagSettings | update_rag_settings |
 | PUT /api/v2/settings/rag/keys/{purpose} | `{api_key: string}`，最大 4096 字符；purpose 为 embedding 或 rerank | RagSettings | update_rag_key |
 | GET /api/v2/settings/rag/index | 无 | RagIndexStatus | get_rag_index_status |
 | POST /api/v2/settings/rag/index | 无 | 202，RagIndexStatus | build_rag_index |
+| POST /api/v2/settings/rag/test/{purpose} | 无；purpose 为 embedding 或 rerank | RagConnectionTestResult | test_rag_connection |
 
-PATCH 省略字段表示保留，显式 null 或额外字段返回 422；模型、base_url 不可通过 API 修改。RagSettings 包含 `enabled: bool`、`rerank_enabled: bool`、`index_directories: string[]`、`embedding` 和 `rerank`。两个模型对象均包含 `model: string`、`base_url: string`、`configured: bool`，不包含密钥。开启缺少凭据的功能返回 422。
+PATCH 省略字段表示保留，显式 null 或额外字段返回 422；模型 ID 不可通过 API 修改。地址只接受无内嵌凭据、查询参数和片段的 HTTP(S) URL。RagSettings 包含 `enabled: bool`、`rerank_enabled: bool`、`index_directories: string[]`、`embedding` 和 `rerank`。两个模型对象均包含 `model: string`、`base_url: string`、`configured: bool`，不包含密钥。开启缺少凭据的功能返回 422。两个地址随 cloud_init 配置导出/初始化。
+
+`RagConnectionTestResult` 包含 `success: bool`、`message: string`。测试使用已保存地址与密钥，只发送固定测试文本，不使用用户文档、不创建索引、不修改开关。embedding 验证 2048 维有限数值向量；rerank 验证非空且文档 ID 对应测试输入。缺少对应密钥返回 422，其他调用失败返回 success=false 与脱敏原因，日志保留详细诊断；探针整体超时 20 秒。页面分别提供保存地址和测试连接按钮，未保存地址或密钥时要求先保存。测试会产生少量模型 API 费用。
+
+索引失败日志区分依赖加载、来源复制、分块、合并、模型初始化、嵌入、写入、快照、校验、发布阶段，上传失败附版本号。手动任务、每日任务和 rerank 回退记录异常消息、异常链、各栈帧及可用的 HTTP 状态/服务商 code、message；分条输出避免单条日志 2000 字符截断丢掉根因。日志脱敏已配置的 RAG/同步密钥，不输出请求正文、文档正文、栈帧局部变量或源码行。页面索引失败仍显示简洁提示。
 
 `RagIndexStatus` 包含 `last_index_time: datetime | null`（当前成功发布版本的 created_at，UTC ISO 8601）、`building: bool`（手动或定时构建进行中）、`error: string | null`（手动后台任务的安全失败提示）、`can_build: bool`（full 模式、RAG 开启且 embedding key 已配置）。未索引显示“尚未索引”；时间按用户配置时区显示。页面每 2 秒刷新状态，离开页面停止轮询；关闭设置页不取消后台任务。后台错误状态只保存在当前进程，新构建成功后清除。
 
@@ -129,18 +138,19 @@ IndexManifest 全部字段：
 
 <key_function>
 - lifeprism/rag/service.py
-  - service.RagService.build:274
-  - service.RagService.search:334
-  - service.RagService.install:200
+  - service.RagService.build:322
+  - service.RagService.search:398
+  - service.RagService.install:248
 - lifeprism/sync/rag_sync.py
   - rag_sync.DailyRagJob.run:74
   - rag_sync.RagSyncSender.upload:30
 - lifeprism/server/api/rag_settings_api.py
-  - rag_settings_api.get_rag_settings:39
-  - rag_settings_api.update_rag_settings:45
-  - rag_settings_api.update_rag_key:58
-  - rag_settings_api.get_rag_index_status:17
-  - rag_settings_api.build_rag_index:30
+  - rag_settings_api.get_rag_settings:47
+  - rag_settings_api.update_rag_settings:53
+  - rag_settings_api.update_rag_key:66
+  - rag_settings_api.get_rag_index_status:25
+  - rag_settings_api.build_rag_index:38
+  - rag_settings_api.test_rag_connection:19
 - lifeprism/server/api/rag_sync_api.py
   - rag_sync_api.receive_index:22
   - rag_sync_api.get_index_manifest:52

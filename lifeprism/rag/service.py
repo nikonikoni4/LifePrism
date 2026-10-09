@@ -13,6 +13,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 import sqlite_vec
@@ -20,22 +21,27 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lifeprism.rag.config import (
     DIMENSIONS,
-    EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     KEYS,
-    RERANK_BASE_URL,
     RERANK_MODEL,
     SettingsSource,
     read_settings,
     validate_directories,
 )
-from lifeprism.rag.diagnostics import log_rag_failure, rag_stage
+from lifeprism.rag.diagnostics import failure_summary, log_rag_failure, rag_stage
 from lifeprism.repository import rag_repository
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ConflictError, ValidationError
 
 logger = get_logger(__name__)
 MAX_INDEX_BYTES = 512 * 1024 * 1024
+
+
+class RagConnectionTestResult(BaseModel):
+    """独立模型连接测试结果，不返回凭据或用户语料。"""
+
+    success: bool
+    message: str
 
 
 class RagIndexStatus(BaseModel):
@@ -139,7 +145,7 @@ class RagService:
             self._manual_error = "索引构建失败，请检查模型密钥、网络和目录；原索引已保留"
 
     def _embedding(self):
-        """显式指定固定模型/地址，缺少凭据时不使用环境兜底。"""
+        """显式指定固定模型与已保存地址，缺少凭据时不使用环境兜底。"""
         from simple_rag.config import DoubaoAPIConfig
         from simple_rag.embedding_api.doubao import DoubaoEmbeddingVision
 
@@ -147,10 +153,49 @@ class RagService:
         if not key:
             raise ValueError("embedding API Key 未配置")
         return DoubaoEmbeddingVision(
-            DoubaoAPIConfig(api_base=EMBEDDING_BASE_URL, api_key=key, model=EMBEDDING_MODEL),
+            DoubaoAPIConfig(
+                api_base=read_settings(self.config).embedding.base_url,
+                api_key=key,
+                model=EMBEDDING_MODEL,
+            ),
             max_retries=5,
             retry_base_wait=5,
         )
+
+    async def test_connection(
+        self, purpose: Literal["embedding", "rerank"]
+    ) -> RagConnectionTestResult:
+        """用固定测试文本独立调用对应模型，不需要索引或启用开关。"""
+        if not self.config.get_storage_key(KEYS[purpose]):
+            raise ValidationError("请先保存该模型的 API Key")
+        try:
+            async with asyncio.timeout(20):
+                if purpose == "embedding":
+                    import numpy as np
+                    from simple_rag.embedding_api import TextPart
+
+                    async with self.embedding_factory() as client:
+                        result = await client.embed(
+                            [TextPart(text="LifePrism 连接测试")], dimensions=DIMENSIONS
+                        )
+                    vector = np.asarray(result.dense)
+                    if vector.shape != (DIMENSIONS,) or not np.isfinite(vector).all():
+                        raise ValueError("嵌入响应必须是 2048 维有限数值向量")
+                else:
+                    from simple_rag.rerank_api import RerankDocument
+
+                    documents = [RerankDocument(chunk_id="probe", text="LifePrism 连接测试")]
+                    async with self.rerank_factory() as client:
+                        hits = await client.rerank("连接测试", documents, top_n=1)
+                    if not hits or any(hit.chunk_id != "probe" for hit in hits):
+                        raise ValueError("rerank 响应为空或包含未知文档")
+        except Exception as exc:
+            # LEGITIMATE: 连接探针边界，显式返回失败结果而非吞掉后冒充成功。
+            model = EMBEDDING_MODEL if purpose == "embedding" else RERANK_MODEL
+            exc.add_note(f"RAG stage=connection_test purpose={purpose} model={model}")
+            log_rag_failure(logger, f"RAG {purpose} 连接测试失败", exc, self.config)
+            return RagConnectionTestResult(success=False, message=failure_summary(exc, self.config))
+        return RagConnectionTestResult(success=True, message="连接成功，模型响应校验通过")
 
     def _reranker(self):
         """只支持已验证的阿里云原生 rerank 契约。"""
@@ -161,7 +206,9 @@ class RagService:
         if not key:
             raise ValueError("rerank API Key 未配置")
         return AliyunReranker(
-            AliyunRerankAPIConfig(api_base=RERANK_BASE_URL, api_key=key, model=RERANK_MODEL)
+            AliyunRerankAPIConfig(
+                api_base=read_settings(self.config).rerank.base_url, api_key=key, model=RERANK_MODEL
+            )
         )
 
     def index_path(self, version: str) -> Path:

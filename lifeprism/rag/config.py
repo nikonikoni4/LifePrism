@@ -2,6 +2,7 @@
 
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -51,14 +52,23 @@ def validate_directories(values: list[str]) -> list[str]:
 
 
 class RagSettingsPatch(BaseModel):
-    """可编辑配置；模型、地址和凭据不接受此接口更新。"""
+    """可编辑开关、目录和地址；模型 ID 固定，凭据另行保存。"""
 
     model_config = ConfigDict(extra="forbid")
     enabled: bool | None = None
     rerank_enabled: bool | None = None
     index_directories: list[str] | None = None
+    embedding_base_url: str | None = None
+    rerank_base_url: str | None = None
 
-    @field_validator("enabled", "rerank_enabled", "index_directories", mode="before")
+    @field_validator(
+        "enabled",
+        "rerank_enabled",
+        "index_directories",
+        "embedding_base_url",
+        "rerank_base_url",
+        mode="before",
+    )
     @classmethod
     def reject_null(cls, value: Any) -> Any:
         """省略表示保留配置，显式 null 不允许清空必需设置。"""
@@ -71,6 +81,24 @@ class RagSettingsPatch(BaseModel):
     def check_directories(cls, value: list[str] | None) -> list[str] | None:
         """校验显式提供的目录列表。"""
         return validate_directories(value) if value is not None else None
+
+    @field_validator("embedding_base_url", "rerank_base_url")
+    @classmethod
+    def check_url(cls, value: str) -> str:
+        """只接受无内嵌凭据和查询参数的 HTTP(S) 接口地址。"""
+        value = value.strip()
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or any(char.isspace() for char in value)
+        ):
+            raise ValueError("Base URL 必须是有效的 HTTP(S) 地址，不包含凭据、查询参数或片段")
+        return value
 
 
 class ModelInfo(BaseModel):
@@ -99,12 +127,12 @@ def read_settings(source: SettingsSource) -> RagSettings:
         index_directories=source.get("rag.index_directories", ["user", "diary"]),
         embedding=ModelInfo(
             model=EMBEDDING_MODEL,
-            base_url=EMBEDDING_BASE_URL,
+            base_url=source.get("rag.embedding_base_url", EMBEDDING_BASE_URL),
             configured=bool(source.get_storage_key(KEYS["embedding"])),
         ),
         rerank=ModelInfo(
             model=RERANK_MODEL,
-            base_url=RERANK_BASE_URL,
+            base_url=source.get("rag.rerank_base_url", RERANK_BASE_URL),
             configured=bool(source.get_storage_key(KEYS["rerank"])),
         ),
     )

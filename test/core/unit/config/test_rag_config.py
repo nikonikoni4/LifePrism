@@ -8,7 +8,10 @@ from pydantic import ValidationError
 pytestmark = pytest.mark.core
 
 
-@pytest.mark.parametrize("field", ["enabled", "rerank_enabled", "index_directories"])
+@pytest.mark.parametrize(
+    "field",
+    ["enabled", "rerank_enabled", "index_directories", "embedding_base_url", "rerank_base_url"],
+)
 def test_rag_patch_rejects_explicit_null(field):
     from lifeprism.rag.config import RagSettingsPatch
 

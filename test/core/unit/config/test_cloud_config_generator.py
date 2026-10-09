@@ -141,6 +141,8 @@ def test_rag_cloud_export_includes_independent_keys_and_settings(mock_env):
         "rag.enabled": True,
         "rag.rerank_enabled": True,
         "rag.index_directories": ["user", "diary"],
+        "rag.embedding_base_url": "https://embed.example/v3",
+        "rag.rerank_base_url": "https://rerank.example/endpoint",
     }
     mock_env["settings"].get.side_effect = lambda key, default=None: rag_values.get(
         key, original_get(key, default)
@@ -155,6 +157,8 @@ def test_rag_cloud_export_includes_independent_keys_and_settings(mock_env):
         "enabled": True,
         "rerank_enabled": True,
         "index_directories": ["user", "diary"],
+        "embedding_base_url": "https://embed.example/v3",
+        "rerank_base_url": "https://rerank.example/endpoint",
     }
     assert data["storage"]["rag_embedding_api_key"] == "synthetic-embedding"
     assert data["storage"]["rag_rerank_api_key"] == "synthetic-rerank"

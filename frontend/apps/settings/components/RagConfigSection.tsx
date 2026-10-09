@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Database, Loader2, RefreshCw } from 'lucide-react';
-import { RagAPI, RagIndexStatus, RagSettings, RagSettingsPatch } from '../ragApi';
+import {
+  RagAPI,
+  RagConnectionTestResult,
+  RagIndexStatus,
+  RagSettings,
+  RagSettingsPatch,
+} from '../ragApi';
 import { getUserTimezone, parseISOString } from '../../../core/utils/dateUtils';
 
 const inputStyle =
@@ -12,6 +18,11 @@ export const RagConfigSection: React.FC = () => {
   const [settings, setSettings] = useState<RagSettings | null>(null);
   const [directories, setDirectories] = useState('user\ndiary');
   const [keys, setKeys] = useState({ embedding: '', rerank: '' });
+  const [urls, setUrls] = useState({ embedding: '', rerank: '' });
+  const [testing, setTesting] = useState<'embedding' | 'rerank' | null>(null);
+  const [testResults, setTestResults] = useState<
+    Partial<Record<'embedding' | 'rerank', RagConnectionTestResult>>
+  >({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -26,6 +37,7 @@ export const RagConfigSection: React.FC = () => {
         if (active) {
           setSettings(value);
           setDirectories(value.index_directories.join('\n'));
+          setUrls({ embedding: value.embedding.base_url, rerank: value.rerank.base_url });
         }
       })
       .catch((reason) => {
@@ -97,6 +109,27 @@ export const RagConfigSection: React.FC = () => {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '密钥保存失败');
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testConnection(purpose: 'embedding' | 'rerank') {
+    setBusy(true);
+    setTesting(purpose);
+    setTestResults((value) => ({ ...value, [purpose]: undefined }));
+    try {
+      const result = await RagAPI.testConnection(purpose);
+      setTestResults((value) => ({ ...value, [purpose]: result }));
+    } catch (reason) {
+      setTestResults((value) => ({
+        ...value,
+        [purpose]: {
+          success: false,
+          message: reason instanceof Error ? reason.message : '连接测试失败',
+        },
+      }));
+    } finally {
+      setTesting(null);
       setBusy(false);
     }
   }
@@ -254,14 +287,37 @@ export const RagConfigSection: React.FC = () => {
                   />
                 </label>
                 <label className="block text-xs text-slate-500">
-                  Base URL（固定）
+                  Base URL
                   <input
                     aria-label={`${label}地址`}
-                    readOnly
-                    value={info.base_url}
-                    className={`${inputStyle} mt-1 bg-slate-100`}
+                    disabled={busy}
+                    value={urls[purpose]}
+                    onChange={(event) => {
+                      setUrls((value) => ({ ...value, [purpose]: event.target.value }));
+                      setTestResults((value) => ({ ...value, [purpose]: undefined }));
+                    }}
+                    className={`${inputStyle} mt-1`}
                   />
                 </label>
+                <button
+                  type="button"
+                  className={buttonStyle}
+                  disabled={busy || !urls[purpose].trim() || urls[purpose] === info.base_url}
+                  onClick={() =>
+                    void update(
+                      purpose === 'embedding'
+                        ? { embedding_base_url: urls[purpose].trim() }
+                        : { rerank_base_url: urls[purpose].trim() }
+                    )
+                  }
+                >
+                  保存{label}地址
+                </button>
+                <p className="text-xs text-slate-500">
+                  {purpose === 'embedding'
+                    ? '填写 API 基础地址，客户端会追加 /embeddings/multimodal。'
+                    : '填写完整 rerank 请求端点，客户端直接向该地址发送请求。'}
+                </p>
                 <label className="block text-xs text-slate-500">
                   API Key
                   <input
@@ -281,6 +337,19 @@ export const RagConfigSection: React.FC = () => {
                   <button
                     type="button"
                     className={buttonStyle}
+                    disabled={
+                      busy ||
+                      !info.configured ||
+                      urls[purpose].trim() !== info.base_url ||
+                      !!keys[purpose].trim()
+                    }
+                    onClick={() => void testConnection(purpose)}
+                  >
+                    {testing === purpose ? '测试中…' : `测试${label}连接`}
+                  </button>
+                  <button
+                    type="button"
+                    className={buttonStyle}
                     disabled={busy || !keys[purpose].trim()}
                     onClick={() => void saveKey(purpose)}
                   >
@@ -297,6 +366,18 @@ export const RagConfigSection: React.FC = () => {
                     </button>
                   )}
                 </div>
+                <p className="text-xs text-slate-500">
+                  测试使用已保存的地址和密钥，仅发送固定测试文本；无需开启功能或构建索引，会产生少量
+                  API 费用。
+                </p>
+                {testResults[purpose] && (
+                  <p
+                    role={testResults[purpose]?.success ? 'status' : 'alert'}
+                    className={`text-sm ${testResults[purpose]?.success ? 'text-emerald-700' : 'text-red-600'}`}
+                  >
+                    {testResults[purpose]?.message}
+                  </p>
+                )}
               </div>
             );
           })}
